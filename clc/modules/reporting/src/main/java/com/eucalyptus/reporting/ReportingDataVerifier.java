@@ -45,7 +45,7 @@ import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.entities.ObjectInfo;
-import com.eucalyptus.objectstorage.util.WalrusProperties;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.reporting.domain.ReportingAccountCrud;
 import com.eucalyptus.reporting.domain.ReportingUserCrud;
 import com.eucalyptus.reporting.event_store.ReportingElasticIpAttachEvent;
@@ -369,7 +369,7 @@ public final class ReportingDataVerifier {
       final ObjectInfo objectInfo = new ObjectInfo();
       objectInfo.setBucketName( key.bucketName );
       objectInfo.setObjectKey( key.objectKey );
-      objectInfo.setVersionId( key.objectVersion==null ? WalrusProperties.NULL_VERSION_ID : key.objectVersion );
+      objectInfo.setVersionId( key.objectVersion==null ? ObjectStorageProperties.NULL_VERSION_ID : key.objectVersion );
       final List<ObjectInfo> infos = Transactions.findAll( objectInfo );
       if ( infos.isEmpty() ) {
         return null;

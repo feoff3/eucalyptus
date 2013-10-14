@@ -92,6 +92,9 @@ import com.eucalyptus.blockstorage.entities.StorageInfo;
 import com.eucalyptus.blockstorage.entities.VolumeExportRecord;
 import com.eucalyptus.blockstorage.entities.VolumeInfo;
 import com.eucalyptus.blockstorage.entities.VolumeToken;
+import com.eucalyptus.blockstorage.exceptions.AccessDeniedException;
+import com.eucalyptus.blockstorage.exceptions.SnapshotNotFoundException;
+import com.eucalyptus.blockstorage.exceptions.SnapshotTooLargeException;
 import com.eucalyptus.blockstorage.msgs.AttachStorageVolumeResponseType;
 import com.eucalyptus.blockstorage.msgs.AttachStorageVolumeType;
 import com.eucalyptus.blockstorage.msgs.CloneVolumeResponseType;
@@ -136,12 +139,9 @@ import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
+import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.event.ListenerRegistry;
-import com.eucalyptus.objectstorage.entities.WalrusInfo;
-import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
-import com.eucalyptus.objectstorage.exceptions.EntityTooLargeException;
-import com.eucalyptus.objectstorage.exceptions.NoSuchEntityException;
 import com.eucalyptus.reporting.event.SnapShotEvent;
 import com.eucalyptus.storage.common.CheckerTask;
 import com.eucalyptus.util.EucalyptusCloudException;
@@ -276,7 +276,7 @@ public class BlockStorageController {
 		UpdateStorageConfigurationResponseType reply = (UpdateStorageConfigurationResponseType) request.getReply();
 		if(ComponentIds.lookup(Eucalyptus.class).name( ).equals(request.getEffectiveUserId()))
 			throw new AccessDeniedException("Only admin can change walrus properties.");
-		//test connection to Walrus
+		//test connection to ObjectStorage
 		StorageProperties.updateWalrusUrl();
 		try {
 			blockManager.checkPreconditions();
@@ -639,7 +639,7 @@ public class BlockStorageController {
 			for (SnapshotInfo snap : snapshots) {
 					totalSnapshotSize += (snap.getSizeGb() != null && idSet.add(snap.getSnapshotId()) ? snap.getSizeGb() : 0);					
 			}
-			int sizeLimitGB = WalrusInfo.getWalrusInfo().getStorageMaxTotalSnapshotSizeInGb();
+			int sizeLimitGB = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxTotalSnapshotSizeInGb();
 			LOG.debug("Snapshot " + snapshotId + " checking snapshot total size of  " + totalSnapshotSize + " against limit of " + sizeLimitGB);
 			return (totalSnapshotSize + volSize) > sizeLimitGB; 
 		} catch(final Throwable e) {
@@ -657,7 +657,7 @@ public class BlockStorageController {
 
 		StorageProperties.updateWalrusUrl();
 		if(!StorageProperties.enableSnapshots) {
-			LOG.error("Snapshots have been disabled. Please check connection to Walrus.");
+			LOG.error("Snapshots have been disabled. Please check connection to ObjectStorage.");
 			return reply;
 		}
 
@@ -694,8 +694,9 @@ public class BlockStorageController {
 			} else {
 				//create snapshot
 				if(StorageProperties.shouldEnforceUsageLimits && totalSnapshotSizeLimitExceeded(snapshotId, sourceVolumeInfo.getSize())) {
-					LOG.info("Snapshot " + snapshotId + " exceeds total snapshot size limit of " + WalrusInfo.getWalrusInfo().getStorageMaxTotalSnapshotSizeInGb());
-					throw new EntityTooLargeException(snapshotId);
+					int maxSize = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxTotalSnapshotSizeInGb();
+					LOG.info("Snapshot " + snapshotId + " exceeds total snapshot size limit of " + maxSize + "GB"); 
+					throw new SnapshotTooLargeException(snapshotId, maxSize);
 				}
 
 				SnapshotInfo snapshotInfo = new SnapshotInfo(snapshotId);
@@ -829,7 +830,7 @@ public class BlockStorageController {
 
 		StorageProperties.updateWalrusUrl();
 		if(!StorageProperties.enableSnapshots) {
-			LOG.error("Snapshots have been disabled. Please check connection to Walrus.");
+			LOG.error("Snapshots have been disabled. Please check connection to ObjectStorage.");
 			return reply;
 		}
 
@@ -962,7 +963,7 @@ public class BlockStorageController {
 			List<SnapshotInfo> snapInfos = dbSnap.query(snapInfo);
 			if(snapInfos.size() == 0) {
 				db.rollback();
-				throw new NoSuchEntityException("Snapshot " + snapshotId + " does not exist or is unavailable");
+				throw new SnapshotNotFoundException("Snapshot " + snapshotId + " does not exist or is unavailable");
 			}
 			volumeInfo.setSnapshotId(snapshotId);
 			reply.setSnapshotId(snapshotId);
@@ -989,8 +990,8 @@ public class BlockStorageController {
 	/* Make sure snapDestination is NOT a bare block device */
 	private String getSnapshot(String snapshotId) throws EucalyptusCloudException {
 		if(!StorageProperties.enableSnapshots) {
-			LOG.error("Snapshot functionality disabled. Please check connection to Walrus");
-			throw new EucalyptusCloudException("could not connect to Walrus.");
+			LOG.error("Snapshot functionality disabled. Please check connection to ObjectStorage");
+			throw new EucalyptusCloudException("could not connect to ObjectStorage.");
 		}
 		/*if(snapDestination.startsWith("/dev/")) {
 			throw new EucalyptusCloudException("Cannot get snapshot directly to block device: " + snapDestination);
@@ -1023,7 +1024,7 @@ public class BlockStorageController {
 		} catch (Exception ex) {
 			// Cleanup the compressed snapshot
 			cleanupFile(tmpCompressedFile);
-			throw new EucalyptusCloudException("Failed to download snapshot " + snapshotId + " from Walrus", ex);
+			throw new EucalyptusCloudException("Failed to download snapshot " + snapshotId + " from ObjectStorage", ex);
 		}
 
 		// Uncompress the snapshot and move it to the right location
@@ -1045,7 +1046,7 @@ public class BlockStorageController {
 
 		return tmpUncompressedFileName;
 
-		// LOG.info("Downloading snapshot " + snapshotId + " from Walrus to " + snapDestination);
+		// LOG.info("Downloading snapshot " + snapshotId + " from ObjectStorage to " + snapDestination);
 		// String snapshotLocation = "snapshots" + "/" + snapshotId;
 		// String absoluteSnapshotPath = snapDestination;
 		// File file = new File(absoluteSnapshotPath);
@@ -1093,8 +1094,8 @@ public class BlockStorageController {
 	private int getSnapshotSize(String snapshotId) throws EucalyptusCloudException {
 		StorageProperties.updateWalrusUrl();
 		if(!StorageProperties.enableSnapshots) {
-			LOG.error("Snapshot functionality disabled. Please check connection to Walrus");
-			throw new EucalyptusCloudException("could not connect to Walrus.");
+			LOG.error("Snapshot functionality disabled. Please check connection to ObjectStorage");
+			throw new EucalyptusCloudException("could not connect to ObjectStorage.");
 		}
 		String snapshotLocation = "snapshots" + "/" + snapshotId;
 		HttpReader snapshotGetter = new HttpReader(snapshotLocation, null, null, "GetWalrusSnapshotSize", "");
@@ -1542,13 +1543,13 @@ public class BlockStorageController {
 
 								// This SC definitely does not have a record of the snapshot in its DB. Check for the snpahsot on the storage backend.
 								// Clusters/zones/partitions may be connected to the same storage backend in which case snapshot does not have to be downloaded
-								// from Walrus.
+								// from ObjectStorage.
 
 								int walrusSnapSize = getSnapshotSize(snapshotId);
 
 								if (!blockManager.getFromBackend(snapshotId, walrusSnapSize)) {
 
-									// Snapshot does not exist on the backend. Needs to be downloaded from Walrus.
+									// Snapshot does not exist on the backend. Needs to be downloaded from ObjectStorage.
 
 									/* START: Snapshot preparation on storage back end */
 
@@ -1621,7 +1622,7 @@ public class BlockStorageController {
 												// try {
 												// getSnapshot(snapshotId, snapDestination, sizeExpected);
 												// } catch (EucalyptusCloudException e) {
-												// LOG.error("Failed to get snapshot " + snapshotId + " from Walrus. Now cleaning up.");
+												// LOG.error("Failed to get snapshot " + snapshotId + " from ObjectStorage. Now cleaning up.");
 												// cleanFailedSnapshotDownload(snapshotId);
 												// throw e;
 												// }

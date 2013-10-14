@@ -95,7 +95,7 @@ import com.eucalyptus.crypto.Certs;
 import com.eucalyptus.crypto.Crypto;
 import com.eucalyptus.crypto.util.PEMFiles;
 import com.eucalyptus.loadbalancing.LoadBalancing;
-import com.eucalyptus.objectstorage.Walrus;
+import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.util.Internets;
 import com.eucalyptus.ws.StackConfiguration;
 import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
@@ -237,8 +237,8 @@ public class X509Download extends HttpServlet {
                                                                 Eucalyptus.INSTANCE.getPort( ) );
         sb.append( "\nexport EC2_URL=" + ServiceUris.remotePublicify( localConfig ) );
       }
-      if ( Topology.isEnabled( Walrus.class ) ) {
-        ServiceConfiguration walrusConfig = Topology.lookup( Walrus.class );
+      if ( Topology.isEnabled( ObjectStorage.class ) ) {
+        ServiceConfiguration walrusConfig = Topology.lookup( ObjectStorage.class );
         try {
           String uri = ServiceUris.remotePublicify( walrusConfig ).toASCIIString( );
           LOG.debug( "Found walrus uri/configuration: uri=" + uri + " config=" + walrusConfig );

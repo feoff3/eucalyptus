@@ -71,7 +71,7 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 import com.eucalyptus.entities.AbstractPersistent;
 
 @Entity
-@PersistenceContext(name="eucalyptus_walrus")
+@PersistenceContext(name="eucalyptus_osg")
 @Table( name = "MetaData" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
 public class MetaDataInfo extends AbstractPersistent {

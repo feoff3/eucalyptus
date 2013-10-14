@@ -275,7 +275,7 @@ public class Contexts {
         clear( ctx );
       }
     } catch ( Exception ex ) {
-      LOG.error( ex );
+      LOG.error( ex, ex );
       Logs.extreme( ).error( cause, cause );
     }
   }

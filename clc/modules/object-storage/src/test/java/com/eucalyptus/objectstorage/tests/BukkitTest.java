@@ -65,9 +65,10 @@ package com.eucalyptus.objectstorage.tests;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+
 import com.eucalyptus.auth.util.Hashes;
-import com.eucalyptus.objectstorage.WalrusControl;
-import com.eucalyptus.objectstorage.msgs.AccessControlListType;
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
+import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketType;
 import com.eucalyptus.objectstorage.msgs.DeleteBucketResponseType;
@@ -80,7 +81,7 @@ import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsType;
 @Ignore("Manual development test")
 public class BukkitTest {
 
-	static WalrusControl bukkit;
+	static ObjectStorageGateway bukkit;
 
 	@Test
 	public void testWalrusControl() throws Exception {
@@ -93,7 +94,7 @@ public class BukkitTest {
 		createBucketRequest.setBucket(bucketName);
 		createBucketRequest.setUserId(userId);
         createBucketRequest.setEffectiveUserId("eucalyptus");
-		AccessControlListType acl = new AccessControlListType();
+		AccessControlList acl = new AccessControlList();
 		createBucketRequest.setAccessControlList(acl);
 		CreateBucketResponseType reply = bukkit.CreateBucket(createBucketRequest);
 		System.out.println(reply);
@@ -119,6 +120,6 @@ public class BukkitTest {
 
     @BeforeClass
     public static void setUp() {
-        bukkit = new WalrusControl();
+        bukkit = new ObjectStorageGateway();
     }
 }

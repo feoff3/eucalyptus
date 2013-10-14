@@ -766,6 +766,20 @@ class EucaConf(object):
 
             self._sync_keys_if_necessary(['euca.p12'])
 
+    def do_register_walrus(self):
+        if hasattr(self.options, 'register_walrus'):
+            self._do_register('eucadmin.registerwalrus',
+                              'RegisterWalrus', 'walrus_port')
+            self._sync_keys_if_necessary(['euca.p12'])
+
+    def do_register_objectstoragegateway(self):
+        if hasattr(self.options, 'register_objectstoragegateway'):
+            self._do_register('eucadmin.registerobjectstoragegateway',
+                              'RegisterObjectStorageGateway', 'objectstoragegateway_port')
+            self._sync_keys_if_necessary(['euca.p12'])
+
+    #Deregistration routines below
+
     def _do_deregister(self, option_name, module_name, class_name):
         if hasattr(self.options, option_name):
             cls = boto.utils.find_class(module_name, class_name)
@@ -815,6 +829,10 @@ class EucaConf(object):
         if hasattr(self.options, 'deregister_vmwarebroker'):
             self.config.update(ConfigBrokerDereg)
 
+    def do_deregister_objectstoragegatway(self):
+        self._do_deregister('deregister_objectstoragegateway',
+                            'eucadmin.deregisterobjectstoragegateway',
+                            'DeregisterObjectStorageGateway')
 
     def _sync_node(self, node):
         keys = ['node-cert.pem', 'cluster-cert.pem', 'cloud-cert.pem',

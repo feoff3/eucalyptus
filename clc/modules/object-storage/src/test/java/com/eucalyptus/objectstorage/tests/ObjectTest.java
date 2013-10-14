@@ -62,14 +62,15 @@
 
 package com.eucalyptus.objectstorage.tests;
 
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
+
 import java.util.ArrayList;
 
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+
 import com.eucalyptus.auth.util.Hashes;
-import com.eucalyptus.objectstorage.WalrusControl;
-import com.eucalyptus.objectstorage.msgs.AccessControlListType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketType;
 import com.eucalyptus.objectstorage.msgs.DeleteBucketResponseType;
@@ -82,14 +83,15 @@ import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectType;
 import com.eucalyptus.objectstorage.msgs.ListBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ListBucketType;
-import com.eucalyptus.objectstorage.msgs.MetaDataEntry;
+import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
 
 @Ignore("Manual development test")
 public class ObjectTest {
 
-	static WalrusControl bukkit;
+	static ObjectStorageGateway bukkit;
 
 	@Test
 	public void testObject() throws Exception {
@@ -102,7 +104,7 @@ public class ObjectTest {
 		createBucketRequest.setBucket(bucketName);
 		createBucketRequest.setUserId(userId);
         createBucketRequest.setEffectiveUserId("eucalyptus");
-		AccessControlListType acl = new AccessControlListType();
+		AccessControlList acl = new AccessControlList();
 		createBucketRequest.setAccessControlList(acl);
 		CreateBucketResponseType reply = bukkit.CreateBucket(createBucketRequest);
 		System.out.println(reply);
@@ -162,6 +164,6 @@ public class ObjectTest {
 
     @BeforeClass
     public static void setUp() {
-        bukkit = new WalrusControl();
+        bukkit = new ObjectStorageGateway();
    }        
 }

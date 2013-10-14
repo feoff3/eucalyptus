@@ -102,7 +102,7 @@ import com.eucalyptus.configurable.PropertyDirectory;
 import com.eucalyptus.crypto.Ciphers;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
-import com.eucalyptus.objectstorage.util.WalrusProperties;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.common.CheckerTask;
 import com.eucalyptus.system.BaseDirectory;
 import com.eucalyptus.util.EucalyptusCloudException;
@@ -246,7 +246,7 @@ public class DASManager implements LogicalStorageManager {
 	}
 
 	public String createAbsoluteEmptyFile(String fileName, long size) throws EucalyptusCloudException {
-		size = size / WalrusProperties.M;
+		size = size / ObjectStorageProperties.M;
 		return createFile(fileName, size);
 	}
 
@@ -674,7 +674,7 @@ public class DASManager implements LogicalStorageManager {
 				volumeManager = new VolumeEntityWrapperManager();
 				volumeManager.add(snapshotInfo);
 				returnValues.add(snapRawFileName);
-				returnValues.add(String.valueOf(size * WalrusProperties.G));
+				returnValues.add(String.valueOf(size * ObjectStorageProperties.G));
 				// } catch(EucalyptusCloudException ex) {
 			} catch(Exception ex) {
 				if(volumeManager != null)

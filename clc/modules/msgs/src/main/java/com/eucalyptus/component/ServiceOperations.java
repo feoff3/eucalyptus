@@ -89,6 +89,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Maps;
+
+import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 
 public class ServiceOperations {
@@ -135,6 +137,53 @@ public class ServiceOperations {
       return 0.3d;
     }
     
+  }
+  
+  /**
+   * Dispatches chunks to the proper chunk handler in the service operation map.
+   * There is no output/response for chunk delivery.
+   * @param request
+   */
+  @SuppressWarnings( "unchecked" )
+  public static <I extends BaseDataChunk> void dispatchChunk( final I request ) {
+	  if ( !serviceOperations.containsKey( request.getClass( ) ) || !StackConfiguration.OOB_INTERNAL_OPERATIONS ) {
+		  try {
+			  ServiceContext.dispatch( RequestQueue.ENDPOINT, request );
+		  } catch ( Exception ex ) {
+			  Contexts.responseError( request.getCorrelationId( ), ex );
+		  }
+	  } else {
+		  try {
+			  final Context ctx = Contexts.lookup( request.getCorrelationId( ) );
+			  //Generic object here, since no response expected
+			  final Function<I, Object> op = ( Function<I, Object> ) serviceOperations.get( request.getClass( ) );
+			  Timers.loggingWrapper( new Callable( ) {
+				  
+				  @Override
+				  public Object call( ) throws Exception {
+					  Contexts.threadLocal( ctx );
+					  try {
+						  op.apply( request );
+					  } catch ( final Exception ex ) {
+						  Logs.extreme( ).error( ex, ex );
+					      Contexts.responseError( request.getCorrelationId( ), ex );
+					  } finally {
+						  Contexts.removeThreadLocal( );
+					  }
+					  return null;
+				  }
+				  
+				  @Override
+				  public String toString( ) {
+					  return super.toString( );
+				  }
+				  
+			  } ).call( );
+		  } catch ( final Exception ex ) {
+			  Logs.extreme( ).error( ex, ex );
+		        Contexts.responseError( request.getCorrelationId( ), ex );
+		  }
+	  }
   }
   
   @SuppressWarnings( "unchecked" )

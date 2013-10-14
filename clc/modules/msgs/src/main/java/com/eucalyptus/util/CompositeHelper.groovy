@@ -69,6 +69,7 @@ public class CompositeHelper<T> {
   private Class<T> destType;
   List<Class> sourceTypes;
   def vars = [:]
+  
   public CompositeHelper( Class<T> destType, List<Class> sources ) {
     this.destType = destType;
     this.sourceTypes = sources;
@@ -76,7 +77,8 @@ public class CompositeHelper<T> {
       vars[it.name]=it
     }
     def check=vars.clone()
-    sources.each{ src -> 
+    
+	sources.each{ src -> 
       src.metaClass.properties.findAll{ it.name!="metaClass"&&it.name!="class" }.each {  f ->
         check.remove(f.name)
       }
@@ -129,5 +131,4 @@ public class CompositeHelper<T> {
     }
     return dest;
   }
-  
 }

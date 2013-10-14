@@ -78,10 +78,10 @@ import org.xbill.DNS.Type;
 
 import com.eucalyptus.component.Topology;
 import com.eucalyptus.component.id.Eucalyptus;
-import com.eucalyptus.objectstorage.WalrusManager;
-import com.eucalyptus.objectstorage.util.WalrusProperties;
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Internets;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 
 import edu.ucsb.eucalyptus.cloud.entities.SystemConfiguration;
 
@@ -147,11 +147,11 @@ public class ServiceZone extends Zone {
             return super.findRecords( name, type );
 		}
     }  else if (name.toString().matches(".*\\.walrus\\..*")) {
-    	//Walrus
+    	//ObjectStorage
     	String bucket = name.toString().substring(0, name.toString().indexOf(".walrus"));
     	InetAddress ip;
     	try {
-			ip = WalrusManager.getBucketIp(bucket);
+			ip = ObjectStorageGateway.getBucketIp(bucket);
 		} catch (EucalyptusCloudException e1) {
         	LOG.error(e1);
 			return super.findRecords(name, type);
@@ -163,7 +163,7 @@ public class ServiceZone extends Zone {
     	SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);
         InetAddress walrusIp = null;
           try {
-		    walrusIp = WalrusProperties.getWalrusAddress();
+		    walrusIp = ObjectStorageProperties.getWalrusAddress();
           } catch (EucalyptusCloudException e) {
         	LOG.error(e);
         	return super.findRecords( name, type );

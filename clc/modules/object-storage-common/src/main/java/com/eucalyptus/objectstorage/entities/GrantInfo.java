@@ -64,20 +64,23 @@ package com.eucalyptus.objectstorage.entities;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Table;
+
 import org.apache.log4j.Logger;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import com.eucalyptus.entities.AbstractPersistent;
-import com.eucalyptus.objectstorage.msgs.AccessControlListType;
-import com.eucalyptus.objectstorage.msgs.Grant;
-import com.eucalyptus.objectstorage.msgs.Grantee;
+import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.Grant;
+import com.eucalyptus.storage.msgs.s3.Grantee;
 
 @Entity
-@PersistenceContext(name="eucalyptus_walrus")
+@PersistenceContext(name="eucalyptus_osg")
 @Table( name = "Grants" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
 public class GrantInfo extends AbstractPersistent {
@@ -152,7 +155,7 @@ public class GrantInfo extends AbstractPersistent {
 		canRead = canWrite = canReadACP = canWriteACP = true;
 	}
 
-	public static void addGrants(String ownerId, List<GrantInfo>grantInfos, AccessControlListType accessControlList) {
+	public static void addGrants(String ownerId, List<GrantInfo>grantInfos, AccessControlList accessControlList) {
 		ArrayList<Grant> grants = accessControlList.getGrants();
 		if (grants.size() > 0) {
 			for (Grant grant: grants) {
