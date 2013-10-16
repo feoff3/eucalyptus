@@ -25,7 +25,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
-
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpMethod;
@@ -36,6 +35,7 @@ import com.eucalyptus.blockstorage.HttpReader;
 import com.eucalyptus.blockstorage.HttpWriter;
 import com.eucalyptus.blockstorage.util.StorageProperties;
 import com.eucalyptus.http.MappingHttpRequest;
+import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataMessage;
 import com.eucalyptus.objectstorage.pipeline.handlers.ObjectStorageAuthenticationHandler;
 import com.eucalyptus.util.EucalyptusCloudException;
@@ -66,7 +66,7 @@ public class OSGAuthenticationTest {
 		//Try the handler
 		try {			
 			ObjectStorageAuthenticationHandler.EucaAuthentication.authenticate(httpRequest, ObjectStorageAuthenticationHandler.processAuthorizationHeader(httpRequest.getAndRemoveHeader("Authorization")));
-		} catch (AuthenticationException e) {
+		} catch (AccessDeniedException e) {
 			e.printStackTrace();
 			System.out.println("Failed!");
 		}

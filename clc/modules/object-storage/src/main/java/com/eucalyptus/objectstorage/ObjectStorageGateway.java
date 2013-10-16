@@ -67,6 +67,8 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
+import javax.persistence.EntityTransaction;
+
 import org.apache.log4j.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -85,11 +87,15 @@ import com.eucalyptus.configurable.PropertyDirectory;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
+import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
+import com.eucalyptus.entities.TransactionException;
+import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.BucketInfo;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
+import com.eucalyptus.objectstorage.exceptions.NoSuchEntityException;
 import com.eucalyptus.objectstorage.exceptions.NotImplementedException;
 import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.AddObjectType;
@@ -209,7 +215,7 @@ public class ObjectStorageGateway {
 				ospClient.start();
 			}
 		} catch(EucalyptusCloudException ex) {
-			LOG.error("Error starting storage backend: " + ex);			
+			LOG.error("Error starting storage backend: " + ex);
 		}		
 	}
 
@@ -414,23 +420,78 @@ public class ObjectStorageGateway {
 		return true;
 	}
 
+	/**
+	 * A terse request logging function to log request entry at INFO level.
+	 * @param request
+	 */
+	private <I extends ObjectStorageRequestType>void logRequest(I request) {
+		StringBuilder canonicalLogEntry = new StringBuilder("osg handling request:" );
+		try {			
+			String accnt = null;
+			String src = null;
+			try {
+				Context ctx = Contexts.lookup(request.getCorrelationId());
+				accnt = ctx.getAccount().getAccountNumber();
+				src = ctx.getRemoteAddress().getHostAddress();
+			} catch(Exception e) {
+				LOG.warn("Failed context lookup by correlation Id: " + request.getCorrelationId());
+			} finally {
+				if(Strings.isNullOrEmpty(accnt)) {
+					accnt = "unknown";
+				}
+				if(Strings.isNullOrEmpty(src)) {
+					src = "unknown";
+				}
+			}
+
+			canonicalLogEntry.append(" Operation: " + request.getClass().getSimpleName());
+			canonicalLogEntry.append(" Account: " + accnt);
+			canonicalLogEntry.append(" Src Ip: " + src);		
+			canonicalLogEntry.append(" Bucket: " + request.getBucket());
+			canonicalLogEntry.append(" Object: " + request.getKey());
+			if(request instanceof GetObjectType) {
+				canonicalLogEntry.append(" VersionId: " + ((GetObjectType)request).getVersionId());
+			} else if(request instanceof PutObjectType) {
+				canonicalLogEntry.append(" ContentMD5: " + ((PutObjectType)request).getContentMD5());
+			}		
+			LOG.info(canonicalLogEntry.toString());
+		} catch(Exception e) {
+			LOG.warn("Problem formatting request log entry. Incomplete entry: " + canonicalLogEntry == null ? "null" : canonicalLogEntry.toString(), e);
+		}		
+	}
+	
 	public HeadBucketResponseType HeadBucket(HeadBucketType request) throws EucalyptusCloudException {
-		LOG.info("Handling HeadBucket request");
-		return ospClient.headBucket(request);
+		logRequest(request);
+		
+		BucketInfo bucket = null;
+		try {
+			bucket = Transactions.find(new BucketInfo(request.getBucket()));
+		} catch (TransactionException e) {
+			LOG.warn("Error finding bucket record: " + request.getBucket());
+		}
+		if(bucket == null) {
+			throw new NoSuchEntityException(request.getBucket());				
+		}
+		
+		if(operationAllowed(request, request.getBucket(), bucket.getOwnerId())) {
+			return ospClient.headBucket(request);
+		} else {
+			throw new AccessDeniedException(request.getBucket());			
+		}
 	}
 
 	public CreateBucketResponseType CreateBucket(CreateBucketType request) throws EucalyptusCloudException {
-		LOG.info("Handling CreateBucket request");		
+		logRequest(request);
 		return ospClient.createBucket(request);
 	}
 
 	public DeleteBucketResponseType DeleteBucket(DeleteBucketType request) throws EucalyptusCloudException {
-		LOG.info("Handling DeleteBucket request");
+		logRequest(request);
 		return ospClient.deleteBucket(request);
 	}
 
 	public ListAllMyBucketsResponseType ListAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {
-		LOG.info("Handling ListAllBuckets request");
+		logRequest(request);
 		Context ctx = Contexts.lookup();
 		Account account = ctx.getAccount();
 		if (account == null) {
@@ -442,55 +503,62 @@ public class ObjectStorageGateway {
 
 	public GetBucketAccessControlPolicyResponseType GetBucketAccessControlPolicy(GetBucketAccessControlPolicyType request) throws EucalyptusCloudException
 	{
+		logRequest(request);
 		return ospClient.getBucketAccessControlPolicy(request);
 	}
 
 	public PostObjectResponseType PostObject (PostObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.postObject(request);
 	}
 
 	public PutObjectInlineResponseType PutObjectInline (PutObjectInlineType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.putObjectInline(request);
 	}
 
 	public AddObjectResponseType AddObject (AddObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.addObject(request);
 	}
 
 	public DeleteObjectResponseType DeleteObject (DeleteObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.deleteObject(request);
 	}
 
 	public ListBucketResponseType ListBucket(ListBucketType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.listBucket(request);
 	}
 
-	public GetObjectAccessControlPolicyResponseType GetObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException
-	{
+	public GetObjectAccessControlPolicyResponseType GetObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.getObjectAccessControlPolicy(request);
 	}
 
-	public SetBucketAccessControlPolicyResponseType SetBucketAccessControlPolicy(SetBucketAccessControlPolicyType request) throws EucalyptusCloudException
-	{
+	public SetBucketAccessControlPolicyResponseType SetBucketAccessControlPolicy(SetBucketAccessControlPolicyType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setBucketAccessControlPolicy(request);
 	}
 
-	public SetObjectAccessControlPolicyResponseType SetObjectAccessControlPolicy(SetObjectAccessControlPolicyType request) throws EucalyptusCloudException
-	{
+	public SetObjectAccessControlPolicyResponseType SetObjectAccessControlPolicy(SetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setObjectAccessControlPolicy(request);
 	}
 
-	public SetRESTBucketAccessControlPolicyResponseType SetRESTBucketAccessControlPolicy(SetRESTBucketAccessControlPolicyType request) throws EucalyptusCloudException
-	{
+	public SetRESTBucketAccessControlPolicyResponseType SetRESTBucketAccessControlPolicy(SetRESTBucketAccessControlPolicyType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setRESTBucketAccessControlPolicy(request);
 	}
 
-	public SetRESTObjectAccessControlPolicyResponseType SetRESTObjectAccessControlPolicy(SetRESTObjectAccessControlPolicyType request) throws EucalyptusCloudException
-	{
+	public SetRESTObjectAccessControlPolicyResponseType SetRESTObjectAccessControlPolicy(SetRESTObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setRESTObjectAccessControlPolicy(request);
 	}
 
 	public GetObjectResponseType GetObject(GetObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
 		ospClient.getObject(request);
 		//ObjectGetter getter = new ObjectGetter(request);
 		//Threads.lookup(ObjectStorage.class, ObjectStorageGateway.ObjectGetter.class).limitTo(1).submit(getter);
@@ -513,38 +581,47 @@ public class ObjectStorageGateway {
 
 	}
 	public GetObjectExtendedResponseType GetObjectExtended(GetObjectExtendedType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.getObjectExtended(request);
 	}
 
 	public GetBucketLocationResponseType GetBucketLocation(GetBucketLocationType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.getBucketLocation(request);
 	}
 
 	public CopyObjectResponseType CopyObject(CopyObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.copyObject(request);
 	}
 
 	public GetBucketLoggingStatusResponseType GetBucketLoggingStatus(GetBucketLoggingStatusType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.getBucketLoggingStatus(request);
 	}
 
 	public SetBucketLoggingStatusResponseType SetBucketLoggingStatus(SetBucketLoggingStatusType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setBucketLoggingStatus(request);
 	}
 
 	public GetBucketVersioningStatusResponseType GetBucketVersioningStatus(GetBucketVersioningStatusType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.getBucketVersioningStatus(request);
 	}
 
 	public SetBucketVersioningStatusResponseType SetBucketVersioningStatus(SetBucketVersioningStatusType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.setBucketVersioningStatus(request);
 	}
 
 	public ListVersionsResponseType ListVersions(ListVersionsType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.listVersions(request);
 	}
 
 	public DeleteVersionResponseType DeleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
+		logRequest(request);
 		return ospClient.deleteVersion(request);
 	}
 

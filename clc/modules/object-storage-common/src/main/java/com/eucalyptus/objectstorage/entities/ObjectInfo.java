@@ -123,6 +123,7 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
     @Column(name="global_write_acp")
     private Boolean globalWriteACP;
 
+    //REMOVE THIS! Replace with json string for ACL: max of 100 grants see: http://docs.aws.amazon.com/AmazonS3/latest/dev/ACLOverview.html
     @OneToMany( cascade = CascadeType.ALL )
     @JoinTable(
             name = "object_has_grants",
@@ -144,6 +145,7 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
     @Column(name="storage_class")
     private String storageClass;
 
+    //REMOVE THIS! Replace with JSON-string
     @OneToMany( cascade = CascadeType.ALL )
     @JoinTable(
             name = "object_has_metadata",
@@ -168,6 +170,11 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
 
     @Column(name="is_last")
     private Boolean last;
+    
+    /*
+     * Metadata limitations: 2KB for user metadata, 8KB total header size. See: http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html
+     */
+    //TODO: zhill. Remove grant joins and metadata info. Store all in the object record itself. ACL as json string, Metadata also json
     
     /**
      * Used to denote the object as a snapshot, for special access-control considerations.
@@ -633,4 +640,5 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
 	public void setIsSnapshot(Boolean isSnapshot) {
 		this.isSnapshot = isSnapshot;
 	}
+	
 }
