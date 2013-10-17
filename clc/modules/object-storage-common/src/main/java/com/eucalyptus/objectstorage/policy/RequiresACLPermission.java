@@ -19,6 +19,7 @@ public @interface RequiresACLPermission {
 	/**
 	 * The set of ACL permissions, from {@link ObjectStorageProperties.Permission} that
 	 */
-	ObjectStorageProperties.Permission[] value();
+	ObjectStorageProperties.Permission[] bucket();
+	ObjectStorageProperties.Permission[] object();
 
 }

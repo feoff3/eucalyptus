@@ -1378,7 +1378,7 @@ public class WalrusFSManager extends WalrusManager {
 		reply.setLastModified(putObjectResponse.getLastModified());
 		reply.set_return(putObjectResponse.get_return());
 		reply.setMetaData(putObjectResponse.getMetaData());
-		reply.setErrorCode(putObjectResponse.getErrorCode());
+		reply.setCode(putObjectResponse.getCode());
 		reply.setStatusMessage(putObjectResponse.getStatusMessage());
 		reply.setLogData(putObjectResponse.getLogData());
 

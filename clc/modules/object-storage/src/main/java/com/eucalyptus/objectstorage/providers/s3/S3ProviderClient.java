@@ -23,6 +23,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.Permissions;
 import com.eucalyptus.auth.policy.PolicySpec;
 import com.eucalyptus.auth.principal.Account;
@@ -88,6 +89,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
@@ -104,6 +106,7 @@ import com.eucalyptus.objectstorage.exceptions.BucketAlreadyExistsException;
 import com.eucalyptus.objectstorage.exceptions.BucketAlreadyOwnedByYouException;
 import com.eucalyptus.objectstorage.exceptions.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.NotImplementedException;
+import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
 import com.eucalyptus.objectstorage.exceptions.TooManyBucketsException;
 import com.google.common.base.Strings;
 
@@ -312,7 +315,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
 		try {
 			BucketInfo searchBucket = new BucketInfo();
-			searchBucket.setOwnerId(account.getAccountNumber());
+			searchBucket.setOwnerCanonicalId(account.getCanonicalId());
 			searchBucket.setHidden(false);
 			
 			List<BucketInfo> bucketInfoList = db.queryEscape(searchBucket);
@@ -336,7 +339,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 								PolicySpec.VENDOR_S3,
 								PolicySpec.S3_RESOURCE_BUCKET,
 								bucketInfo.getBucketName(),
-								bucketInfo.getOwnerId())) {
+								account.getAccountNumber())) {
 					
 					buckets.add(new BucketListEntry(bucketInfo.getBucketName(),
 							DateUtils.format(bucketInfo.getCreationDate().getTime(), 
@@ -379,6 +382,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public CreateBucketResponseType createBucket(CreateBucketType request) throws EucalyptusCloudException {
+		//TODO: move all of the DB and Authz logic out of here.
 		CreateBucketResponseType reply = (CreateBucketResponseType) request.getReply();
 		Context ctx = Contexts.lookup();
 		Account account = ctx.getAccount();
@@ -394,93 +398,103 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		if (accessControlList == null) {
 			accessControlList = new AccessControlList();
 		}
+		
+		AccessControlPolicy accessControlPolicy = new AccessControlPolicy();
+		accessControlPolicy.setAccessControlList(accessControlList);
+		accessControlPolicy.setOwner(new CanonicalUser(account.getCanonicalId(),""));
 
 		if (!checkBucketName(bucketName))
 			throw new InvalidBucketNameException(bucketName);
 
 		EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-
-		if (ObjectStorageProperties.shouldEnforceUsageLimits
-				&& !Contexts.lookup().hasAdministrativePrivileges()) {
-			BucketInfo searchBucket = new BucketInfo();
-			searchBucket.setOwnerId(account.getAccountNumber());
-			List<BucketInfo> bucketList = db.queryEscape(searchBucket);
-			if (bucketList.size() >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
-				db.rollback();
-				throw new TooManyBucketsException(bucketName);
-			}
-		}
-
-		BucketInfo bucketInfo = new BucketInfo(bucketName);
-		List<BucketInfo> bucketList = db.queryEscape(bucketInfo);
-
-		if (bucketList.size() > 0) {
-			if (bucketList.get(0).getOwnerId()
-					.equals(account.getAccountNumber())) {
-				// bucket already exists and you created it
-				db.rollback();
-				throw new BucketAlreadyOwnedByYouException(bucketName);
-			}
-			// bucket already exists
-			db.rollback();
-			throw new BucketAlreadyExistsException(bucketName);
-		} else {
-			if (ctx.hasAdministrativePrivileges()
-					|| (Permissions.isAuthorized(PolicySpec.VENDOR_S3,
-							PolicySpec.S3_RESOURCE_BUCKET, "",
-							ctx.getAccount(), PolicySpec.S3_CREATEBUCKET,
-							ctx.getUser()) && Permissions.canAllocate(
-							PolicySpec.VENDOR_S3,
-							PolicySpec.S3_RESOURCE_BUCKET, "",
-							PolicySpec.S3_CREATEBUCKET, ctx.getUser(), 1L))) {
-				// create bucket and set its acl
-				BucketInfo bucket = new BucketInfo(account.getAccountNumber(),
-						ctx.getUser().getUserId(), bucketName, new Date());
-				ArrayList<GrantInfo> grantInfos = new ArrayList<GrantInfo>();
-				bucket.addGrants(account.getAccountNumber(), grantInfos,
-						accessControlList);
-				bucket.setGrants(grantInfos);
-				bucket.setBucketSize(0L);
-				bucket.setLoggingEnabled(false);
-				bucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled
-						.toString());
-				bucket.setHidden(false);
-				if (locationConstraint != null)
-					bucket.setLocation(locationConstraint);
-				else
-					bucket.setLocation("US");
-				// call the storage manager to save the bucket to disk
-				try {
-					db.add(bucket);
-					try {
-						AmazonS3Client s3Client = getS3Client(ctx.getUser(), ctx.getUser().getUserId());
-						s3Client.createBucket(bucketName);
-					} catch(AmazonServiceException ex) {
-						LOG.error("Got service error from backend: " + ex.getMessage(), ex);
-						throw new EucalyptusCloudException(ex);
-					} catch(AmazonClientException ex) {
-						LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
-						throw new EucalyptusCloudException(ex);
-					}					
-					db.commit();					
-				} catch (Exception ex) {
-					LOG.error(ex, ex);
+		try {
+			if (ObjectStorageProperties.shouldEnforceUsageLimits
+					&& !Contexts.lookup().hasAdministrativePrivileges()) {
+				BucketInfo searchBucket = new BucketInfo();
+				searchBucket.setOwnerCanonicalId(account.getCanonicalId());
+				List<BucketInfo> bucketList = db.queryEscape(searchBucket);
+				if (bucketList.size() >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					db.rollback();
-					if (Exceptions.isCausedBy(ex, ConstraintViolationException.class)) {
-						throw new BucketAlreadyExistsException(bucketName);
-					} else {
-						throw new EucalyptusCloudException(
-								"Unable to create bucket: " + bucketName, ex);
-					}
+					throw new TooManyBucketsException(bucketName);
 				}
-			} else {
-				LOG.error("Not authorized to create bucket by " + ctx.getUserFullName());
+			}
+
+			BucketInfo bucketInfo = new BucketInfo(bucketName);
+			List<BucketInfo> bucketList = db.queryEscape(bucketInfo);
+
+			if (bucketList.size() > 0) {
+				if (bucketList.get(0).getOwnerCanonicalId() .equals(account.getCanonicalId())) {
+					// bucket already exists and you created it
+					db.rollback();
+					throw new BucketAlreadyOwnedByYouException(bucketName);
+				}
+				// bucket already exists
 				db.rollback();
-				throw new AccessDeniedException("Bucket", bucketName);
+				throw new BucketAlreadyExistsException(bucketName);
+			} else {
+				if (ctx.hasAdministrativePrivileges()
+						|| (Permissions.isAuthorized(PolicySpec.VENDOR_S3,
+								PolicySpec.S3_RESOURCE_BUCKET, "",
+								ctx.getAccount(), PolicySpec.S3_CREATEBUCKET,
+								ctx.getUser()) && Permissions.canAllocate(
+										PolicySpec.VENDOR_S3,
+										PolicySpec.S3_RESOURCE_BUCKET, "",
+										PolicySpec.S3_CREATEBUCKET, ctx.getUser(), 1L))) {
+					// create bucket and set its acl
+					BucketInfo bucket = new BucketInfo(account.getCanonicalId(),
+							ctx.getUser().getUserId(), bucketName, new Date());
+					try {
+						bucket.setAcl(accessControlPolicy);
+					} catch(Exception e) {
+						LOG.error("Error setting ACL on bucket: " + e.getMessage(), e);
+						throw new ObjectStorageException("Internal error");
+					}
+					bucket.setBucketSize(0L);
+					bucket.setLoggingEnabled(false);
+					bucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
+					bucket.setHidden(false);
+					if (locationConstraint != null)
+						bucket.setLocation(locationConstraint);
+					else
+						bucket.setLocation("US");
+
+					// call the storage manager to save the bucket to disk
+					try {
+						db.add(bucket);
+						try {
+							AmazonS3Client s3Client = getS3Client(ctx.getUser(), ctx.getUser().getUserId());
+							s3Client.createBucket(bucketName);
+						} catch(AmazonServiceException ex) {
+							LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+							throw new EucalyptusCloudException(ex);
+						} catch(AmazonClientException ex) {
+							LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+							throw new EucalyptusCloudException(ex);
+						}					
+						db.commit();					
+					} catch (Exception ex) {
+						LOG.error(ex, ex);
+						db.rollback();
+						if (Exceptions.isCausedBy(ex, ConstraintViolationException.class)) {
+							throw new BucketAlreadyExistsException(bucketName);
+						} else {
+							throw new EucalyptusCloudException(
+									"Unable to create bucket: " + bucketName, ex);
+						}
+					}
+				} else {
+					LOG.error("Not authorized to create bucket by " + ctx.getUserFullName());
+					db.rollback();
+					throw new AccessDeniedException("Bucket", bucketName);
+				}
+			}
+			reply.setBucket(bucketName);
+			return reply;
+		} finally {
+			if(db != null && db.isActive()) {
+				db.rollback();
 			}
 		}
-		reply.setBucket(bucketName);
-		return reply;
 
 	}
 

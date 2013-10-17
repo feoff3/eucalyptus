@@ -64,14 +64,18 @@ package com.eucalyptus.objectstorage.util;
 
 import org.apache.log4j.Logger;
 
+import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.Principals;
 import com.eucalyptus.component.Topology;
 import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.scripting.Groovyness;
 import com.eucalyptus.system.BaseDirectory;
 import com.eucalyptus.util.EucalyptusCloudException;
+import com.google.common.base.Strings;
+import com.google.common.collect.Sets;
 
 import java.net.*;
+import java.util.Set;
 
 public class ObjectStorageProperties {
 	private static Logger LOG = Logger.getLogger(ObjectStorageProperties.class);
@@ -119,10 +123,13 @@ public class ObjectStorageProperties {
 	public static final String STREAMING_HTTP_PUT = "STREAMING_HTTP_PUT";
 	public static final String AMZ_ACL = "x-amz-acl";
 
-	public static final String ALL_USERS_GROUP = "http://acs.amazonaws.com/groups/global/AllUsers";
-	public static final String AUTHENTICATED_USERS_GROUP = "http://acs.amazonaws.com/groups/global/AuthenticatedUsers";
-	public static final String LOGGING_GROUP = "http://acs.amazonaws.com/groups/s3/LogDelivery";
-
+	//TODO: zhill - these should be replaced by references to the actual Accounts lookup. May need to add these as valid groups/accounts
+	public static enum S3_GROUP {
+		ALL_USERS_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/global/AllUsers"; }}, 
+		AUTHENTICATED_USERS_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"; }},
+		LOGGING_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/s3/LogDelivery"; }}
+	}
+	
 	public static final String IGNORE_PREFIX = "x-ignore-";
 	public static final String COPY_SOURCE = "x-amz-copy-source";
 	public static final String METADATA_DIRECTIVE = "x-amz-metadata-directive";
@@ -143,12 +150,11 @@ public class ObjectStorageProperties {
 	public static final String EUCA_MOUNT_WRAPPER = BaseDirectory.LIBEXEC.toString() + "/euca_mountwrap";
 	public static final String EUCA_USER = System.getProperty("euca.user");
 	public static final Integer DEFAULT_INITIAL_CAPACITY = 10; //10 GB initial total capacity.
-
+	
 	//15 minutes
 	public final static long EXPIRATION_LIMIT = 900000;
-
-	static { Groovyness.loadConfig("walrusprops.groovy"); }
-
+	
+	
 	public enum CannedACL {
 		private_only { public String toString() { return "private"; }}, 
 		public_read { public String toString() { return "public-read";}}, 
@@ -260,17 +266,40 @@ public class ObjectStorageProperties {
 	/*
 	 * Simply determines if the userId is a member of the groupId, very simplistic only for ALL_USERS and AUTHENTICATED_USERS, not arbitrary groups.
 	 * Arbitrary groups are not yet supported in ObjectStorage bucket policies/IAM policies.
+	 * userId should be a canonicalId
 	 */
 	public static boolean isUserMember(String userId, String groupId) {
-		if(groupId == null) {
+		if(Strings.isNullOrEmpty(groupId)) {
 			return false;
 		}
 		
-		if(groupId.equals(ObjectStorageProperties.ALL_USERS_GROUP)) {
+		try {
+			ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(groupId);
+			return isUserMember(userId, group);
+		} catch(IllegalArgumentException e) {
+			LOG.warn("Unknown group id requested for membership check: " + groupId);
+			return false;
+		}		
+	}
+	
+	/**
+	 * Just checks the basic S3 groups for membership of the userId.
+	 * Caller must ensure that the userId is a valid ID in the system. That is outside the scope of this method.
+	 * @param userId
+	 * @param group
+	 * @return
+	 */
+	public static boolean isUserMember(String userId, ObjectStorageProperties.S3_GROUP group) {
+		if(group == null) {
+			return false;
+		}
+		
+		if(ObjectStorageProperties.S3_GROUP.ALL_USERS_GROUP.equals(group)) {
 			return true;
 		}
 		
-		if(groupId.equals(ObjectStorageProperties.AUTHENTICATED_USERS_GROUP) && userId != null && !"".equals(userId) && !userId.equals(Principals.nobodyUser().getUserId())) {
+		if(ObjectStorageProperties.S3_GROUP.AUTHENTICATED_USERS_GROUP.equals(group)
+				&& !Strings.isNullOrEmpty(userId) && !userId.equals(Principals.nobodyUser().getUserId())) {
 			return true;
 		}
 		

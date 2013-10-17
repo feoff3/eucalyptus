@@ -67,6 +67,8 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
@@ -94,6 +96,7 @@ import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.BucketInfo;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
+import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
 import com.eucalyptus.objectstorage.exceptions.NoSuchEntityException;
 import com.eucalyptus.objectstorage.exceptions.NotImplementedException;
@@ -153,12 +156,15 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
+import com.eucalyptus.objectstorage.policy.RequiresACLPermission;
 import com.eucalyptus.objectstorage.policy.RequiresPermission;
 import com.eucalyptus.objectstorage.policy.ResourceType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Lookups;
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 
 import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
@@ -356,21 +362,53 @@ public class ObjectStorageGateway {
 	}
 
 	/**
-	 * Evaluates the IAM policy for the operation requested
+	 * Evaluates the authorization for the operation requested, evaluates IAM, ACL, and bucket policy (bucket policy not yet supported).
 	 * @param request
-	 * @param resourceId optional (can be null) explicit resourceId to check. If null, the request is used to get the resource.
+	 * @param optionalResourceId optional (can be null) explicit resourceId to check. If null, the request is used to get the resource.
+	 * @param optionalOwnerId optional (can be null) owner Id for the resource being evaluated.
+	 * @param optionalResourceAcl option acl for the requested resource
 	 * @return
 	 */
-	protected static <T extends ObjectStorageRequestType> boolean operationAllowed(T request, final String optionalResourceId, final String optionalOwnerId) throws IllegalArgumentException {
+	protected static <T extends ObjectStorageRequestType> boolean operationAllowed(@Nonnull T request, @Nullable final S3AccessControlledEntity bucketResourceEntity, @Nullable final S3AccessControlledEntity objectResourceEntity) throws IllegalArgumentException {
 		if(isAdminUser()) {
 			//System admin can do anything
 			return true;
 		}
-
-		String resourceOwnerAccountId = optionalOwnerId;
-		if(Strings.isNullOrEmpty(resourceOwnerAccountId)) {
+		String resourceOwnerAccountId = null;
+		Account userAccount = null;
+		
+		//TODO: do all bucket checks first, then object checks (if required).
+		//Most operations require bucket OR object but not both.
+		//Make determination based on request resource type
+		
+		String resourceType = request.getClass().getAnnotation(ResourceType.class).value();
+		if(resourceType == null) {
+			throw new IllegalArgumentException("No resource type found in request class annotations, cannot process.");
+		} else {
 			try {
-				Account userAccount = null;
+				//Ensure we have the proper resource entities present and get owner info						
+				if(PolicySpec.S3_RESOURCE_BUCKET.equals(resourceType)) {
+					//Get the bucket owner.
+					if(bucketResourceEntity == null) {
+						LOG.error("Could not check access for operation due to no bucket resource entity found");
+						return false;
+					}
+					resourceOwnerAccountId = Accounts.lookupAccountByCanonicalId(bucketResourceEntity.getOwnerCanonicalId()).getAccountNumber();
+				} else if(PolicySpec.S3_RESOURCE_OBJECT.equals(resourceType)) {
+					if(objectResourceEntity == null) {
+						LOG.error("Could not check access for operation due to no object resource entity found");
+						return false;
+					}
+					resourceOwnerAccountId = Accounts.lookupAccountByCanonicalId(objectResourceEntity.getOwnerCanonicalId()).getAccountNumber();
+				}
+			} catch(AuthException e) {
+				LOG.error("Exception caught looking up resource owner. Disallowing operation.",e);
+				return false;
+			}
+		}
+		
+		if(Strings.isNullOrEmpty(resourceOwnerAccountId)) {
+			try {				
 				try {
 					userAccount = Contexts.lookup(request.getCorrelationId()).getAccount();
 				} catch(NoSuchContextException e) {
@@ -392,17 +430,42 @@ public class ObjectStorageGateway {
 			}
 		}
 		
+		ObjectStorageProperties.Permission[] requiredBucketACLPermissions = request.getClass().getAnnotation(RequiresACLPermission.class).bucket();
+		ObjectStorageProperties.Permission[] requiredObjectACLPermissions = request.getClass().getAnnotation(RequiresACLPermission.class).object();
+		if(requiredBucketACLPermissions == null && requiredObjectACLPermissions == null) {
+			throw new IllegalArgumentException("No requires-permission actions found in request class annotations, cannot process.");
+		}
+
+		//Is the user's account allowed?
+		Boolean aclAllow = true;
+		if(bucketResourceEntity != null) {
+			for(ObjectStorageProperties.Permission permission : requiredBucketACLPermissions) {
+				aclAllow = aclAllow && bucketResourceEntity.can(permission, userAccount.getCanonicalId());
+			}
+		} else if(requiredBucketACLPermissions.length > 0 && bucketResourceEntity == null) {
+			//Disallow. Couldn't check permission
+			LOG.error("Could not check bucket ACLs due to null resource entity");
+			aclAllow = false;
+		}
+		
+		if(objectResourceEntity != null) {
+			for(ObjectStorageProperties.Permission permission : requiredObjectACLPermissions) {
+				aclAllow = aclAllow && objectResourceEntity.can(permission, userAccount.getCanonicalId());
+			}
+		} else if(requiredObjectACLPermissions.length > 0 && objectResourceEntity == null) {
+			//Disallow. Could not check perms.
+			LOG.error("Could not check object ACLs due to null resource entity");
+			aclAllow = false;
+		}
+		
+		//TODO: if account doesn't have access, can we stop here?
+		
 		String[] actions = request.getClass().getAnnotation(RequiresPermission.class).value();
 		if(actions == null) {
 			throw new IllegalArgumentException("No requires-permission actions found in request class annotations, cannot process.");
 		}
 
-		String resourceType = request.getClass().getAnnotation(ResourceType.class).value();
-		if(resourceType == null) {
-			throw new IllegalArgumentException("No resource type found in request class annotations, cannot process.");
-		}		
-
-		String resourceId = optionalResourceId;		
+		String resourceId = null;
 		if(resourceId == null ) {
 			if(resourceType.equals(PolicySpec.S3_RESOURCE_BUCKET)) {
 				resourceId = request.getBucket();
@@ -410,14 +473,18 @@ public class ObjectStorageGateway {
 				resourceId = request.getKey();
 			}
 		}
-
+		
+		//Is the user itself allowed?
+		Boolean iamAllow = true;
+		//Evaluate each iam action required, all must be allowed
 		for(String action : actions ) {
-			if(!Lookups.checkPrivilege(action, PolicySpec.VENDOR_S3, resourceType, resourceId, resourceOwnerAccountId)) {
-				return false;
-			}			
+			iamAllow = iamAllow && !Lookups.checkPrivilege(action, PolicySpec.VENDOR_S3, resourceType, resourceId, resourceOwnerAccountId);
 		}
-
-		return true;
+		
+		//TODO: add actual policy evaluation here when bucket policies are supported.
+		Boolean bucketPolicyAllow = true;
+		
+		return aclAllow && iamAllow && bucketPolicyAllow;
 	}
 
 	/**
@@ -459,7 +526,7 @@ public class ObjectStorageGateway {
 			LOG.warn("Problem formatting request log entry. Incomplete entry: " + canonicalLogEntry == null ? "null" : canonicalLogEntry.toString(), e);
 		}		
 	}
-	
+		
 	public HeadBucketResponseType HeadBucket(HeadBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
@@ -473,7 +540,7 @@ public class ObjectStorageGateway {
 			throw new NoSuchEntityException(request.getBucket());				
 		}
 		
-		if(operationAllowed(request, request.getBucket(), bucket.getOwnerId())) {
+		if(operationAllowed(request, bucket, null)) {
 			return ospClient.headBucket(request);
 		} else {
 			throw new AccessDeniedException(request.getBucket());			

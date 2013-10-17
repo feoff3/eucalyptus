@@ -63,8 +63,12 @@
 package com.eucalyptus.objectstorage.policy;
 
 import java.util.List;
+
 import javax.persistence.EntityTransaction;
+
 import org.hibernate.criterion.Projections;
+
+import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
@@ -77,7 +81,7 @@ public class ObjectStorageQuotaUtil {
   public static long countBucketByAccount( String accountId ) throws AuthException {
     EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
     BucketInfo searchBucket = new BucketInfo();
-    searchBucket.setOwnerId(accountId);
+    searchBucket.setOwnerIamUserId(accountId);
     try {
       List<BucketInfo> bucketInfoList = db.query(searchBucket);
       db.commit();
@@ -91,7 +95,7 @@ public class ObjectStorageQuotaUtil {
   public static long countBucketByUser( String userId ) throws AuthException {
     EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
     BucketInfo searchBucket = new BucketInfo();
-    searchBucket.setUserId(userId);
+    searchBucket.setOwnerIamUserId(userId);
     try {
       List<BucketInfo> bucketInfoList = db.query(searchBucket);
       db.commit();
@@ -136,9 +140,10 @@ public class ObjectStorageQuotaUtil {
   }
   
   public static long countTotalObjectSizeByAccount(String accountId) throws AuthException {
+	  String canonicalId = Accounts.lookupAccountById(accountId).getCanonicalId();
     EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
     BucketInfo searchBucket = new BucketInfo();
-    searchBucket.setOwnerId(accountId);
+    searchBucket.setOwnerCanonicalId(accountId);
     try {
       List<BucketInfo> bucketInfoList = db.query(searchBucket);
       long size = 0;
@@ -156,7 +161,7 @@ public class ObjectStorageQuotaUtil {
   public static long countTotalObjectSizeByUser(String userId) throws AuthException {
     EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
     BucketInfo searchBucket = new BucketInfo();
-    searchBucket.setUserId(userId);
+    searchBucket.setOwnerIamUserId(userId);
     try {
       List<BucketInfo> bucketInfoList = db.query(searchBucket);
       long size = 0;
