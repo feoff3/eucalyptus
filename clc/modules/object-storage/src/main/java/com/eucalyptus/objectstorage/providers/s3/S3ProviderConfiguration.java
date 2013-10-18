@@ -8,18 +8,18 @@ import com.eucalyptus.configurable.ConfigurableFieldType;
 public class S3ProviderConfiguration{
 	
 	@ConfigurableField( description = "External S3 endpoint.",
-			displayName = "endpoint" )
-	protected static String S3Endpoint  = "s3.amazonaws.com";
+			displayName = "s3_endpoint" )
+	public static String S3Endpoint  = "s3.amazonaws.com";
 	
 	@ConfigurableField( description = "External S3 Access Key.",
-			displayName = "accesskey", 
+			displayName = "s3_access_key", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
-	protected static String S3AccessKey;
+	public static String S3AccessKey;
 	
 	@ConfigurableField( description = "External S3 Secret Key.",
-			displayName = "secretkey", 
+			displayName = "s3_secret_key", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
-	protected static String S3SecretKey;
+	public static String S3SecretKey;
 
 	public static String getS3AccessKey() {
 		return S3AccessKey;
