@@ -4,7 +4,7 @@ import com.eucalyptus.configurable.ConfigurableClass;
 import com.eucalyptus.configurable.ConfigurableField;
 import com.eucalyptus.configurable.ConfigurableFieldType;
 
-@ConfigurableClass( root = "objectstorage", description = "Configuration for S3-compatible backend")
+@ConfigurableClass( root = "objectstorage", description = "Configuration for S3-compatible backend", singleton=true)
 public class S3ProviderConfiguration{
 	
 	@ConfigurableField( description = "External S3 endpoint.",
@@ -17,7 +17,7 @@ public class S3ProviderConfiguration{
 	protected static String S3AccessKey;
 	
 	@ConfigurableField( description = "External S3 Secret Key.",
-			displayName = "objectstorage.s3endpoint", 
+			displayName = "objectstorage.s3secretkey", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
 	protected static String S3SecretKey;
 

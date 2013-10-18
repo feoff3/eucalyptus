@@ -223,7 +223,14 @@ public final class ReportingDataVerifier {
           final ReportingS3ObjectEventStore store = ReportingS3ObjectEventStore.getInstance();
           final S3ObjectKey key = (S3ObjectKey) resource.resourceKey;
           final ObjectInfo objectInfo = findObjectInfo( key );
-          final User user = objectInfo==null ? null : getAccountAdmin( accountNumberToAccountAdminMap, objectInfo.getOwnerId() );
+          String accountId = null;
+          try{
+        	  accountId = Accounts.lookupAccountById(objectInfo.getOwnerCanonicalId()).getAccountNumber();
+          } catch(Exception e) { 
+        	  accountId = null; 
+          }
+          
+          final User user = objectInfo==null ? null : getAccountAdmin( accountNumberToAccountAdminMap, accountId);
           if ( objectInfo != null && user != null && ensureUserAndAccount( verifiedUserIds, user.getUserId() ) ) {
             store.insertS3ObjectCreateEvent( objectInfo.getBucketName(), objectInfo.getObjectKey(), objectInfo.getVersionId(), objectInfo.getSize(), objectInfo.getCreationTimestamp().getTime(), user.getUserId() );
           }
