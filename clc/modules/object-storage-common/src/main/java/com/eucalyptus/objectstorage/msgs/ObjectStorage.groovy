@@ -235,7 +235,7 @@ public class ObjectStorageRedirectMessageType extends ObjectStorageErrorMessageT
 
 @RequiresPermission([PolicySpec.S3_GETBUCKETACL])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
-@RequiresACLPermission([ObjectStorageProperties.Permission.READ_ACP])
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ_ACP], bucket=[])
 public class GetBucketAccessControlPolicyType extends ObjectStorageRequestType {}
 
 public class GetBucketAccessControlPolicyResponseType extends ObjectStorageResponseType {
@@ -244,7 +244,7 @@ public class GetBucketAccessControlPolicyResponseType extends ObjectStorageRespo
 
 @RequiresPermission([PolicySpec.S3_GETOBJECTACL])
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
-@RequiresACLPermission([ObjectStorageProperties.Permission.READ_ACP])
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ_ACP], bucket=[])
 public class GetObjectAccessControlPolicyType extends ObjectStorageRequestType {
 	String versionId;
 }
@@ -253,8 +253,6 @@ public class GetObjectAccessControlPolicyResponseType extends ObjectStorageRespo
 	AccessControlPolicy accessControlPolicy;
 }
 
-//TODO: this permission must be set on each bucket in the listing. @RequiresPermission([PolicySpec.S3_LISTALLMYBUCKETS])
-//@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 public class ListAllMyBucketsType extends ObjectStorageRequestType {}
 public class ListAllMyBucketsResponseType extends ObjectStorageResponseType {
 	CanonicalUser owner;
@@ -267,9 +265,15 @@ public class ObjectStorageHeadRequestType extends ObjectStorageRequestType {}
 public class ObjectStorageHeadResponseType extends ObjectStorageResponseType {}
 
 
+@RequiresPermission([PolicySpec.S3_GETOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
 public class HeadBucketType extends ObjectStorageHeadRequestType {}
 public class HeadBucketResponseType extends ObjectStorageHeadResponseType{}
 
+@RequiresPermission([PolicySpec.S3_CREATEBUCKET])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[]) //No ACLs for creating a bucket
 public class CreateBucketType extends ObjectStorageRequestType {
 	AccessControlList accessControlList;
 	String locationConstraint;

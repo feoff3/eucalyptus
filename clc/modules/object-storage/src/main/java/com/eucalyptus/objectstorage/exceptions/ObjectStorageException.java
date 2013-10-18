@@ -68,8 +68,14 @@ import com.eucalyptus.storage.msgs.BucketLogData;
 import com.eucalyptus.util.EucalyptusCloudException;
 
 @SuppressWarnings("serial")
-public class ObjectStorageException extends EucalyptusCloudException {
-
+public class ObjectStorageException extends EucalyptusCloudException {	
+	String message;
+	String code;
+	HttpResponseStatus status;
+	String resourceType;
+    String resource;
+    BucketLogData logData;
+    
 	public void setStatus(HttpResponseStatus status) {
 		this.status = status;
 	}
@@ -90,13 +96,6 @@ public class ObjectStorageException extends EucalyptusCloudException {
 		this.resource = resource;
 	}
 
-	String message;
-	String code;
-	HttpResponseStatus status;
-	String resourceType;
-    String resource;
-    BucketLogData logData;
-    
 	public ObjectStorageException()
 	{
 		super();

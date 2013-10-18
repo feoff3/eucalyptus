@@ -71,8 +71,10 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
+import javax.persistence.Lob;
 import javax.persistence.OneToMany;
 import javax.persistence.PersistenceContext;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
 
 import org.apache.log4j.Logger;
@@ -80,12 +82,14 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 import org.hibernate.annotations.OptimisticLocking;
+import org.hibernate.annotations.Type;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.AbstractPersistent;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.Grantee;
@@ -98,39 +102,12 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 @PersistenceContext(name="eucalyptus_osg")
 @Table( name = "Objects" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-public class ObjectInfo extends AbstractPersistent implements Comparable { 
-    @Column( name = "owner_id" )
-    private String ownerId;
-
-    @Column( name = "object_key" )
+public class ObjectInfo extends S3AccessControlledEntity implements Comparable {
+	@Column( name = "object_key" )
     private String objectKey;
 
     @Column( name = "bucket_name" )
     private String bucketName;
-
-    @Column( name = "object_name" )
-    private String objectName;
-
-    @Column(name="global_read")
-    private Boolean globalRead;
-
-    @Column(name="global_write")
-    private Boolean globalWrite;
-
-    @Column(name="global_read_acp")
-    private Boolean globalReadACP;
-
-    @Column(name="global_write_acp")
-    private Boolean globalWriteACP;
-
-    @OneToMany( cascade = CascadeType.ALL )
-    @JoinTable(
-            name = "object_has_grants",
-            joinColumns = { @JoinColumn( name = "object_id" ) },
-            inverseJoinColumns = @JoinColumn( name = "grant_id" )
-    )
-    @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-    private List<GrantInfo> grants = new ArrayList<GrantInfo>();
 
     @Column(name="etag")
     private String etag;
@@ -144,16 +121,12 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
     @Column(name="storage_class")
     private String storageClass;
 
-    @OneToMany( cascade = CascadeType.ALL )
-    @JoinTable(
-            name = "object_has_metadata",
-            joinColumns = { @JoinColumn( name = "object_id" ) },
-            inverseJoinColumns = @JoinColumn( name = "metadata_id" )
-    )
-    @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-    @Column(name="metadata")
-    private List<MetaDataInfo> metaData = new ArrayList<MetaDataInfo>();
-
+    //The user-metadata map in json string form, empty is {}
+    @Column(name="user_metadata") //8K max per S3 spec
+    @Type(type="org.hibernate.type.StringClobType")
+    @Lob
+    private String userMetadata;
+    
     @Column(name="content_type")
     private String contentType;
 
@@ -168,7 +141,7 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
 
     @Column(name="is_last")
     private Boolean last;
-    
+        
     /**
      * Used to denote the object as a snapshot, for special access-control considerations.
      */
@@ -178,13 +151,25 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
  
     private static Logger LOG = Logger.getLogger( ObjectInfo.class );
 
-    public ObjectInfo() {
+    @PrePersist
+    public void checkNulls() {
+    	//Because Lob types don't like nulls
+    	if(this.userMetadata == null) {
+    		this.userMetadata = "{}";
+    	}
     }
+    
+    public ObjectInfo() {}
 
     public ObjectInfo(String bucketName, String objectKey) {
         this.bucketName = bucketName;
         this.objectKey = objectKey;
     }
+
+	@Override
+	protected String getResourceFullName() {
+		return getBucketName() + "/" + getObjectKey();
+	}
 
     public String getObjectKey() {
         return objectKey;
@@ -200,62 +185,6 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
 
     public void setBucketName(String bucketName) {
         this.bucketName = bucketName;
-    }
-
-    public String getObjectName() {
-        return objectName;
-    }
-
-    public void setObjectName(String objectName) {
-        this.objectName = objectName;
-    }
-
-    public String getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(String ownerId) {
-        this.ownerId = ownerId;
-    }
-
-    public boolean isGlobalRead() {
-        return globalRead;
-    }
-
-    public void setGlobalRead(Boolean globalRead) {
-        this.globalRead = globalRead;
-    }
-
-    public boolean isGlobalWrite() {
-        return globalWrite;
-    }
-
-    public void setGlobalWrite(Boolean globalWrite) {
-        this.globalWrite = globalWrite;
-    }
-
-    public boolean isGlobalReadACP() {
-        return globalReadACP;
-    }
-
-    public void setGlobalReadACP(Boolean globalReadACP) {
-        this.globalReadACP = globalReadACP;
-    }
-
-    public boolean isGlobalWriteACP() {
-        return globalWriteACP;
-    }
-
-    public void setGlobalWriteACP(Boolean globalWriteACP) {
-        this.globalWriteACP = globalWriteACP;
-    }
-
-    public List<GrantInfo> getGrants() {
-        return grants;
-    }
-
-    public void setGrants(List<GrantInfo> grants) {
-        this.grants = grants;
     }
 
     public String getEtag() {
@@ -290,255 +219,12 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
         this.storageClass = storageClass;
     }
 
-    public boolean canWrite(String userId) {
-        if(deleted) {
-        	return (ownerId.equals(userId));
-        }
-       
-        if (globalWrite) {
-            return true;
-        }
-        if (ownerId.equals(userId)) {
-          return true;
-        }
-        for (GrantInfo grantInfo: grants) {
-			if (grantInfo.getUserId() != null && grantInfo.getUserId().equals(userId) && grantInfo.canWrite()) {
-				return true;
-			}
-			else if(grantInfo.getGrantGroup() != null && ObjectStorageProperties.isUserMember(userId, grantInfo.getGrantGroup()) && grantInfo.canWrite()) {
-				return true;
-			}
-		}
-
-        return false;
+    public String getUserMetadata() {
+        return this.userMetadata;
     }
 
-    public boolean canRead(User user) {
-      return user.isSystemAdmin()||canRead(user.getName());
-    }
-
-    public boolean canRead(String userId) {
-        if(deleted) {
-       	    return (ownerId.equals(userId));
-        }
-
-        if (globalRead) {
-            return true;
-        }
-        if (ownerId.equals(userId)) {
-          return true;
-        }
-        for (GrantInfo grantInfo: grants) {
-			if (grantInfo.getUserId() != null && grantInfo.getUserId().equals(userId) && grantInfo.canRead()) {
-				return true;
-			}
-			else if(grantInfo.getGrantGroup() != null && ObjectStorageProperties.isUserMember(userId, grantInfo.getGrantGroup()) && grantInfo.canRead()) {
-				return true;
-			}
-		}
-        return false;
-    }
-
-    public boolean canReadACP(String userId) {
-        if(ownerId.equals(userId)) {
-            //owner can always acp
-            return true;
-        } else if (globalReadACP) {
-            return true;
-        } else {
-        	for (GrantInfo grantInfo: grants) {
-    			if (grantInfo.getUserId() != null && grantInfo.getUserId().equals(userId) && grantInfo.canReadACP()) {
-    				return true;
-    			}
-    			else if(grantInfo.getGrantGroup() != null && ObjectStorageProperties.isUserMember(userId, grantInfo.getGrantGroup()) && grantInfo.canReadACP()) {
-    				return true;
-    			}
-    		}
-        }
-
-        return false;
-    }
-
-    public boolean canWriteACP(String userId) {
-        if (globalWriteACP) {
-            return true;
-        }
-        if (ownerId.equals(userId)) {
-          return true;
-        }
-        
-        for (GrantInfo grantInfo: grants) {
-			if (grantInfo.getUserId() != null && grantInfo.getUserId().equals(userId) && grantInfo.canWriteACP()) {
-				return true;
-			}
-			else if(grantInfo.getGrantGroup() != null && ObjectStorageProperties.isUserMember(userId, grantInfo.getGrantGroup()) && grantInfo.canWriteACP()) {
-				return true;
-			}
-		}
-
-        return false;
-    }
-
-    public void resetGlobalGrants() {
-        globalRead = globalWrite = globalReadACP = globalWriteACP = false;
-    }
-
-    public void addGrants(String ownerId, String bucketOwnerId, List<GrantInfo>grantInfos, AccessControlList accessControlList) {
-        ArrayList<Grant> grants = accessControlList.getGrants();
-        Grant foundGrant = null;
-        List<Grant> addGrants = new ArrayList<Grant>();
-        globalRead = globalReadACP = false;
-        globalWrite = globalWriteACP = false;
-
-        if (grants.size() > 0) {
-        	for (Grant grant: grants) {
-        		String permission = grant.getPermission();				
-        		if (permission.equals(ObjectStorageProperties.CannedACL.aws_exec_read.toString())) {
-        			globalRead = globalReadACP = false;
-        			globalWrite = globalWriteACP = false;
-        			foundGrant = grant;
-        		} else if (permission.equals(ObjectStorageProperties.CannedACL.public_read.toString())) {
-        			globalReadACP = false;
-        			globalRead = true;
-        			globalWrite = globalWriteACP = false;
-        			foundGrant = grant;
-        		} else if (permission.equals(ObjectStorageProperties.CannedACL.public_read_write.toString())) {
-        			globalReadACP = globalWriteACP = false;
-        			globalRead = globalWrite = true;
-        			foundGrant = grant;
-        		} else if (permission.equals(ObjectStorageProperties.CannedACL.authenticated_read.toString())) {
-        			globalRead = globalReadACP = false;
-        			globalWrite = globalWriteACP = false;
-                    addGrants.add(new Grant(new Grantee(
-                            new Group(ObjectStorageProperties.AUTHENTICATED_USERS_GROUP)),
-                            ObjectStorageProperties.Permission.READ.toString()));
-                    addGrants.add(new Grant(new Grantee(
-                            new CanonicalUser(bucketOwnerId, bucketName)),
-                            ObjectStorageProperties.Permission.FULL_CONTROL.toString()));
-        			foundGrant = grant;
-        		} else if (permission.equals(ObjectStorageProperties.CannedACL.private_only.toString())) {
-        			globalRead = globalReadACP = globalWrite = globalWriteACP = false;
-        			foundGrant = grant;
-        		} else if(permission.equals(ObjectStorageProperties.CannedACL.bucket_owner_full_control.toString())) {
-        			//Lookup the bucket owner.
-        			String bucketOwnerName = null;
-        			try {
-        				bucketOwnerName = Accounts.lookupAccountById(bucketOwnerId).getName();
-        			} catch(AuthException ex) {        				
-        				bucketOwnerName = "";
-        			}
-                    addGrants.add(new Grant(new Grantee(
-                            new CanonicalUser(bucketOwnerId, bucketOwnerName)),
-                            ObjectStorageProperties.Permission.FULL_CONTROL.toString()));
-        			foundGrant = grant;
-        		} else if(permission.equals(ObjectStorageProperties.CannedACL.bucket_owner_read.toString())) {
-        			//Lookup the bucket owner.
-        			String bucketOwnerName = null;
-        			try {
-        				bucketOwnerName = Accounts.lookupAccountById(bucketOwnerId).getName();
-        			} catch(AuthException ex) {        				
-        				bucketOwnerName = "";
-        			}        			
-        			addGrants.add( new Grant( new Grantee(
-                            new CanonicalUser(bucketOwnerId, bucketOwnerName) ),
-                            ObjectStorageProperties.Permission.READ.toString()));
-        			foundGrant = grant;        		
-        		} else if(permission.equals(ObjectStorageProperties.CannedACL.log_delivery_write.toString())) {
-                    addGrants.add( new Grant( new Grantee(
-                            new Group(ObjectStorageProperties.LOGGING_GROUP)),
-                            ObjectStorageProperties.Permission.WRITE.toString()));
-                    addGrants.add( new Grant( new Grantee(
-                            new Group(ObjectStorageProperties.LOGGING_GROUP)),
-                            ObjectStorageProperties.Permission.READ_ACP.toString()));
-                    addGrants.add(new Grant(new Grantee(
-                            new CanonicalUser(ownerId, bucketName)),
-                            ObjectStorageProperties.Permission.FULL_CONTROL.toString()));
-                    foundGrant = grant;
-                } else if(grant.getGrantee().getGroup() != null) {
-        			String groupUri = grant.getGrantee().getGroup().getUri();
-        			if(groupUri.equals(ObjectStorageProperties.ALL_USERS_GROUP)) {
-        				if(permission.equals(ObjectStorageProperties.Permission.FULL_CONTROL.toString()))
-        					globalRead = globalReadACP = globalWrite = globalWriteACP = true;
-        				else if(permission.equals(ObjectStorageProperties.Permission.READ.toString()))
-        					globalRead = true;
-        				else if(permission.equals(ObjectStorageProperties.Permission.READ_ACP.toString()))
-        					globalReadACP = true;
-        				else if(permission.equals(ObjectStorageProperties.Permission.WRITE.toString()))
-        					globalWrite = true;
-        				else if(permission.equals(ObjectStorageProperties.Permission.WRITE_ACP.toString()))
-        					globalWriteACP = true;
-        				foundGrant = grant;
-        			}
-        		}
-
-        	}
-        }
- 
-        if(foundGrant != null) {
-            grants.remove(foundGrant);
-            
-            if(addGrants != null && addGrants.size() > 0) {
-                for (Grant addGrant : addGrants) {
-                    grants.add(addGrant);
-                }
-            }
-        }
-        GrantInfo.addGrants(ownerId, grantInfos, accessControlList);
-    }
-
-    public void readPermissions(List<Grant> grants) {
-    	if(globalRead && globalReadACP && globalWrite && globalWriteACP) {
-			grants.add(new Grant(new Grantee(new Group(ObjectStorageProperties.ALL_USERS_GROUP)), ObjectStorageProperties.Permission.FULL_CONTROL.toString()));
-			return;
-		}
-		if(globalRead) {
-			grants.add(new Grant(new Grantee(new Group(ObjectStorageProperties.ALL_USERS_GROUP)), ObjectStorageProperties.Permission.READ.toString()));
-		}
-		if(globalReadACP) {
-			grants.add(new Grant(new Grantee(new Group(ObjectStorageProperties.ALL_USERS_GROUP)), ObjectStorageProperties.Permission.READ_ACP.toString()));
-		}
-		if(globalWrite) {
-			grants.add(new Grant(new Grantee(new Group(ObjectStorageProperties.ALL_USERS_GROUP)), ObjectStorageProperties.Permission.WRITE.toString()));
-		}
-		if(globalWriteACP) {
-			grants.add(new Grant(new Grantee(new Group(ObjectStorageProperties.ALL_USERS_GROUP)), ObjectStorageProperties.Permission.WRITE_ACP.toString()));
-		}
-    }
-
-    public void replaceMetaData(List<MetaDataEntry>metaDataEntries) {
-        metaData = new ArrayList<MetaDataInfo>();
-        for (MetaDataEntry metaDataEntry: metaDataEntries) {
-            MetaDataInfo metaDataInfo = new MetaDataInfo();
-            metaDataInfo.setObjectName(objectName);
-            metaDataInfo.setName(metaDataEntry.getName());
-            metaDataInfo.setValue(metaDataEntry.getValue());
-            metaData.add(metaDataInfo);
-        }
-    }
-
-    public void returnMetaData(List<MetaDataEntry>metaDataEntries) {
-        for (MetaDataInfo metaDataInfo: metaData) {
-            MetaDataEntry metaDataEntry = new MetaDataEntry();
-            metaDataEntry.setName(metaDataInfo.getName());
-            metaDataEntry.setValue(metaDataInfo.getValue());
-            metaDataEntries.add(metaDataEntry);
-        }
-    }
-
-    public List<MetaDataInfo> cloneMetaData() {
-        ArrayList<MetaDataInfo> metaDataInfos = new ArrayList<MetaDataInfo>();
-        for(MetaDataInfo metaDataInfo : metaData) {
-            metaDataInfos.add(new MetaDataInfo(metaDataInfo));
-        }
-        return metaDataInfos;
-    }
-
-    public List<MetaDataInfo> getMetaData() {
-        return metaData;
-    }
-
-    public void setMetaData(List<MetaDataInfo> metaData) {
-        this.metaData = metaData;
+    public void setUserMetadata(String metaData) {
+        this.userMetadata = metaData;
     }
 
     public String getContentType() {
@@ -632,5 +318,9 @@ public class ObjectInfo extends AbstractPersistent implements Comparable {
 
 	public void setIsSnapshot(Boolean isSnapshot) {
 		this.isSnapshot = isSnapshot;
+	}
+
+	public void setResourceAcl(AccessControlPolicy policy) {
+		
 	}
 }

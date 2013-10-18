@@ -110,8 +110,8 @@ public class S3ErrorMessage extends BaseMessage {
 		this.requestId = requestId;
 		this.hostId = hostId;
 	}
-	
-	
+
+
 	public HttpResponseStatus getStatus() {
 		return status;
 	}
@@ -333,18 +333,4 @@ public class DeleteMarkerEntry extends EucalyptusData {
 	String lastModified;
 	CanonicalUser owner;
 }
-
-/*
- * Service Operations
- */
-public class ListAllMyBucketsRequest extends S3Request {
-	def ListAllMyBucketsRequest() {}
-}
-
-
-public class ListAllMyBucketsResponse extends S3Response {
-	CanonicalUser owner;
-	ListAllMyBucketsList bucketList;
-}
-
 

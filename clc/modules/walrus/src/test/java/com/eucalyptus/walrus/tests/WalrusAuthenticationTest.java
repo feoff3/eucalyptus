@@ -36,6 +36,7 @@ import com.eucalyptus.blockstorage.util.StorageProperties;
 import com.eucalyptus.http.MappingHttpRequest;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataMessage;
 import com.eucalyptus.util.EucalyptusCloudException;
+import com.eucalyptus.walrus.exceptions.AccessDeniedException;
 import com.eucalyptus.walrus.pipeline.WalrusAuthenticationHandler;
 import com.google.gwt.user.client.Random;
 
@@ -64,7 +65,7 @@ public class WalrusAuthenticationTest {
 		//Try the handler
 		try {			
 			WalrusAuthenticationHandler.EucaAuthentication.authenticate(httpRequest, WalrusAuthenticationHandler.processAuthorizationHeader(httpRequest.getAndRemoveHeader("Authorization")));
-		} catch (AuthenticationException e) {
+		} catch (AccessDeniedException e) {
 			e.printStackTrace();
 			System.out.println("Failed!");
 		}

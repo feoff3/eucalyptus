@@ -70,7 +70,7 @@ import com.eucalyptus.auth.policy.key.Keys;
 import com.eucalyptus.auth.policy.key.PolicyKey;
 import com.eucalyptus.auth.policy.key.QuotaKey;
 
-@PolicyKey( Keys.S3_QUOTA_BUCKET_SIZE )
+//@PolicyKey( Keys.S3_QUOTA_BUCKET_SIZE )
 public class BucketSizeQuotaKey extends QuotaKey {
   
   private static final String KEY = Keys.S3_QUOTA_BUCKET_SIZE;

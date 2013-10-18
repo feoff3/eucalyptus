@@ -14,12 +14,12 @@ public class ObjectStorageRESTExceptionStage implements UnrollableStage {
 
 	@Override
 	public void unrollStage(ChannelPipeline pipeline) {
-		pipeline.addLast("walrus-exception", new ObjectStorageRESTExceptionHandler());
+		pipeline.addLast("osg-exception", new ObjectStorageRESTExceptionHandler());
 	}
 
 	@Override
 	public String getName() {
-		return "walrus-exception";
+		return "osg-exception";
 	}
 
 }

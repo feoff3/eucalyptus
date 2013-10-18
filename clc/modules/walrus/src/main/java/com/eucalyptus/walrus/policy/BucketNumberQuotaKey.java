@@ -70,7 +70,7 @@ import com.eucalyptus.auth.policy.key.Keys;
 import com.eucalyptus.auth.policy.key.PolicyKey;
 import com.eucalyptus.auth.policy.key.QuotaKey;
 
-@PolicyKey( Keys.S3_QUOTA_BUCKET_NUMBER_FAKE )
+//@PolicyKey( Keys.S3_QUOTA_BUCKET_NUMBER_FAKE )
 public class BucketNumberQuotaKey extends QuotaKey {
   
   private static final String KEY = Keys.S3_QUOTA_BUCKET_NUMBER_FAKE;
