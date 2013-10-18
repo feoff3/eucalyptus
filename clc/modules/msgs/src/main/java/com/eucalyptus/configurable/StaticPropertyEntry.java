@@ -198,9 +198,6 @@ public class StaticPropertyEntry extends AbstractConfigurableProperty {
           entry = new StaticPropertyEntry( c, fqPrefix, field, description, defaultValue, p, annote.readonly( ), annote.displayName( ), annote.type( ), alias,
                                            changeListener );
           return entry;
-        } else {
-        	//Debugging only 
-        	LOG.debug("Cannot build " + c.getName() + " " + field.getName() + " as static property due to no static public modifiers");
         }
       }
       return null;

@@ -54,7 +54,7 @@ public class ObjectStorageProviders extends ServiceJarDiscovery {
 	
 	@ConfigurableField( description = "Object Storage Provider client to use for backend", displayName = "objectstorage.providerclient", changeListener = ObjectStorageProviderChangeListener.class)
 	public static volatile String providerClient = ""; //configured by user to specify which back-end client to use
-	
+
 	/**
 	 * Change listener for the osg provider client setting.
 	 * @author zhill
