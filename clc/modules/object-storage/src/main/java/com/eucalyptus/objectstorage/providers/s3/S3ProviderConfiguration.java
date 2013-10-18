@@ -4,20 +4,20 @@ import com.eucalyptus.configurable.ConfigurableClass;
 import com.eucalyptus.configurable.ConfigurableField;
 import com.eucalyptus.configurable.ConfigurableFieldType;
 
-@ConfigurableClass( root = "objectstorage", description = "Configuration for S3-compatible backend", singleton=true)
+@ConfigurableClass( root = "objectstorage.s3provider", description = "Configuration for S3-compatible backend")
 public class S3ProviderConfiguration{
 	
 	@ConfigurableField( description = "External S3 endpoint.",
-			displayName = "objectstorage.s3endpoint" )
+			displayName = "endpoint" )
 	protected static String S3Endpoint  = "s3.amazonaws.com";
 	
 	@ConfigurableField( description = "External S3 Access Key.",
-			displayName = "objectstorage.s3accesskey", 
+			displayName = "accesskey", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
 	protected static String S3AccessKey;
 	
 	@ConfigurableField( description = "External S3 Secret Key.",
-			displayName = "objectstorage.s3secretkey", 
+			displayName = "secretkey", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
 	protected static String S3SecretKey;
 

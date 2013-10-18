@@ -47,7 +47,7 @@ import com.google.common.collect.Sets;
  *
  */
 
-@ConfigurableClass( root = "objectstorage", alias = "basic", description = "Basic object storage configuration.", singleton = true, deferred = true )
+@ConfigurableClass( root = "objectstorage", description = "Basic object storage configuration.")
 public class ObjectStorageProviders extends ServiceJarDiscovery {
 	private static Logger LOG = Logger.getLogger( ObjectStorageProviders.class );
 	private static final String UNSET = "unset";
