@@ -53,8 +53,16 @@ public class ObjectStorageProviders extends ServiceJarDiscovery {
 	private static final String UNSET = "unset";
 	
 	@ConfigurableField( description = "Object Storage Provider client to use for backend", displayName = "objectstorage.providerclient", changeListener = ObjectStorageProviderChangeListener.class)
-	public static volatile String providerClient = ""; //configured by user to specify which back-end client to use
-
+	protected static volatile String providerClient = ""; //configured by user to specify which back-end client to use
+	
+	public static void setProviderClient(String s) {
+		providerClient = s;
+	}
+	
+	public static String getProviderClient() {
+		return providerClient;
+	}
+	
 	/**
 	 * Change listener for the osg provider client setting.
 	 * @author zhill

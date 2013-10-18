@@ -110,6 +110,8 @@ public class SingletonDatabasePropertyEntry extends AbstractConfigurableProperty
           return null;
         }
       } else {
+      	//Debugging only 
+      	LOG.debug("Cannot build " + c.getName() + " " + f.getName() + " as singleton database property due to incorrect annotations on class");
         return null;
       }
       return null;
