@@ -44,7 +44,7 @@ import com.eucalyptus.blockstorage.Volume;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
-import com.eucalyptus.objectstorage.entities.ObjectInfo;
+import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.reporting.domain.ReportingAccountCrud;
 import com.eucalyptus.reporting.domain.ReportingUserCrud;
@@ -219,10 +219,10 @@ public final class ReportingDataVerifier {
           if ( address != null && ensureUserAndAccount( verifiedUserIds, address.getUserId() ) ) {
             store.insertCreateEvent( address.getCreationTimestamp().getTime(), address.getUserId(), address.getDisplayName() );
           }
-        } else if ( ObjectInfo.class.equals( holder.type ) ) {
+        } else if ( ObjectEntity.class.equals( holder.type ) ) {
           final ReportingS3ObjectEventStore store = ReportingS3ObjectEventStore.getInstance();
           final S3ObjectKey key = (S3ObjectKey) resource.resourceKey;
-          final ObjectInfo objectInfo = findObjectInfo( key );
+          final ObjectEntity objectInfo = findObjectInfo( key );
           String accountId = null;
           try{
         	  accountId = Accounts.lookupAccountById(objectInfo.getOwnerCanonicalId()).getAccountNumber();
@@ -259,7 +259,7 @@ public final class ReportingDataVerifier {
         if ( Address.class.equals( holder.type ) ) {
           final ReportingElasticIpEventStore store = ReportingElasticIpEventStore.getInstance();
           store.insertDeleteEvent( resource.resourceKey.toString(), timestamp );
-        } else if ( ObjectInfo.class.equals( holder.type ) ) {
+        } else if ( ObjectEntity.class.equals( holder.type ) ) {
           final ReportingS3ObjectEventStore store = ReportingS3ObjectEventStore.getInstance();
           final S3ObjectKey key = (S3ObjectKey) resource.resourceKey;
           store.insertS3ObjectDeleteEvent( key.bucketName, key.objectKey, key.objectVersion, timestamp );
@@ -371,18 +371,18 @@ public final class ReportingDataVerifier {
         Predicates.compose( Predicates.equalTo( uuid ), naturalId() ) ), null );
   }
 
-  private static ObjectInfo findObjectInfo( final S3ObjectKey key ) {
+  private static ObjectEntity findObjectInfo( final S3ObjectKey key ) {
     try {
-      final ObjectInfo objectInfo = new ObjectInfo();
+      final ObjectEntity objectInfo = new ObjectEntity();
       objectInfo.setBucketName( key.bucketName );
       objectInfo.setObjectKey( key.objectKey );
       objectInfo.setVersionId( key.objectVersion==null ? ObjectStorageProperties.NULL_VERSION_ID : key.objectVersion );
-      final List<ObjectInfo> infos = Transactions.findAll( objectInfo );
+      final List<ObjectEntity> infos = Transactions.findAll( objectInfo );
       if ( infos.isEmpty() ) {
         return null;
       }
-      ObjectInfo result = infos.get( 0 );
-      for ( final ObjectInfo current : infos ) {
+      ObjectEntity result = infos.get( 0 );
+      for ( final ObjectEntity current : infos ) {
         if ( current.getCreationTimestamp().after( result.getCreationTimestamp() ) ) {
           result = current;
         }
@@ -538,9 +538,9 @@ public final class ReportingDataVerifier {
         }
 
         // S3 Objects
-        for ( final ObjectInfo objectInfo : Transactions.findAll( new ObjectInfo() ) ) {
+        for ( final ObjectEntity objectInfo : Transactions.findAll( new ObjectEntity() ) ) {
           if ( Boolean.FALSE.equals(objectInfo.getDeleted()) ) {
-            view.add( ObjectInfo.class, s3ObjectResource(
+            view.add( ObjectEntity.class, s3ObjectResource(
                 objectInfo.getBucketName(),
                 objectInfo.getObjectKey(),
                 objectInfo.getVersionId() ) );
@@ -707,7 +707,7 @@ public final class ReportingDataVerifier {
       }
 
       for ( final S3ObjectKey s3ObjectKey : s3ObjectList ) {
-        view.add( ObjectInfo.class, ReportingDataVerifier.s3ObjectResource(s3ObjectKey) );
+        view.add( ObjectEntity.class, ReportingDataVerifier.s3ObjectResource(s3ObjectKey) );
       }
 
       for ( final Map.Entry<String,RelationTimestamp> volumeEntry : volumeRelationMap.entrySet() ) {

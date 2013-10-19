@@ -81,7 +81,7 @@ public class ObjectStorageDELETEOutboundStage implements UnrollableStage {
 
   @Override
   public void unrollStage( ChannelPipeline pipeline ) {
-    pipeline.addLast( "objectstorage-outbound", new ObjectStorageOutboundHandler( ) );
+    pipeline.addLast( "objectstorage-outbound", new ObjectStorageDELETEOutboundHandler( ) );
   }
 
 }

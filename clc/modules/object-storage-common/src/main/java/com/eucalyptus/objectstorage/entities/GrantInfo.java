@@ -97,7 +97,7 @@ public class GrantInfo extends AbstractPersistent {
 	@Column(name="allow_write_acp")
 	private Boolean canWriteACP;
 
-	private static Logger LOG = Logger.getLogger( ObjectInfo.class );
+	private static Logger LOG = Logger.getLogger( ObjectEntity.class );
 
 	public GrantInfo(){
 		canRead = canWrite = canReadACP = canWriteACP = false;

@@ -68,6 +68,7 @@ import org.junit.Test;
 
 import com.eucalyptus.auth.util.Hashes;
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
+import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketType;
@@ -120,6 +121,6 @@ public class BukkitTest {
 
     @BeforeClass
     public static void setUp() {
-        bukkit = new ObjectStorageGateway();
+        bukkit = new ObjectStorageGatewayImpl();
     }
 }

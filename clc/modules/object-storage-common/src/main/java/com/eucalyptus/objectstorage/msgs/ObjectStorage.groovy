@@ -103,6 +103,8 @@ import edu.ucsb.eucalyptus.msgs.EucalyptusData;
 import edu.ucsb.eucalyptus.msgs.StatEventRecord;
 
 public class ObjectStorageResponseType extends ObjectStorageRequestType {
+	HttpResponseStatus status; //Most should be 200-ok, but for deletes etc it may be 204-No Content
+	
 	def ObjectStorageResponseType() {}
 }
 
@@ -291,12 +293,9 @@ public class CreateBucketResponseType extends ObjectStorageResponseType {
 	String bucket;
 }
 
-public class DeleteBucketType extends ObjectStorageDeleteType {
-}
+public class DeleteBucketType extends ObjectStorageDeleteType {}
 
-public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {
-	Status status;
-}
+public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {}
 
 public class ObjectStorageDataRequestType extends ObjectStorageRequestType {
 	String randomKey;

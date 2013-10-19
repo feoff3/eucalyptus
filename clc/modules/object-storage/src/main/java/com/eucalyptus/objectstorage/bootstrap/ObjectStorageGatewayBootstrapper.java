@@ -70,7 +70,7 @@ import com.eucalyptus.bootstrap.DependsLocal;
 import com.eucalyptus.bootstrap.Provides;
 import com.eucalyptus.bootstrap.RunDuring;
 import com.eucalyptus.objectstorage.ObjectStorage;
-import com.eucalyptus.objectstorage.ObjectStorageGateway;
+import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
 import com.eucalyptus.objectstorage.bootstrap.ObjectStorageGatewayBootstrapper;
 import com.eucalyptus.util.Exceptions;
 
@@ -85,9 +85,9 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
     synchronized ( ObjectStorageGatewayBootstrapper.class ) {
       if ( singleton == null ) {
         singleton = new ObjectStorageGatewayBootstrapper( );
-        LOG.info( "Creating ObjectStorageGateway Bootstrapper instance." );
+        LOG.info( "Creating ObjectStorageGatewayImpl Bootstrapper instance." );
       } else {
-        LOG.info( "Returning ObjectStorageGateway Bootstrapper instance." );
+        LOG.info( "Returning ObjectStorageGatewayImpl Bootstrapper instance." );
       }
     }
     return singleton;
@@ -95,13 +95,13 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
   
   @Override
   public boolean load( ) throws Exception {
-    ObjectStorageGateway.checkPreconditions( );
+    ObjectStorageGatewayImpl.checkPreconditions( );
     return true;
   }
   
   @Override
   public boolean start( ) throws Exception {
-    ObjectStorageGateway.configure( );
+    ObjectStorageGatewayImpl.configure( );
     return true;
   }
   
@@ -110,7 +110,7 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
    */
   @Override
   public boolean enable( ) throws Exception {
-    ObjectStorageGateway.enable( );
+    ObjectStorageGatewayImpl.enable( );
     return true;
   }
   
@@ -119,7 +119,7 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
    */
   @Override
   public boolean stop( ) throws Exception {
-    ObjectStorageGateway.stop( );
+    ObjectStorageGatewayImpl.stop( );
     return true;
   }
   
@@ -134,7 +134,7 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
    */
   @Override
   public boolean disable( ) throws Exception {
-    ObjectStorageGateway.disable( );
+    ObjectStorageGatewayImpl.disable( );
     return true;
   }
   
@@ -144,7 +144,7 @@ public class ObjectStorageGatewayBootstrapper extends Bootstrapper {
   @Override
   public boolean check( ) throws Exception {
     //check local storage
-    ObjectStorageGateway.check( );
+    ObjectStorageGatewayImpl.check( );
     return true;
   }
 }

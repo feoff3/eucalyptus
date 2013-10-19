@@ -19,11 +19,9 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Protocol;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.Permissions;
 import com.eucalyptus.auth.policy.PolicySpec;
 import com.eucalyptus.auth.principal.Account;
@@ -67,8 +65,6 @@ import com.eucalyptus.objectstorage.msgs.ListBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ListBucketType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
 import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
@@ -97,15 +93,15 @@ import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Exceptions;
 import com.eucalyptus.util.Lookups;
-import com.eucalyptus.objectstorage.entities.BucketInfo;
-import com.eucalyptus.objectstorage.entities.GrantInfo;
-import com.eucalyptus.objectstorage.entities.ObjectInfo;
+import com.eucalyptus.objectstorage.entities.Bucket;
+import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
-import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
-import com.eucalyptus.objectstorage.exceptions.BucketAlreadyExistsException;
-import com.eucalyptus.objectstorage.exceptions.BucketAlreadyOwnedByYouException;
-import com.eucalyptus.objectstorage.exceptions.InvalidBucketNameException;
-import com.eucalyptus.objectstorage.exceptions.NotImplementedException;
+import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
+import com.eucalyptus.objectstorage.exceptions.s3.AccountProblemException;
+import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyExistsException;
+import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyOwnedByYouException;
+import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
+import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
 import com.eucalyptus.objectstorage.exceptions.TooManyBucketsException;
 import com.google.common.base.Strings;
@@ -273,15 +269,15 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	}
 	
 	private boolean bucketHasSnapshots(String bucketName) throws Exception {
-		EntityWrapper<ObjectInfo> dbSnap = null;
+		EntityWrapper<ObjectEntity> dbSnap = null;
 
 		try {
-			dbSnap = EntityWrapper.get(ObjectInfo.class);
-			ObjectInfo objInfo = new ObjectInfo();
+			dbSnap = EntityWrapper.get(ObjectEntity.class);
+			ObjectEntity objInfo = new ObjectEntity();
 			objInfo.setBucketName(bucketName);
 			objInfo.setIsSnapshot(true);
 
-			Criteria snapCount = dbSnap.createCriteria(ObjectInfo.class).add(Example.create(objInfo)).setProjection(Projections.rowCount());
+			Criteria snapCount = dbSnap.createCriteria(ObjectEntity.class).add(Example.create(objInfo)).setProjection(Projections.rowCount());
 			snapCount.setReadOnly(true);
 			Long rowCount = (Long)snapCount.uniqueResult();
 			dbSnap.rollback();
@@ -312,17 +308,17 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		if (account == null) {
 			throw new AccessDeniedException("no such account");
 		}
-		EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
+		EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
 		try {
-			BucketInfo searchBucket = new BucketInfo();
+			Bucket searchBucket = new Bucket();
 			searchBucket.setOwnerCanonicalId(account.getCanonicalId());
 			searchBucket.setHidden(false);
 			
-			List<BucketInfo> bucketInfoList = db.queryEscape(searchBucket);
+			List<Bucket> bucketInfoList = db.queryEscape(searchBucket);
 			
 			ArrayList<BucketListEntry> buckets = new ArrayList<BucketListEntry>();
 			
-			for (BucketInfo bucketInfo : bucketInfoList) {
+			for (Bucket bucketInfo : bucketInfoList) {
 				if (ctx.hasAdministrativePrivileges()) {						
 					try {
 						//TODO: zhill -- we should modify the bucket schema to indicate if the bucket is a snapshot bucket, or use a seperate type for snap containers
@@ -356,7 +352,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				reply.setBucketList(bucketList);
 			} catch (Exception ex) {
 				LOG.error(ex);
-				throw new AccessDeniedException("Account: " + account.getName() + " not found", ex);
+				//This is an account problem, the auth and authz are already done, this is a weird case
+				throw new AccountProblemException();
 			}			
 		} catch (EucalyptusCloudException e) {
 			db.rollback();
@@ -391,7 +388,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		String locationConstraint = request.getLocationConstraint();
 
 		if (account == null) {
-			throw new AccessDeniedException("Bucket", bucketName);
+			throw new AccessDeniedException(bucketName);
 		}
 
 		AccessControlList accessControlList = request.getAccessControlList();
@@ -406,21 +403,21 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		if (!checkBucketName(bucketName))
 			throw new InvalidBucketNameException(bucketName);
 
-		EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
+		EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
 		try {
 			if (ObjectStorageProperties.shouldEnforceUsageLimits
 					&& !Contexts.lookup().hasAdministrativePrivileges()) {
-				BucketInfo searchBucket = new BucketInfo();
+				Bucket searchBucket = new Bucket();
 				searchBucket.setOwnerCanonicalId(account.getCanonicalId());
-				List<BucketInfo> bucketList = db.queryEscape(searchBucket);
+				List<Bucket> bucketList = db.queryEscape(searchBucket);
 				if (bucketList.size() >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					db.rollback();
 					throw new TooManyBucketsException(bucketName);
 				}
 			}
 
-			BucketInfo bucketInfo = new BucketInfo(bucketName);
-			List<BucketInfo> bucketList = db.queryEscape(bucketInfo);
+			Bucket bucketInfo = new Bucket(bucketName);
+			List<Bucket> bucketList = db.queryEscape(bucketInfo);
 
 			if (bucketList.size() > 0) {
 				if (bucketList.get(0).getOwnerCanonicalId() .equals(account.getCanonicalId())) {
@@ -441,7 +438,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 										PolicySpec.S3_RESOURCE_BUCKET, "",
 										PolicySpec.S3_CREATEBUCKET, ctx.getUser(), 1L))) {
 					// create bucket and set its acl
-					BucketInfo bucket = new BucketInfo(account.getCanonicalId(),
+					Bucket bucket = new Bucket(account.getCanonicalId(),
 							ctx.getUser().getUserId(), bucketName, new Date());
 					try {
 						bucket.setAcl(accessControlPolicy);
@@ -485,7 +482,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				} else {
 					LOG.error("Not authorized to create bucket by " + ctx.getUserFullName());
 					db.rollback();
-					throw new AccessDeniedException("Bucket", bucketName);
+					throw new AccessDeniedException(bucketName);
 				}
 			}
 			reply.setBucket(bucketName);

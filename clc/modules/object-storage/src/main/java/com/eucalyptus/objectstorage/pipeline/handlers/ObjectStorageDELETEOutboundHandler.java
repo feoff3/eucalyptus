@@ -63,21 +63,14 @@
 package com.eucalyptus.objectstorage.pipeline.handlers;
 
 import org.apache.log4j.Logger;
-import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
 import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.http.MappingHttpResponse;
-import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
-import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.ws.handlers.MessageStackHandler;
 
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
@@ -85,8 +78,8 @@ import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
 import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
 @ChannelPipelineCoverage("one")
-public class ObjectStorageOutboundHandler extends MessageStackHandler {
-	private static Logger LOG = Logger.getLogger( ObjectStorageOutboundHandler.class );
+public class ObjectStorageDELETEOutboundHandler extends MessageStackHandler {
+	private static Logger LOG = Logger.getLogger( ObjectStorageDELETEOutboundHandler.class );	
 
 	@Override
 	public void outgoingMessage( ChannelHandlerContext ctx, MessageEvent event ) throws Exception {
@@ -94,60 +87,25 @@ public class ObjectStorageOutboundHandler extends MessageStackHandler {
 			MappingHttpResponse httpResponse = ( MappingHttpResponse ) event.getMessage( );
 			BaseMessage msg = (BaseMessage) httpResponse.getMessage( );
 
-			if(msg instanceof PutObjectResponseType) {
-				PutObjectResponseType putObjectResponse = (PutObjectResponseType) msg;
-				httpResponse.addHeader(HttpHeaders.Names.ETAG, '\"' + putObjectResponse.getEtag() + '\"');
-				if(putObjectResponse.getLastModified() != null) {
-				    httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, putObjectResponse.getLastModified());
-				}
-				if(putObjectResponse.getVersionId() != null) {
-					httpResponse.addHeader(ObjectStorageProperties.X_AMZ_VERSION_ID, putObjectResponse.getVersionId());
-				}
-			} else if (msg instanceof PostObjectResponseType) {
-				PostObjectResponseType postObjectResponse = (PostObjectResponseType) msg;
-				String redirectUrl = postObjectResponse.getRedirectUrl();
-				if ( redirectUrl != null ) {
-					httpResponse.addHeader(HttpHeaders.Names.LOCATION, redirectUrl);
-					httpResponse.setStatus(HttpResponseStatus.SEE_OTHER);
-					httpResponse.setMessage(null);
-				} else {
-					Integer successCode = postObjectResponse.getSuccessCode();
-					if ( successCode != null ) {
-						if(successCode != 201) {
-							httpResponse.setMessage(null);
-							httpResponse.setStatus(new HttpResponseStatus(successCode, "OK"));
-						} else {
-							httpResponse.setStatus(new HttpResponseStatus(successCode, "Created"));
-						}
-					}
-				}
-				//have to force a close for browsers
-				event.getFuture().addListener(ChannelFutureListener.CLOSE);
-			} else if(msg instanceof CopyObjectResponseType) {
-				CopyObjectResponseType copyResponse = (CopyObjectResponseType) msg;
-				if(copyResponse.getVersionId() != null)
-					httpResponse.addHeader("x-amz-version-id", copyResponse.getVersionId());
-				if(copyResponse.getCopySourceVersionId() != null)
-					httpResponse.addHeader("x-amz-copy-source-version-id", copyResponse.getCopySourceVersionId());
-			} else if(msg instanceof EucalyptusErrorMessageType) {      
+			if(msg instanceof EucalyptusErrorMessageType) {      
 				EucalyptusErrorMessageType errorMessage = (EucalyptusErrorMessageType) msg;
 				BaseMessage errMsg = OSGUtil.convertErrorMessage(errorMessage);
 				if(errMsg instanceof ObjectStorageErrorMessageType) {
-					ObjectStorageErrorMessageType walrusErrorMsg = (ObjectStorageErrorMessageType) errMsg;
-					httpResponse.setStatus(walrusErrorMsg.getStatus());
+					ObjectStorageErrorMessageType objErrorMsg = (ObjectStorageErrorMessageType) errMsg;
+					httpResponse.setStatus(objErrorMsg.getStatus());
 				}
-				httpResponse.setMessage(errMsg);
 			} else if(msg instanceof ExceptionResponseType) {      
 				ExceptionResponseType errorMessage = (ExceptionResponseType) msg;
 				BaseMessage errMsg = OSGUtil.convertErrorMessage(errorMessage);
 				if(errMsg instanceof ObjectStorageErrorMessageType) {
-					ObjectStorageErrorMessageType walrusErrorMsg = (ObjectStorageErrorMessageType) errMsg;
-					httpResponse.setStatus(walrusErrorMsg.getStatus());
-				}	
-			} else if (msg instanceof CreateBucketResponseType) {
-				httpResponse.setStatus(HttpResponseStatus.OK);
+					ObjectStorageErrorMessageType objErrorMsg = (ObjectStorageErrorMessageType) errMsg;
+					httpResponse.setStatus(objErrorMsg.getStatus());
+				}				
+			} else {
+				//Normal response
+				httpResponse.setStatus(HttpResponseStatus.NO_CONTENT);
+				//Since a DELETE response, never include a body
 				httpResponse.setMessage(null);
-				event.getFuture().addListener(ChannelFutureListener.CLOSE);
 			}
 		}
 	}

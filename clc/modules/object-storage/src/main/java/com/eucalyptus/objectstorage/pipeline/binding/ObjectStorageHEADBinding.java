@@ -65,7 +65,7 @@ package com.eucalyptus.objectstorage.pipeline.binding;
 import org.apache.log4j.Logger;
 
 /**
- * Does binding for REST HEAD requests in the ObjectStorageGateway for the S3 API.
+ * Does binding for REST HEAD requests in the ObjectStorageGatewayImpl for the S3 API.
  * 
  *
  */

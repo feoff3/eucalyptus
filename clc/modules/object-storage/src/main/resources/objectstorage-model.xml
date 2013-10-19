@@ -102,7 +102,7 @@
             <inbound>
                 <inbound-endpoint ref="ObjectStorageVM"/>
             </inbound>
-            <component class="com.eucalyptus.objectstorage.ObjectStorageGateway"/>
+            <component class="com.eucalyptus.objectstorage.ObjectStorageGatewayImpl"/>
             <outbound>
                 <pass-through-router>
                     <outbound-endpoint ref="ObjectStorageReplyQueueVM"/>
@@ -125,7 +125,7 @@
                 <inbound-endpoint ref="ObjectStorageInternalWS"/>
                 <inbound-endpoint ref="ObjectStorageInternalVM"/>
             </inbound>
-            <component class="com.eucalyptus.objectstorage.ObjectStorageGateway"/>
+            <component class="com.eucalyptus.objectstorage.ObjectStorageGatewayImpl"/>
         </service>
 
     </model>

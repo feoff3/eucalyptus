@@ -63,6 +63,7 @@
 package com.eucalyptus.objectstorage.tests;
 
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
+import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
 
 import java.util.ArrayList;
 
@@ -164,6 +165,6 @@ public class ObjectTest {
 
     @BeforeClass
     public static void setUp() {
-        bukkit = new ObjectStorageGateway();
+        bukkit = new ObjectStorageGatewayImpl();
    }        
 }

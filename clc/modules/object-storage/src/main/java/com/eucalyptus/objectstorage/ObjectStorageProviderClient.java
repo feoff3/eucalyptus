@@ -58,7 +58,7 @@ import com.eucalyptus.util.EucalyptusCloudException;
 
 /**
  * Class that any ObjectStorageProvider client implementation must extend.
- * This is the interface used by the ObjectStorageGateway to invoke operations
+ * This is the interface used by the ObjectStorageGatewayImpl to invoke operations
  * on the provider backend.
  * @author zhill
  *
