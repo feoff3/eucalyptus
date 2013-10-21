@@ -64,6 +64,7 @@ package com.eucalyptus.dns;
 
 import java.io.IOException;
 import java.net.InetAddress;
+
 import org.apache.log4j.Logger;
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.DClass;
@@ -81,6 +82,7 @@ import com.eucalyptus.component.id.Eucalyptus;
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Internets;
+import com.eucalyptus.walrus.util.WalrusProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 
 import edu.ucsb.eucalyptus.cloud.entities.SystemConfiguration;
@@ -159,11 +161,22 @@ public class ServiceZone extends Zone {
         SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);
         resp.addRRset( new RRset( new ARecord( name, 1, ttl, ip ) ) );
         return resp;
-    } else if (name.toString().startsWith("walrus.")) {
+    } else if (name.toString().startsWith("objectstorage.")) {
+    	SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);
+        InetAddress osgIp = null;
+          try {
+		    osgIp = ObjectStorageProperties.getObjectStorageAddress();
+          } catch (EucalyptusCloudException e) {
+        	LOG.error(e);
+        	return super.findRecords( name, type );
+          }
+		  resp.addRRset( new RRset( new ARecord( name, 1, 20/*ttl*/, osgIp ) ) );
+		  return resp;
+	} else if (name.toString().startsWith("walrus.")) {
     	SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);
         InetAddress walrusIp = null;
           try {
-		    walrusIp = ObjectStorageProperties.getWalrusAddress();
+		    walrusIp = WalrusProperties.getWalrusAddress();
           } catch (EucalyptusCloudException e) {
         	LOG.error(e);
         	return super.findRecords( name, type );
@@ -174,5 +187,6 @@ public class ServiceZone extends Zone {
       return super.findRecords( name, type );
     }
   }
+  
   
 }

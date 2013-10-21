@@ -76,6 +76,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+
 import com.eucalyptus.bootstrap.Bootstrap;
 import com.eucalyptus.bootstrap.BootstrapArgs;
 import com.eucalyptus.bootstrap.Databases;
@@ -116,6 +117,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
+
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 
 
@@ -940,6 +942,31 @@ public class Topology {
     } else {
       return res;
     }
+  }
+  
+  public static <T extends ServiceConfiguration> Iterable<T> lookupMany( final Class<? extends ComponentId> compClass, final Partition... maybePartition ) {
+	    final ComponentId compId = ComponentIds.lookup( compClass );
+	    final Partition partition =
+	      ( ( maybePartition != null ) && ( maybePartition.length > 0 )
+	                                                                   ? ( compId.isPartitioned( )
+	                                                                                                                        ? maybePartition[0]
+	                                                                                                                        : null )
+	                                                                   : null );
+	    Iterable<T> res = null;
+	    //ManyToOne partitions are handled differently
+	    if(ComponentIds.lookup(compClass).isManyToOnePartition()) {
+	    	if(partition != null) {
+	    		res = (Iterable<T>) ServiceConfigurations.filter(compClass, ServiceConfigurations.filterByPartition(partition));
+	    	} else {
+	    		res = (Iterable<T>) ServiceConfigurations.filter(compClass, ServiceConfigurations.filterEnabled());
+	    	}
+	    }
+	    String err = "Failed to lookup ENABLED service of type " + compClass.getSimpleName( ) + ( partition != null ? " in partition " + partition : "." );
+	    if ( res == null ) {
+	      throw new NoSuchElementException( err );
+	    } else {
+	    	return res;
+	    }    
   }
   
   public static Collection<ServiceConfiguration> enabledServices( final Class<? extends ComponentId> compId ) {

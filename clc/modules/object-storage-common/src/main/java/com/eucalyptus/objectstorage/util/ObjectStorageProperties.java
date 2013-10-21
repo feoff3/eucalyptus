@@ -66,15 +66,20 @@ import org.apache.log4j.Logger;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.Principals;
+import com.eucalyptus.component.ServiceConfiguration;
 import com.eucalyptus.component.Topology;
 import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.scripting.Groovyness;
 import com.eucalyptus.system.BaseDirectory;
 import com.eucalyptus.util.EucalyptusCloudException;
+import com.eucalyptus.walrus.Walrus;
 import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 
 import java.net.*;
+import java.util.Iterator;
 import java.util.Set;
 
 public class ObjectStorageProperties {
@@ -314,12 +319,29 @@ public class ObjectStorageProperties {
 		}
 		return TRACKER_URL;
 	}
-
+	
 	public static InetAddress getWalrusAddress() throws EucalyptusCloudException {
-		if (Topology.isEnabled(ObjectStorage.class)) {
+		if (Topology.isEnabled(Walrus.class)) {
 			return Topology.lookup(ObjectStorage.class).getInetAddress();
+		} else {
+			throw new EucalyptusCloudException("Walrus not ENABLED");
+		}	    
+	}
+	
+	private static Iterator<ServiceConfiguration> objectStores;
+	private static Iterable<ServiceConfiguration> currentStores;
+	
+	public static InetAddress getObjectStorageAddress() throws EucalyptusCloudException {
+		if (Topology.isEnabled(ObjectStorage.class)) {
+			Iterable<ServiceConfiguration> newStores = Topology.lookupMany(ObjectStorage.class);
+			if(objectStores == null || (Iterables.elementsEqual(currentStores, newStores))) {
+				currentStores = newStores;
+				objectStores = Iterators.cycle(currentStores);
+			}
+			return objectStores.next().getInetAddress();
 		} else {
 			throw new EucalyptusCloudException("ObjectStorage not ENABLED");
 		}	    
 	}
+	
 }
