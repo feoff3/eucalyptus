@@ -11,6 +11,10 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 
 /**
  * Declares the set of ACL permissions required to execute the request.
+ * Setting ownerOnly declares the operation to be only executable by the resource owner account.
+ * ownerOnly is typically used for S3 operations that don't have a corresponding ACL
+ * operation. IAM evaluation for users within the owning account must still be
+ * performed
  *
  */
 @Target({ ElementType.TYPE })
@@ -21,5 +25,5 @@ public @interface RequiresACLPermission {
 	 */
 	ObjectStorageProperties.Permission[] bucket();
 	ObjectStorageProperties.Permission[] object();
-
+	boolean ownerOnly() default false;
 }

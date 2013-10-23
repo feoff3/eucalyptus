@@ -16,7 +16,7 @@ import com.google.common.base.Supplier;
 
 public class Objects implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(Objects.class);
-
+	
 	@Override
 	public boolean exists(String bucketName, String objectKey, String versionId) throws TransactionException {
 		return lookupAndClose(bucketName, objectKey, versionId) != null;
@@ -26,7 +26,7 @@ public class Objects implements ObjectManager {
 	public ObjectEntity lookupAndClose(String bucketName, String objectKey, String versionId) throws TransactionException {
 		try {
 			ObjectEntity objectExample = new ObjectEntity(bucketName, objectKey, versionId);
-			ObjectEntity foundObject = Transactions.find(objectExample);			
+			ObjectEntity foundObject = Transactions.find(objectExample);		
 			return foundObject;
 		} catch (TransactionException e) {
 			if(e.getCause() instanceof NoSuchElementException) {

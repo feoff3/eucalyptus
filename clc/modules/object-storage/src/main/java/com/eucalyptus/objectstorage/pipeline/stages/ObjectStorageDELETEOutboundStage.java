@@ -64,6 +64,7 @@ package com.eucalyptus.objectstorage.pipeline.stages;
 
 import org.jboss.netty.channel.ChannelPipeline;
 
+import com.eucalyptus.objectstorage.pipeline.handlers.ObjectStorageDELETEOutboundHandler;
 import com.eucalyptus.objectstorage.pipeline.handlers.ObjectStorageOutboundHandler;
 import com.eucalyptus.ws.stages.UnrollableStage;
 
