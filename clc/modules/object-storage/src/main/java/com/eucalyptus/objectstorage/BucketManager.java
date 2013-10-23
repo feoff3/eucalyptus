@@ -2,6 +2,7 @@ package com.eucalyptus.objectstorage;
 
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -11,6 +12,7 @@ import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.google.common.base.Predicate;
 
@@ -20,6 +22,22 @@ import com.google.common.base.Predicate;
  * must succeed in order for the metadata/db operation to be committed (e.g. creating a bucket on a filesystem or backend).
  */
 public interface BucketManager {
+
+	/**
+	 * Create the bucket
+	 * @param bucketName
+	 * @param ownerCanonicalId
+	 * @param resourceModifier
+	 * @return
+	 * @throws TransactionException
+	 */
+	public abstract <T extends Object ,R extends Object> T create(@Nonnull String bucketName, 
+			@Nonnull String ownerCanonicalId,
+			@Nonnull String ownerIamUserId,
+			@Nonnull String acl, 
+			@Nonnull String location,			
+			@Nullable ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
+
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
 	 * @param bucketName
@@ -38,16 +56,16 @@ public interface BucketManager {
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */
-	public abstract List<Bucket> listByUser(@Nonnull String ownerCanonicalId, @Nonnull String userIamId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+	public abstract List<Bucket> listByUser(@Nonnull String userIamId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
 	
+	public abstract long countByUser(@Nonnull String userIamId, boolean includeHidden, Callable<Boolean> resourceModifier) throws ExecutionException;
+
 	/**
 	 * Checks if bucket exists.
 	 * @param bucketName
 	 * @return
 	 */
 	public abstract boolean exists(@Nonnull String bucketName, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
-	
-	public abstract void create(@Nonnull String bucketName, @Nonnull String ownerCanonicalId, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
 	
 	/**
 	 * Delete the bucket by name. Idempotent operation

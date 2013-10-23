@@ -132,7 +132,25 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			this.decodedAcl = resultMap;
 		}
 	}
-	
+
+	/**
+	 * Utility method for getting the string version of an access control list
+	 * @param acl
+	 * @return
+	 */
+	public static String decodeAclToString(AccessControlList acl) {
+		Map<String, Integer> resultMap = AccessControlListToInternal.INSTANCE.apply(acl);
+		ObjectMapper mapper = new ObjectMapper();
+		
+		try {
+			//Serialize into json
+			return mapper.writeValueAsString(resultMap);
+		} catch (IOException e) {
+			LOG.error("Error mapping: " + acl.toString() + " to json via mapper");				
+			return null;
+		}
+		
+	}
 	
 	/**
 	 * Returns the message-typed version of the acl policy.

@@ -386,7 +386,6 @@ public class PostObjectResponseType extends ObjectStorageDataResponseType {
 	String key;
 }
 
-
 /* PUT /bucket/object with x-amz-copy-src header */
 public class CopyObjectType extends ObjectStorageRequestType {
 	String sourceBucket;

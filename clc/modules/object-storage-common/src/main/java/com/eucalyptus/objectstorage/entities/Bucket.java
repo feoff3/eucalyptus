@@ -106,11 +106,11 @@ public class Bucket extends S3AccessControlledEntity {
 
 	@Column(name="versioning")
 	private String versioning;
-	
+		
 	//Needed for enforcing IAM size quotas, to prevent having to scan all objects
 	@Column(name="bucket_size")
 	private Long bucketSize;
-
+	
 	public Long getBucketSize() {
 		return bucketSize;
 	}

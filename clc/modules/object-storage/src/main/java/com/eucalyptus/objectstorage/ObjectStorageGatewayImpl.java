@@ -65,6 +65,7 @@ package com.eucalyptus.objectstorage;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
@@ -610,7 +611,7 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageGateway#CreateBucket(com.eucalyptus.objectstorage.msgs.CreateBucketType)
 	 */
 	@Override
-	public CreateBucketResponseType CreateBucket(CreateBucketType request) throws EucalyptusCloudException {
+	public CreateBucketResponseType CreateBucket(final CreateBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
 		Bucket bucket = Buckets.INSTANCE.get(request.getBucket(), null);
@@ -618,8 +619,56 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 			throw new NoSuchBucketException(request.getBucket());			
 		}
 		
-		if(operationAllowed(request, bucket, null, 1)) {
-			return ospClient.createBucket(request);
+		String userId = null;
+		String canonicalId = null;
+		long bucketCount = 0;
+		try {
+			canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
+			userId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getUserId();
+			bucketCount = Buckets.INSTANCE.countByUser(userId, false, null);
+		} catch( AuthException e) {
+			LOG.error("Failed userID lookup for accesskeyID " + request.getAccessKeyID());
+			throw new AccessDeniedException(request.getBucket());
+		} catch(ExecutionException e) {
+			LOG.error("Failed getting bucket count for user " + userId);
+			//Don't fail the operation, the count may not be important
+			bucketCount = 0;
+		} catch (NoSuchContextException e) {
+			LOG.error("Error finding context to lookup canonical Id of user", e);
+			throw new InternalErrorException(request.getBucket());
+		}
+		
+		if(operationAllowed(request, bucket, null, bucketCount + 1)) {
+			try {
+				return Buckets.INSTANCE.create(request.getBucket(),
+						canonicalId,
+						userId,
+						S3AccessControlledEntity.decodeAclToString(request.getAccessControlList()), 
+						request.getLocationConstraint(),
+						new ReversableOperation<CreateBucketResponseType, Boolean>() {
+					public CreateBucketResponseType call() throws Exception {
+						return ospClient.createBucket(request);
+					}
+					
+					public Boolean rollback(CreateBucketResponseType arg) throws Exception {
+						DeleteBucketType deleteRequest = new DeleteBucketType();
+						deleteRequest.setBucket(arg.getBucket());					
+						try {
+							DeleteBucketResponseType response = ospClient.deleteBucket(deleteRequest);
+							return response.get_return();
+						} catch(Exception e) {
+							LOG.error("Rollback (deletebucket) for createbucket " + arg.getBucket() + " failed",e);
+							return false;
+						}
+					}
+				});
+			} catch(TransactionException e) {
+				LOG.error("Error creating bucket metadata. Failing create for bucket " + request.getBucket(), e);
+				throw new InternalErrorException(request.getBucket());
+			} catch(Exception e) {
+				LOG.error("Unknown exception caused failure of CreateBucket for bucket " + request.getBucket(), e);
+				throw new InternalErrorException(request.getBucket());
+			}
 		} else {
 			throw new AccessDeniedException(request.getBucket());			
 		}
