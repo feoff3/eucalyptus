@@ -301,7 +301,6 @@
 	</mapping>
 
 	<mapping name="DeleteBucketResponse" class="com.eucalyptus.objectstorage.msgs.DeleteBucketResponseType">
-			<structure name="DeleteBucketResponse" field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />
 	</mapping>
 
 	<mapping name="PutObjectResponse" class="com.eucalyptus.objectstorage.msgs.PutObjectResponseType">
