@@ -380,6 +380,7 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 	 * @param optionalResourceId optional (can be null) explicit resourceId to check. If null, the request is used to get the resource.
 	 * @param optionalOwnerId optional (can be null) owner Id for the resource being evaluated.
 	 * @param optionalResourceAcl option acl for the requested resource
+	 * @param resourceAllocationSize the size for the quota check(s) if applicable
 	 * @return
 	 */
 	protected static <T extends ObjectStorageRequestType> boolean operationAllowed(@Nonnull T request, @Nullable final S3AccessControlledEntity bucketResourceEntity, @Nullable final S3AccessControlledEntity objectResourceEntity, long resourceAllocationSize) throws IllegalArgumentException {

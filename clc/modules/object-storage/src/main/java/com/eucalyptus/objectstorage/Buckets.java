@@ -92,5 +92,21 @@ public enum Buckets implements BucketManager {
 			throw e;
 		}
 	}
+	
+	@Override
+	public List<Bucket> listByUser(String ownerCanonicalId, String userIamId, boolean includeHidden, Callable<Boolean> resourceModifier) throws TransactionException {
+		Bucket searchBucket = new Bucket();
+		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
+		searchBucket.setHidden(includeHidden);
+		searchBucket.setOwnerIamUserId(userIamId);
+		List<Bucket> buckets = null;
+		try {
+			buckets = Transactions.findAll(searchBucket);
+			return buckets;
+		} catch (TransactionException e) {
+			LOG.error("Error listing buckets for user " + ownerCanonicalId + " due to DB transaction error", e);
+			throw e;
+		}
+	}
 
 }

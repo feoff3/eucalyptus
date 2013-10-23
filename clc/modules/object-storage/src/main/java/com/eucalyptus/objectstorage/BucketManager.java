@@ -33,6 +33,12 @@ public interface BucketManager {
 	 * @return
 	 */
 	public abstract List<Bucket> list(@Nonnull String ownerCanonicalId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+
+	/**
+	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
+	 * @return
+	 */
+	public abstract List<Bucket> listByUser(@Nonnull String ownerCanonicalId, @Nonnull String userIamId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
 	
 	/**
 	 * Checks if bucket exists.
