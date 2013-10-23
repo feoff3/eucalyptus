@@ -1,5 +1,5 @@
 /*************************************************************************
- * Copyright 2009-2012 Eucalyptus Systems, Inc.
+ * Copyright 2009-2013 Eucalyptus Systems, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,48 +16,6 @@
  * Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
  * CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
  * additional information or have any questions.
- *
- * This file may incorporate work covered under the following copyright
- * and permission notice:
- *
- *   Software License Agreement (BSD License)
- *
- *   Copyright (c) 2008, Regents of the University of California
- *   All rights reserved.
- *
- *   Redistribution and use of this software in source and binary forms,
- *   with or without modification, are permitted provided that the
- *   following conditions are met:
- *
- *     Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *
- *     Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer
- *     in the documentation and/or other materials provided with the
- *     distribution.
- *
- *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *   FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *   COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *   BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *   POSSIBILITY OF SUCH DAMAGE. USERS OF THIS SOFTWARE ACKNOWLEDGE
- *   THE POSSIBLE PRESENCE OF OTHER OPEN SOURCE LICENSED MATERIAL,
- *   COPYRIGHTED MATERIAL OR PATENTED MATERIAL IN THIS SOFTWARE,
- *   AND IF ANY SUCH MATERIAL IS DISCOVERED THE PARTY DISCOVERING
- *   IT MAY INFORM DR. RICH WOLSKI AT THE UNIVERSITY OF CALIFORNIA,
- *   SANTA BARBARA WHO WILL THEN ASCERTAIN THE MOST APPROPRIATE REMEDY,
- *   WHICH IN THE REGENTS' DISCRETION MAY INCLUDE, WITHOUT LIMITATION,
- *   REPLACEMENT OF THE CODE SO IDENTIFIED, LICENSING OF THE CODE SO
- *   IDENTIFIED, OR WITHDRAWAL OF THE CODE CAPABILITY TO THE EXTENT
- *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
 package com.eucalyptus.objectstorage;
@@ -65,7 +23,6 @@ package com.eucalyptus.objectstorage;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
@@ -95,10 +52,12 @@ import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
+import com.eucalyptus.objectstorage.auth.OSGAuthorizationHandler;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
@@ -167,7 +126,6 @@ import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.system.Ats;
 import com.eucalyptus.util.EucalyptusCloudException;
-import com.eucalyptus.util.Lookups;
 import com.google.common.base.Function;
 import com.google.common.base.Strings;
 
@@ -356,197 +314,6 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 			return null;
 		}	
 	}
-
-
-	/**
-	 * Does the current request have an authenticated user? Or is it anonymous?
-	 * @return
-	 */
-	protected static boolean isUserAnonymous() {
-		Context ctx = Contexts.lookup();
-		return (ctx.getAccount() == null || ctx.getAccount().equals(Principals.nobodyAccount()));
-	}
-
-	/**
-	 * Does the current context have admin priviledges
-	 * @return
-	 */
-	protected static boolean isAdminUser() {
-		return Contexts.lookup().hasAdministrativePrivileges();
-	}
-
-	/**
-	 * Evaluates the authorization for the operation requested, evaluates IAM, ACL, and bucket policy (bucket policy not yet supported).
-	 * @param request
-	 * @param optionalResourceId optional (can be null) explicit resourceId to check. If null, the request is used to get the resource.
-	 * @param optionalOwnerId optional (can be null) owner Id for the resource being evaluated.
-	 * @param optionalResourceAcl option acl for the requested resource
-	 * @param resourceAllocationSize the size for the quota check(s) if applicable
-	 * @return
-	 */
-	protected static <T extends ObjectStorageRequestType> boolean operationAllowed(@Nonnull T request, @Nullable final S3AccessControlledEntity bucketResourceEntity, @Nullable final S3AccessControlledEntity objectResourceEntity, long resourceAllocationSize) throws IllegalArgumentException {
-		/*
-		 * Process the operation's authz requirements based on the request type annotations
-		 */
-		Ats requestAuthzProperties = Ats.from(request);
-		ObjectStorageProperties.Permission[] requiredBucketACLPermissions = null;
-		ObjectStorageProperties.Permission[] requiredObjectACLPermissions = null;
-		Boolean allowOwnerOnly = null;
-		RequiresACLPermission requiredACLs = requestAuthzProperties.get(RequiresACLPermission.class);
-		if(requiredACLs != null) {
-			requiredBucketACLPermissions = requiredACLs.bucket();
-			requiredObjectACLPermissions = requiredACLs.object();
-			allowOwnerOnly = requiredACLs.ownerOnly();
-		} else {
-			//No ACL annotation is ok, maybe a admin only op
-		}
-		
-		String[] requiredActions = null;
-		RequiresPermission perms = requestAuthzProperties.get(RequiresPermission.class);
-		if(perms != null) {
-			requiredActions = perms.value(); 
-		}
-
-		Boolean allowAdmin = (requestAuthzProperties.get(AdminOverrideAllowed.class) != null);
-		Boolean allowOnlyAdmin = (requestAuthzProperties.get(AdminOverrideAllowed.class) != null) && requestAuthzProperties.get(AdminOverrideAllowed.class).adminOnly();
-		
-		//Must have at least one of: admin-only, owner-only, ACL, or IAM.
-		if(requiredBucketACLPermissions == null && 
-				requiredObjectACLPermissions == null &&
-				requiredActions == null &&
-				!allowAdmin) {
-			//Insufficient permission set on the message type.
-			throw new IllegalArgumentException("Insufficient permission annotations on type: " + request.getClass().getName() + " cannot evaluate authorization");
-		}
-		
-		String resourceType = null;
-		if(requestAuthzProperties.get(ResourceType.class) != null) {
-			resourceType = requestAuthzProperties.get(ResourceType.class).value();
-		}
-				
-		if(allowAdmin && isAdminUser()) {
-			//Admin override
-			return true;
-		}
-		
-		Account resourceOwnerAccount = null;
-		User requestUser = null;
-		Account requestAccount = null;
-		try {			
-			try {
-				requestAccount = Contexts.lookup(request.getCorrelationId()).getAccount();
-			} catch(NoSuchContextException e) {
-				//This is not an expected path, but if no context found use the request credentials itself
-				if(!Strings.isNullOrEmpty(request.getEffectiveUserId())) {
-					requestAccount = Accounts.lookupAccessKeyById(request.getEffectiveUserId()).getUser().getAccount();
-				} else if(!Strings.isNullOrEmpty(request.getAccessKeyID())) {
-					requestAccount = Accounts.lookupAccessKeyById(request.getAccessKeyID()).getUser().getAccount();
-				}
-			}
-		} catch (AuthException e) {
-			LOG.error("Failed to get user for request, cannot verify authorization: " + e.getMessage(), e);				
-			return false;
-		}
-		
-		if(resourceType == null) {
-			throw new IllegalArgumentException("No resource type found in request class annotations, cannot process.");
-		} else {
-			try {
-				//Ensure we have the proper resource entities present and get owner info						
-				if(PolicySpec.S3_RESOURCE_BUCKET.equals(resourceType)) {
-					//Get the bucket owner.
-					if(bucketResourceEntity == null) {
-						LOG.error("Could not check access for operation due to no bucket resource entity found");
-						return false;
-					}
-					resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(bucketResourceEntity.getOwnerCanonicalId());
-				} else if(PolicySpec.S3_RESOURCE_OBJECT.equals(resourceType)) {
-					if(objectResourceEntity == null) {
-						LOG.error("Could not check access for operation due to no object resource entity found");
-						return false;
-					}
-					resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(objectResourceEntity.getOwnerCanonicalId());
-				}
-			} catch(AuthException e) {
-				LOG.error("Exception caught looking up resource owner. Disallowing operation.",e);
-				return false;
-			}
-		}
-		
-		//Get the resourceId based on IAM resource type
-		String resourceId = null;
-		if(resourceId == null ) {
-			if(resourceType.equals(PolicySpec.S3_RESOURCE_BUCKET)) {
-				resourceId = request.getBucket();
-			} else if(resourceType.equals(PolicySpec.S3_RESOURCE_OBJECT)) {
-				resourceId = request.getKey();
-			}
-		}
-		
-		if(requiredBucketACLPermissions == null && requiredObjectACLPermissions == null) {
-			throw new IllegalArgumentException("No requires-permission actions found in request class annotations, cannot process.");
-		}
-
-		/* ACL Checks */
-		//Is the user's account allowed?
-		Boolean aclAllow = false;
-		
-		if(requiredBucketACLPermissions != null && requiredBucketACLPermissions.length > 0) {
-			//Check bucket ACLs
-			
-			if(bucketResourceEntity == null) {
-				//There are bucket ACL requirements but no bucket entity to check. fail.
-				//Don't bother with other checks, this is an invalid state
-				throw new IllegalArgumentException("Null bucket resource, cannot evaluate bucket ACL");
-			}
-			
-			//Evaluate the bucket ACL, any matching grant gives permission
-			for(ObjectStorageProperties.Permission permission : requiredBucketACLPermissions) {
-				aclAllow = aclAllow || bucketResourceEntity.can(permission, requestAccount.getCanonicalId());
-			}
-		}
-		
-		//Check object ACLs, if any
-		if(requiredObjectACLPermissions != null && requiredObjectACLPermissions.length > 0) {
-			if(objectResourceEntity == null) {
-				//There are object ACL requirements but no object entity to check. fail.
-				//Don't bother with other checks, this is an invalid state				
-				throw new IllegalArgumentException("Null bucket resource, cannot evaluate bucket ACL");
-			}
-			for(ObjectStorageProperties.Permission permission : requiredObjectACLPermissions) {
-				aclAllow = aclAllow || objectResourceEntity.can(permission, requestAccount.getCanonicalId());
-			}
-		}
-
-		/* Resource owner only? if so, override any previous acl decisions
-		 * It is not expected that owneronly is set as well as other ACL permissions,
-		 * Regular owner permissions (READ, WRITE, READ_ACP, WRITE_ACP) are handled by the regular acl checks.
-		 * OwnerOnly should be only used for operations not covered by the other Permissions (e.g. logging, or versioning)
-		 */
-		aclAllow = (allowOwnerOnly ? resourceOwnerAccount.getAccountNumber().equals(requestAccount.getAccountNumber()) : aclAllow);
-		
-		/* IAM checks for user */		
-		Boolean iamAllow = true;
-		//Evaluate each iam action required, all must be allowed
-		for(String action : requiredActions ) {
-			/*Permissions.isAuthorized(vendor, resourceType, resourceName, resourceAccount, action, requestUser);
-			Permissions.canAllocate(
-					PolicySpec.VENDOR_S3,
-					PolicySpec.S3_RESOURCE_BUCKET, "",
-					PolicySpec.S3_CREATEBUCKET, ctx.getUser(), 1L)
-					*/
-			iamAllow = Permissions.isAuthorized(PolicySpec.VENDOR_S3,
-					resourceType, resourceId,
-					resourceOwnerAccount , action,
-					requestUser) && Permissions.canAllocate(
-					PolicySpec.VENDOR_S3,
-					resourceType, resourceId,
-					action, requestUser, resourceAllocationSize);
-			//iamAllow = iamAllow && !Lookups.checkPrivilege(action, PolicySpec.VENDOR_S3, resourceType, resourceId, resourceOwnerAccountId);
-		}
-		
-		return aclAllow && iamAllow;
-	}
 	
 	/**
 	 * A terse request logging function to log request entry at INFO level.
@@ -600,7 +367,7 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 			throw new NoSuchBucketException(request.getBucket());				
 		}
 		
-		if(operationAllowed(request, bucket, null, 0)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 			return ospClient.headBucket(request);
 		} else {
 			throw new AccessDeniedException(request.getBucket());			
@@ -638,8 +405,18 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 			throw new InternalErrorException(request.getBucket());
 		}
 		
-		if(operationAllowed(request, bucket, null, bucketCount + 1)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, bucketCount + 1)) {
 			try {
+				/* 
+				 * This is a secondary check, independent to the iam quota check, based on the configured max bucket count property.
+				 * The count does not include "hidden" buckets for snapshots etc since the user has no direct control of those via the s3 endpoint 
+				 */
+				if (ObjectStorageProperties.shouldEnforceUsageLimits
+						&& !Contexts.lookup().hasAdministrativePrivileges() &&					
+						Buckets.INSTANCE.countByAccount(canonicalId, true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
+					throw new TooManyBucketsException(request.getBucket());					
+				}
+				
 				return Buckets.INSTANCE.create(request.getBucket(),
 						canonicalId,
 						userId,
@@ -685,7 +462,7 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 			throw new NoSuchBucketException(request.getBucket());			
 		}
 		
-		if(operationAllowed(request, bucket, null, 0)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 			return ospClient.deleteBucket(request);
 		} else {
 			throw new AccessDeniedException(request.getBucket());			
@@ -710,7 +487,7 @@ public class ObjectStorageGatewayImpl implements ObjectStorageGateway {
 	public ListAllMyBucketsResponseType ListAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
-		if(operationAllowed(request, null, null, 0)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
 			ListAllMyBucketsResponseType response = (ListAllMyBucketsResponseType) request.getReply();
 			/*
 			 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.

@@ -1,8 +1,29 @@
+/*************************************************************************
+ * Copyright 2009-2013 Eucalyptus Systems, Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see http://www.gnu.org/licenses/.
+ *
+ * Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
+ * CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
+ * additional information or have any questions.
+ ************************************************************************/
+
 package com.eucalyptus.objectstorage.entities;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import javax.persistence.Column;
@@ -12,9 +33,10 @@ import javax.persistence.PostLoad;
 import javax.persistence.PrePersist;
 import javax.persistence.Transient;
 
+import net.sf.json.JSONObject;
+import net.sf.json.JSONSerializer;
+
 import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
 import org.hibernate.annotations.Type;
 
 import com.eucalyptus.auth.Accounts;
@@ -55,7 +77,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	private String acl; //A JSON encoded string that is the acl list.
 	
 	/**
-	 * Map for running actual checks against. Saved to optimize multiple accesses
+	 * Map for running actual checks against. Saved to optimize multiple accesses. Caching
 	 */
 	@Transient
 	private Map<String, Integer> decodedAcl = null;
@@ -99,7 +121,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		return this.acl;
 	}
 	
-	public synchronized void setAcl(String aclString) {
+	public void setAcl(String aclString) {
 		this.acl = aclString;
 		setDecodedAcl(null);
 	}
@@ -111,6 +133,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 */
 	public void setAcl(final AccessControlPolicy msgAcl) throws Exception {
 		AccessControlPolicy policy = msgAcl;
+		
 		//Add the owner info if not already set
 		if(policy.getOwner() == null && this.getOwnerCanonicalId() != null) {
 			policy.setOwner(new CanonicalUser(this.getOwnerCanonicalId(),""));
@@ -118,19 +141,11 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			//Already present or can't be set
 		}
 		
-		Map<String, Integer> resultMap = AccessControlPolicyToInternal.INSTANCE.apply(policy);
-		ObjectMapper mapper = new ObjectMapper();
+		Map<String, Integer> resultMap = AccessControlPolicyToMap.INSTANCE.apply(policy);
 		
-		synchronized(this) {
-			try {
-				//Serialize into json
-				this.acl = mapper.writeValueAsString(resultMap);
-			} catch (IOException e) {
-				LOG.error("Error mapping: " + msgAcl.toString() + " to json via mapper");				
-				return;
-			}
-			this.decodedAcl = resultMap;
-		}
+		//Serialize into json
+		setAcl(JSONObject.fromObject(resultMap).toString());
+		setDecodedAcl(resultMap);		
 	}
 
 	/**
@@ -139,17 +154,10 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @return
 	 */
 	public static String decodeAclToString(AccessControlList acl) {
-		Map<String, Integer> resultMap = AccessControlListToInternal.INSTANCE.apply(acl);
-		ObjectMapper mapper = new ObjectMapper();
-		
-		try {
-			//Serialize into json
-			return mapper.writeValueAsString(resultMap);
-		} catch (IOException e) {
-			LOG.error("Error mapping: " + acl.toString() + " to json via mapper");				
-			return null;
-		}
-		
+		Map<String, Integer> resultMap = AccessControlListToMap.INSTANCE.apply(acl);
+				
+		//Serialize into json
+		return JSONObject.fromObject(resultMap).toString();
 	}
 	
 	/**
@@ -159,7 +167,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @throws Exception
 	 */
 	public AccessControlPolicy getAccessControlPolicy() throws Exception {
-		return InternalToAccessControlPolicy.INSTANCE.apply(getDecodedAcl());
+		return MapToAccessControlPolicy.INSTANCE.apply(getDecodedAcl());
 	}
 	
 	/**
@@ -203,23 +211,30 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		return false;
 	}
 	
-	private synchronized void setDecodedAcl(Map<String, Integer> r) {
-		this.decodedAcl = r;
+	private synchronized void setDecodedAcl(Map<String, Integer> permissionsMap) {
+		this.decodedAcl = permissionsMap;
 	}
 	
 	private synchronized Map<String, Integer> getDecodedAcl() throws Exception {
-		if(decodedAcl == null) {
+		if(this.decodedAcl == null) {
 			try {
-				ObjectMapper mapper = new ObjectMapper();
 				//Jackson requires this method to handle generics
-				this.decodedAcl = mapper.readValue(this.acl, new TypeReference<Map<String, Integer>>(){});
+				Map<String, Integer> aclMap = new HashMap<String,Integer>();
+				JSONObject aclJson = (JSONObject)JSONSerializer.toJSON(this.getAcl());
+				String key = null;
+				Iterator keys = aclJson.keys();
+				while(keys.hasNext()) {
+					key = (String)keys.next();
+					aclMap.put((String)key, new Integer(aclJson.getInt((String)key)));
+				}
+				setDecodedAcl(aclMap);
 			} catch(Exception e) {
 				setDecodedAcl(null);
 				LOG.error("Error decoding acl from DB string",e);	
 				throw e;
 			}
 		}	
-		return decodedAcl;
+		return this.decodedAcl;
 	}
 	
 	/**
@@ -229,7 +244,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @author zhill
 	 *
 	 */
-	public enum InternalToAccessControlPolicy implements Function<Map<String, Integer>, AccessControlPolicy> {
+	protected enum MapToAccessControlPolicy implements Function<Map<String, Integer>, AccessControlPolicy> {
 		INSTANCE;
 		
 		@Override
@@ -251,7 +266,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),""));
 				}
 				
-				for(Grant g : AccountGrantsFromInternal.INSTANCE.apply(entry.getValue())) {
+				for(Grant g : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
 					g.setGrantee(grantee);
 					grants.add(g);
 				}
@@ -267,7 +282,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * the persistence type
 	 * @param msg
 	 */	
-	public enum AccessControlPolicyToInternal implements Function<AccessControlPolicy, Map<String, Integer>> {
+	protected enum AccessControlPolicyToMap implements Function<AccessControlPolicy, Map<String, Integer>> {
 		INSTANCE;	
 		
 		/**
@@ -276,7 +291,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		@Override
 		public Map<String, Integer> apply(AccessControlPolicy srcPolicy) {
 			Map<String, Integer> aclMap = null;
-			aclMap = AccessControlListToInternal.INSTANCE.apply(srcPolicy.getAccessControlList());
+			aclMap = AccessControlListToMap.INSTANCE.apply(srcPolicy.getAccessControlList());
 			
 			//Should be an empty map if nothing in the list. null is an error.
 			if(aclMap == null) {
@@ -313,7 +328,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @author zhill
 	 *
 	 */
-	public enum AccessControlListToInternal implements Function<AccessControlList, Map<String, Integer>> {
+	protected enum AccessControlListToMap implements Function<AccessControlList, Map<String, Integer>> {
 		INSTANCE;	
 		
 		/**
@@ -381,7 +396,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * 
 	 * Represents the grant(s) for a single canonicalId/group
 	 */
-	public enum AccountGrantsFromInternal implements Function<Integer, Grant[]> {
+	protected enum AccountGrantsFromBitmap implements Function<Integer, Grant[]> {
 		INSTANCE;
 		
 		@Override
@@ -423,7 +438,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @author zhill
 	 *
 	 */
-	public enum BitmapGrant {
+	protected enum BitmapGrant {
 		INSTANCE;
 		
 		private static final int readMask = 8; //4th bit from right
