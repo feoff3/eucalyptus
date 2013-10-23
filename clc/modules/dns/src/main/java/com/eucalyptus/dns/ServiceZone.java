@@ -64,6 +64,7 @@ package com.eucalyptus.dns;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.xbill.DNS.ARecord;
@@ -163,14 +164,15 @@ public class ServiceZone extends Zone {
         return resp;
     } else if (name.toString().startsWith("objectstorage.")) {
     	SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);
-        InetAddress osgIp = null;
           try {
-		    osgIp = ObjectStorageProperties.getObjectStorageAddress();
+		    List<InetAddress>osgIps = ObjectStorageProperties.getObjectStorageAddress();
+		    for ( InetAddress osgIp : osgIps ) {
+			  resp.addRRset( new RRset( new ARecord( name, 1, 20/*ttl*/, osgIp ) ) );
+		    }
           } catch (EucalyptusCloudException e) {
         	LOG.error(e);
         	return super.findRecords( name, type );
           }
-		  resp.addRRset( new RRset( new ARecord( name, 1, 20/*ttl*/, osgIp ) ) );
 		  return resp;
 	} else if (name.toString().startsWith("walrus.")) {
     	SetResponse resp = new SetResponse(SetResponse.SUCCESSFUL);

@@ -79,7 +79,9 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public class ObjectStorageProperties {
@@ -328,17 +330,23 @@ public class ObjectStorageProperties {
 		}	    
 	}
 	
-	private static Iterator<ServiceConfiguration> objectStores;
+	private static Iterator<ServiceConfiguration> rrStores;
 	private static Iterable<ServiceConfiguration> currentStores;
 	
-	public static InetAddress getObjectStorageAddress() throws EucalyptusCloudException {
+	public static List<InetAddress> getObjectStorageAddress() throws EucalyptusCloudException {
 		if (Topology.isEnabled(ObjectStorage.class)) {
 			Iterable<ServiceConfiguration> newStores = Topology.lookupMany(ObjectStorage.class);
-			if(objectStores == null || (Iterables.elementsEqual(currentStores, newStores))) {
+			List<InetAddress> addresses = new ArrayList<InetAddress>();
+			if(rrStores == null || (!Iterables.elementsEqual(currentStores, newStores))) {
 				currentStores = newStores;
-				objectStores = Iterators.cycle(currentStores);
+				rrStores = Iterators.cycle(currentStores);
 			}
-			return objectStores.next().getInetAddress();
+			Iterator<ServiceConfiguration> current = currentStores.iterator();
+			while(current.hasNext()) {
+				current.next();
+				addresses.add(rrStores.next().getInetAddress());
+			}
+			return addresses;
 		} else {
 			throw new EucalyptusCloudException("ObjectStorage not ENABLED");
 		}	    
