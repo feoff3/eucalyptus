@@ -58,6 +58,7 @@ import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
@@ -123,6 +124,7 @@ import com.eucalyptus.objectstorage.policy.RequiresACLPermission;
 import com.eucalyptus.objectstorage.policy.RequiresPermission;
 import com.eucalyptus.objectstorage.policy.ResourceType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
@@ -466,11 +468,15 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						BucketManagerFactory.getInstance().countByAccount(canonicalId, true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
+
+				final AccessControlPolicy acPolicy = new AccessControlPolicy();
+				acPolicy.setAccessControlList(request.getAccessControlList());
+				acPolicy.setOwner(new CanonicalUser(canonicalId,""));
 				
 				return BucketManagerFactory.getInstance().create(request.getBucket(),
 						canonicalId,
 						userId,
-						S3AccessControlledEntity.decodeAclToString(request.getAccessControlList()), 
+						S3AccessControlledEntity.marshallACPToString(acPolicy), 
 						request.getLocationConstraint(),
 						new ReversableOperation<CreateBucketResponseType, Boolean>() {
 					public CreateBucketResponseType call() throws Exception {
@@ -492,6 +498,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			} catch(TransactionException e) {
 				LOG.error("Error creating bucket metadata. Failing create for bucket " + request.getBucket(), e);
 				throw new InternalErrorException(request.getBucket());
+			} catch(S3Exception e) {
+				LOG.error("Error creating bucket " + request.getBucket(), e);
+				throw e;
 			} catch(Exception e) {
 				LOG.error("Unknown exception caused failure of CreateBucket for bucket " + request.getBucket(), e);
 				throw new InternalErrorException(request.getBucket());

@@ -153,8 +153,15 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @param acl
 	 * @return
 	 */
-	public static String decodeAclToString(AccessControlList acl) {
+	public static String marshallAclToString(AccessControlList acl) {
 		Map<String, Integer> resultMap = AccessControlListToMap.INSTANCE.apply(acl);
+				
+		//Serialize into json
+		return JSONObject.fromObject(resultMap).toString();
+	}
+	
+	public static String marshallACPToString(AccessControlPolicy acl) {
+		Map<String, Integer> resultMap = AccessControlPolicyToMap.INSTANCE.apply(acl);
 				
 		//Serialize into json
 		return JSONObject.fromObject(resultMap).toString();
@@ -338,6 +345,11 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		public Map<String, Integer> apply(AccessControlList srcList) {
 			HashMap<String, Integer> aclMap = new HashMap<String, Integer>();
 			String canonicalId = null;
+			if(srcList == null) {
+				//Nothing to do
+				return aclMap;
+			}
+			
 			for(Grant g: srcList.getGrants()) {
 				if(g.getGrantee() == null || Strings.isNullOrEmpty(g.getPermission())) {
 					//Invalid message.
@@ -401,6 +413,10 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		
 		@Override
 		public Grant[] apply(Integer srcBitmap) {
+			if(srcBitmap == null) {
+				return null;
+			}
+			
 			Grant[] grants = new Grant[3];
 			
 			if(BitmapGrant.allows(ObjectStorageProperties.Permission.FULL_CONTROL, srcBitmap)) {
