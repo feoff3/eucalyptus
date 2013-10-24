@@ -57,6 +57,7 @@ import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
@@ -123,6 +124,7 @@ import com.eucalyptus.objectstorage.policy.RequiresPermission;
 import com.eucalyptus.objectstorage.policy.ResourceType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
+import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.system.Ats;
 import com.eucalyptus.util.EucalyptusCloudException;
@@ -143,7 +145,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 	private static ObjectStorageProviderClient ospClient = null;
 	protected static ConcurrentHashMap<String, ChannelBuffer> streamDataMap = new ConcurrentHashMap<String, ChannelBuffer>();
-
+	protected static final String USR_EMAIL_KEY = "email";//lookup for account admins email
+	
 	public ObjectStorageGateway() {}
 	
 	public static void checkPreconditions() throws EucalyptusCloudException, ExecutionException {}
@@ -215,6 +218,41 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 		//Be sure it's empty
 		streamDataMap.clear();
+	}
+	
+	/**
+	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
+	 */
+	private boolean checkBucketName(String bucketName) {
+		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
+			return false;
+		if(bucketName.length() < 3 || bucketName.length() > 255)
+			return false;
+		String[] addrParts = bucketName.split("\\.");
+		boolean ipFormat = true;
+		if(addrParts.length == 4) {
+			for(String addrPart : addrParts) {
+				try {
+					Integer.parseInt(addrPart);
+				} catch(NumberFormatException ex) {
+					ipFormat = false;
+					break;
+				}
+			}
+		} else {
+			ipFormat = false;
+		}		
+		if(ipFormat)
+			return false;
+		return true;
+	}
+	
+	protected String getAccountEmailAddress(String canonicalId) {
+		try {
+			return Accounts.lookupAccountByCanonicalId(canonicalId).lookupAdmin().getInfo(USR_EMAIL_KEY);
+		} catch(Exception e) {
+			return "";
+		}
 	}
 
 	/* (non-Javadoc)
@@ -403,6 +441,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			LOG.error("Error finding context to lookup canonical Id of user", e);
 			throw new InternalErrorException(request.getBucket());
 		}
+		
 		//Fake entity for auth check
 		final S3AccessControlledEntity fakeBucketEntity = new S3AccessControlledEntity() {			
 			@Override
@@ -413,6 +452,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucketEntity, null, bucketCount + 1)) {
 			try {
+				//Check the validity of the bucket name.				
+				if (!checkBucketName(request.getBucket())) {
+					throw new InvalidBucketNameException(request.getBucket());
+				}
+
 				/* 
 				 * This is a secondary check, independent to the iam quota check, based on the configured max bucket count property.
 				 * The count does not include "hidden" buckets for snapshots etc since the user has no direct control of those via the s3 endpoint 
@@ -479,7 +523,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 	}
 	
-	protected ListAllMyBucketsList generateBucketListing(List<Bucket> buckets) {
+	protected static ListAllMyBucketsList generateBucketListing(List<Bucket> buckets) {
 		ListAllMyBucketsList bucketList = new ListAllMyBucketsList();
 		bucketList.setBuckets(new ArrayList<BucketListEntry>());
 		for(Bucket b : buckets ) {
@@ -505,12 +549,17 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			try {
 				canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
 			} catch (NoSuchContextException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				try {
+					canonicalId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getAccount().getCanonicalId();
+				} catch(AuthException ex) {
+					LOG.error("Could not retrieve canonicalId for user with accessKey: " + request.getAccessKeyID());
+					throw new InternalErrorException();
+				}
 			}
 			try {
 				List<Bucket> listing = BucketManagerFactory.getInstance().list(canonicalId, false, null);
-				response.setBucketList(generateBucketListing(listing));			
+				response.setBucketList(generateBucketListing(listing));
+				response.setOwner(new CanonicalUser(canonicalId, getAccountEmailAddress(canonicalId)));				
 				return response;
 			} catch(TransactionException e) {
 				throw new InternalErrorException();

@@ -198,29 +198,6 @@ public class WalrusProviderClient extends S3ProviderClient {
 		this.setUsePathStyle(true);
 	}
 
-	@Override
-	public void check() throws EucalyptusCloudException {}
-
-	@Override
-	public void start() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub
-	}
-
-	@Override
-	public void stop() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
-	@Override
-	public void enable() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
-	@Override
-	public void disable() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
 	/**
 	 * Simply looks up the currently enabled Walrus service.
 	 * @return

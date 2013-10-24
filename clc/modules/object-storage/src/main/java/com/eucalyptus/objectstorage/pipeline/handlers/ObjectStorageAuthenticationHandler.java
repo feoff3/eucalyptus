@@ -103,7 +103,6 @@ import com.eucalyptus.objectstorage.pipeline.auth.ObjectStorageWrappedComponentC
 import com.eucalyptus.objectstorage.pipeline.auth.ObjectStorageWrappedCredentials;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
-import com.eucalyptus.storage.msgs.s3.MissingSecurityHeader;
 import com.eucalyptus.ws.handlers.MessageStackHandler;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;

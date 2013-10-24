@@ -83,33 +83,6 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 	
-	/**
-	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
-	 */
-	private boolean checkBucketName(String bucketName) {
-		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
-			return false;
-		if(bucketName.length() < 3 || bucketName.length() > 255)
-			return false;
-		String[] addrParts = bucketName.split("\\.");
-		boolean ipFormat = true;
-		if(addrParts.length == 4) {
-			for(String addrPart : addrParts) {
-				try {
-					Integer.parseInt(addrPart);
-				} catch(NumberFormatException ex) {
-					ipFormat = false;
-					break;
-				}
-			}
-		} else {
-			ipFormat = false;
-		}		
-		if(ipFormat)
-			return false;
-		return true;
-	}
-	
 	@Override
 	public Bucket get(@Nonnull String bucketName,
 			@Nonnull boolean includeHidden,
@@ -142,9 +115,6 @@ public class DbBucketManagerImpl implements BucketManager {
 			@Nonnull String acl, 
 			@Nonnull String location,
 			@Nullable ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException {
-		
-		if (!checkBucketName(bucketName))
-			throw new InvalidBucketNameException(bucketName);
 
 		Bucket newBucket = new Bucket(bucketName);
 		try {

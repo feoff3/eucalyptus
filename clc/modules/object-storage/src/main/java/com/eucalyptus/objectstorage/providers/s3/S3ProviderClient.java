@@ -223,44 +223,44 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	
 	@Override
 	public void initialize() throws EucalyptusCloudException {
-		LOG.debug("Initializing S3ProviderClient");		
-		LOG.debug("Initialization of S3ProviderClient completed successfully");		
+		LOG.debug("Initializing");		
+		LOG.debug("Initialization completed successfully");		
 	}
 
 	@Override
 	public void check() throws EucalyptusCloudException {
-		LOG.debug("Checking S3ProviderClient");		
-		LOG.debug("Check S3ProviderClient completed successfully");		
+		LOG.debug("Checking");		
+		LOG.debug("Check completed successfully");		
 	}
 	
 	@Override
 	public void checkPreconditions() throws EucalyptusCloudException {
-		LOG.debug("Checking S3ProviderClient preconditions");		
-		LOG.debug("Check S3ProviderClient preconditions completed successfully");
+		LOG.debug("Checking preconditions");		
+		LOG.debug("Check preconditions completed successfully");
 	}
 
 	@Override
 	public void start() throws EucalyptusCloudException {
-		LOG.debug("Starting S3ProviderClient");		
-		LOG.debug("Start of S3ProviderClient completed successfully");		
+		LOG.debug("Starting");		
+		LOG.debug("Start completed successfully");		
 	}
 
 	@Override
 	public void stop() throws EucalyptusCloudException {
-		LOG.debug("Stopping S3ProviderClient");		
-		LOG.debug("Stop of S3ProviderClient completed successfully");		
+		LOG.debug("Stopping");
+		LOG.debug("Stop completed successfully");		
 	}
 
 	@Override
 	public void enable() throws EucalyptusCloudException {
-		LOG.debug("Enabling S3ProviderClient");		
-		LOG.debug("Enable of S3ProviderClient completed successfully");		
+		LOG.debug("Enabling");		
+		LOG.debug("Enable completed successfully");		
 	}
 
 	@Override
 	public void disable() throws EucalyptusCloudException {
-		LOG.debug("Disabling S3ProviderClient");		
-		LOG.debug("Disable of S3ProviderClient completed successfully");
+		LOG.debug("Disabling");		
+		LOG.debug("Disable completed successfully");
 	}
 		
 	/*
