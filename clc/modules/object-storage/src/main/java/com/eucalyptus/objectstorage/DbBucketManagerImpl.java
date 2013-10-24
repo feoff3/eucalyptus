@@ -148,7 +148,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		
 		T result = null;		
 		try {
-			if(resourceModifier != null) { 
+			if(resourceModifier != null) {
 				result = resourceModifier.call();
 			}
 		} catch(Exception e) {
