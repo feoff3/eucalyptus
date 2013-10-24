@@ -21,6 +21,7 @@
 package com.eucalyptus.objectstorage;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
@@ -126,6 +127,8 @@ public class DbBucketManagerImpl implements BucketManager {
 					throw new BucketAlreadyExistsException(bucketName);
 				}
 			}
+		} catch(NoSuchElementException e) {
+			//Expected result, continue	
 		} catch(TransactionException e) {
 			//Lookup failed.
 			LOG.error("Lookup for bucket " + bucketName + " failed during creation checks. Cannot proceed.",e);
@@ -152,7 +155,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 		
 		try {
-			Transactions.save(newBucket);			
+			Transactions.saveDirect(newBucket);			
 		} catch(TransactionException ex) {
 			//Rollback the bucket creation.
 			LOG.error("Error persisting bucket record for bucket " + bucketName, ex);
