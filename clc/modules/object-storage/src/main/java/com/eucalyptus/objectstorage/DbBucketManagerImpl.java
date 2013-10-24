@@ -20,6 +20,7 @@
 
 package com.eucalyptus.objectstorage;
 
+import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
@@ -143,6 +144,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		newBucket.setLoggingEnabled(false);
 		newBucket.setOwnerIamUserId(ownerIamUserId);
 		newBucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
+		newBucket.setCreationDate(new Date());
 		
 		T result = null;		
 		try {
