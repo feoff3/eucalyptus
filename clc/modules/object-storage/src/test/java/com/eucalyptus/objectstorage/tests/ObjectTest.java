@@ -62,8 +62,8 @@
 
 package com.eucalyptus.objectstorage.tests;
 
+import com.eucalyptus.objectstorage.ObjectStorageService;
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
-import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
 
 import java.util.ArrayList;
 
@@ -92,7 +92,7 @@ import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
 @Ignore("Manual development test")
 public class ObjectTest {
 
-	static ObjectStorageGateway bukkit;
+	static ObjectStorageService bukkit;
 
 	@Test
 	public void testObject() throws Exception {
@@ -165,6 +165,6 @@ public class ObjectTest {
 
     @BeforeClass
     public static void setUp() {
-        bukkit = new ObjectStorageGatewayImpl();
+        bukkit = new ObjectStorageGateway();
    }        
 }

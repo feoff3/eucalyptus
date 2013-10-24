@@ -76,7 +76,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 
 /**
- * Base class for all ObjectStorageGatewayImpl REST pipelines.
+ * Base class for all ObjectStorageGateway REST pipelines.
  * @author zhill
  *
  */

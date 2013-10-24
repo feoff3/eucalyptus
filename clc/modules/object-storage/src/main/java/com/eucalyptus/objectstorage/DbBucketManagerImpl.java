@@ -29,34 +29,110 @@ import javax.annotation.Nullable;
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
+import org.hibernate.Criteria;
+import org.hibernate.criterion.Example;
+import org.hibernate.criterion.Projections;
 
 import com.eucalyptus.entities.Entities;
+import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.entities.Bucket;
+import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyExistsException;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyOwnedByYouException;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
+import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 
-public enum Buckets implements BucketManager {
-	INSTANCE;
-	private static final Logger LOG = Logger.getLogger(Buckets.class);
+public class DbBucketManagerImpl implements BucketManager {
+	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
+	
+	/**
+	 * Does the bucket contain snapshots...
+	 * @param bucketName
+	 * @return
+	 * @throws Exception
+	 */
+	private boolean bucketHasSnapshots(String bucketName) throws Exception {
+		EntityWrapper<ObjectEntity> dbSnap = null;
 
+		try {
+			dbSnap = EntityWrapper.get(ObjectEntity.class);
+			ObjectEntity objInfo = new ObjectEntity();
+			objInfo.setBucketName(bucketName);
+			objInfo.setIsSnapshot(true);
+
+			Criteria snapCount = dbSnap.createCriteria(ObjectEntity.class).add(Example.create(objInfo)).setProjection(Projections.rowCount());
+			snapCount.setReadOnly(true);
+			Long rowCount = (Long)snapCount.uniqueResult();
+			dbSnap.rollback();
+			if (rowCount != null && rowCount.longValue() > 0) {
+				return true;
+			}
+			return false;
+		} catch(Exception e) {
+			if(dbSnap != null) {
+				dbSnap.rollback();
+			}
+			throw e;
+		}
+	}
+	
+	/**
+	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
+	 */
+	private boolean checkBucketName(String bucketName) {
+		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
+			return false;
+		if(bucketName.length() < 3 || bucketName.length() > 255)
+			return false;
+		String[] addrParts = bucketName.split("\\.");
+		boolean ipFormat = true;
+		if(addrParts.length == 4) {
+			for(String addrPart : addrParts) {
+				try {
+					Integer.parseInt(addrPart);
+				} catch(NumberFormatException ex) {
+					ipFormat = false;
+					break;
+				}
+			}
+		} else {
+			ipFormat = false;
+		}		
+		if(ipFormat)
+			return false;
+		return true;
+	}
+	
 	@Override
-	public Bucket get(String bucketName, Callable<Boolean> resourceModifier) {
-		// TODO Auto-generated method stub
-		return null;
+	public Bucket get(@Nonnull String bucketName,
+			@Nonnull boolean includeHidden,
+			@Nullable ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+		try {
+			Bucket searchExample = new Bucket(bucketName);
+			searchExample.setHidden(includeHidden);
+			return Transactions.find(searchExample);
+		} catch (TransactionException e) {
+			LOG.error("Error querying bucket existence in db",e);
+			throw e;
+		}		
 	}
 
 	@Override
-	public boolean exists(String bucketName, Callable<Boolean> resourceModifier) {
-		// TODO Auto-generated method stub
-		return false;
+	public boolean exists(@Nonnull String bucketName,
+			@Nullable ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+		try {
+			return (Transactions.find(new Bucket(bucketName)) != null);
+		} catch (TransactionException e) {
+			LOG.error("Error querying bucket existence in db",e);
+			throw e;
+		}
 	}
 
 	@Override
@@ -67,6 +143,9 @@ public enum Buckets implements BucketManager {
 			@Nonnull String location,
 			@Nullable ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException {
 		
+		if (!checkBucketName(bucketName))
+			throw new InvalidBucketNameException(bucketName);
+
 		Bucket newBucket = new Bucket(bucketName);
 		try {
 			Bucket foundBucket = Transactions.find(newBucket);
@@ -122,13 +201,15 @@ public enum Buckets implements BucketManager {
 	}
 	
 	@Override
-	public void delete(String bucketName, Callable<Boolean> resourceModifier) {
+	public void delete(String bucketName, 
+			ReversableOperation<?,?> resourceModifier) {
 		// TODO Auto-generated method stub
 		
 	}
 
 	@Override
-	public void delete(Bucket bucketEntity, Callable<Boolean> resourceModifier) throws BucketNotEmptyException {
+	public void delete(Bucket bucketEntity, 
+			ReversableOperation<?,?> resourceModifier) throws BucketNotEmptyException {
 		try {
 			//TODO: add emptiness check
 			Transactions.delete(bucketEntity);
@@ -139,7 +220,8 @@ public enum Buckets implements BucketManager {
 
 	@Override
 	public void updateVersioningState(String bucketName,
-			VersioningStatus newState, Callable<Boolean> resourceModifier) throws InvalidBucketStateException, TransactionException {
+			VersioningStatus newState, 
+			ReversableOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException {
 		
 		EntityTransaction db = Entities.get(Bucket.class);
 		try {
@@ -162,7 +244,9 @@ public enum Buckets implements BucketManager {
 	}
 
 	@Override
-	public List<Bucket> list(String ownerCanonicalId, boolean includeHidden, Callable<Boolean> resourceModifier) throws TransactionException {
+	public List<Bucket> list(String ownerCanonicalId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
 		searchBucket.setHidden(includeHidden);
@@ -177,7 +261,9 @@ public enum Buckets implements BucketManager {
 	}
 	
 	@Override
-	public List<Bucket> listByUser(String userIamId, boolean includeHidden, Callable<Boolean> resourceModifier) throws TransactionException {
+	public List<Bucket> listByUser(String userIamId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -192,7 +278,9 @@ public enum Buckets implements BucketManager {
 	}
 	
 	@Override
-	public long countByUser(String userIamId, boolean includeHidden, Callable<Boolean> resourceModifier) throws ExecutionException {
+	public long countByUser(String userIamId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -208,7 +296,9 @@ public enum Buckets implements BucketManager {
 	}
 
 	@Override
-	public long countByAccount(String canonicalId, boolean includeHidden, Callable<Boolean> resourceModifier) throws ExecutionException {
+	public long countByAccount(String canonicalId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerCanonicalId(canonicalId);

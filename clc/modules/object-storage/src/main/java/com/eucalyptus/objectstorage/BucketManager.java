@@ -38,8 +38,12 @@ import com.google.common.base.Predicate;
 
 /**
  * Interface to operate on buckets
- * Each operation includes a 'resourceModifier' predicate that can optionally be used to invoke another operation that
+ * Each operation includes a 'resourceModifier' ReversibleOperation that can optionally be used to invoke another operation that
  * must succeed in order for the metadata/db operation to be committed (e.g. creating a bucket on a filesystem or backend).
+ * The intent is to allow wrapping the backend operation in a transaction as necessary.
+ * 
+ * This interface is an enactment mechanism, not a policy checker. Validation on input, beyon what is required for the operation
+ * to succeed, is outside the scope for this. e.g. BucketManager will not enforce S3 naming conventions.
  */
 public interface BucketManager {
 
@@ -51,47 +55,68 @@ public interface BucketManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract <T extends Object ,R extends Object> T create(@Nonnull String bucketName, 
-			@Nonnull String ownerCanonicalId,
-			@Nonnull String ownerIamUserId,
-			@Nonnull String acl, 
-			@Nonnull String location,			
-			@Nullable ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
+	public abstract <T extends Object ,R extends Object> T create(String bucketName, 
+			 String ownerCanonicalId,
+			 String ownerIamUserId,
+			 String acl, 
+			 String location,			
+			 ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
 	 * @param bucketName
 	 * @return
 	 */
-	public abstract Bucket get(@Nonnull String bucketName, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+	public abstract Bucket get( String bucketName,
+			 boolean includeHidden,
+			 ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	/**
 	 * Returns list of buckets owned by id. Buckets are detached from any persistence session.
 	 * @param ownerCanonicalId
 	 * @param includeHidden
 	 * @return
 	 */
-	public abstract List<Bucket> list(@Nonnull String ownerCanonicalId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+	public abstract List<Bucket> list( String ownerCanonicalId, 
+			 boolean includeHidden, 
+			 ReversableOperation<?,?> resourceModifier) throws TransactionException;
 
 	/**
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */
-	public abstract List<Bucket> listByUser(@Nonnull String userIamId, boolean includeHidden, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+	public abstract List<Bucket> listByUser( String userIamId, 
+			boolean includeHidden,  
+			ReversableOperation<?,?> resourceModifier) throws TransactionException;
 	
-	public abstract long countByUser(@Nonnull String userIamId, boolean includeHidden, Callable<Boolean> resourceModifier) throws ExecutionException;
-	public abstract long countByAccount(String canonicalId, boolean includeHidden, Callable<Boolean> resourceModifier) throws ExecutionException;
+	/**
+	 * Returns count of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
+	 * @return
+	 */
+	public abstract long countByUser( String userIamId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws ExecutionException;
+	/**
+	 * Returns count of buckets owned by account id, in the given account. Buckets are detached from any persistence session.
+	 * @return
+	 */	
+	public abstract long countByAccount(String canonicalId, 
+			boolean includeHidden, 
+			ReversableOperation<?,?> resourceModifier) throws ExecutionException;
+	
 	/**
 	 * Checks if bucket exists.
 	 * @param bucketName
 	 * @return
 	 */
-	public abstract boolean exists(@Nonnull String bucketName, @Nullable Callable<Boolean> resourceModifier) throws TransactionException;
+	public abstract boolean exists( String bucketName,  
+			ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket by name. Idempotent operation
 	 * @param bucketName
 	 */
-	public abstract void delete(@Nonnull String bucketName, @Nullable Callable<Boolean> resourceModifier)  throws TransactionException;
+	public abstract void delete( String bucketName,  
+			ReversableOperation<?,?> resourceModifier)  throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
@@ -99,7 +124,10 @@ public interface BucketManager {
 	 * not required to provide one or pass a loaded or attached entity
 	 * @param bucketEntity
 	 */
-	public abstract void delete(Bucket bucketEntity, Callable<Boolean> resourceModifier)  throws TransactionException, BucketNotEmptyException;
+	public abstract void delete(Bucket bucketEntity, 
+			ReversableOperation<?,?> resourceModifier)  throws TransactionException, BucketNotEmptyException;
 	
-	public abstract void updateVersioningState(String bucketName, ObjectStorageProperties.VersioningStatus newState, Callable<Boolean> resourceModifier) throws InvalidBucketStateException, TransactionException; 	
+	public abstract void updateVersioningState(String bucketName, 
+			ObjectStorageProperties.VersioningStatus newState, 
+			ReversableOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException; 	
 }

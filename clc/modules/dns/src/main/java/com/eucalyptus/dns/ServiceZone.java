@@ -78,7 +78,7 @@ import org.xbill.DNS.Type;
 
 import com.eucalyptus.component.Topology;
 import com.eucalyptus.component.id.Eucalyptus;
-import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Internets;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
@@ -151,7 +151,7 @@ public class ServiceZone extends Zone {
     	String bucket = name.toString().substring(0, name.toString().indexOf(".walrus"));
     	InetAddress ip;
     	try {
-			ip = ObjectStorageGatewayImpl.getBucketIp(bucket);
+			ip = ObjectStorageGateway.getBucketIp(bucket);
 		} catch (EucalyptusCloudException e1) {
         	LOG.error(e1);
 			return super.findRecords(name, type);

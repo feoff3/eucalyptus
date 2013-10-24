@@ -69,7 +69,7 @@ import org.jboss.netty.handler.codec.http.HttpRequest;
 
 import com.eucalyptus.component.annotation.ComponentPart;
 import com.eucalyptus.objectstorage.ObjectStorage;
-import com.eucalyptus.objectstorage.ObjectStorageGatewayImpl;
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStorageDELETEBindingStage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStorageDELETEOutboundStage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStorageOutboundStage;
@@ -82,7 +82,7 @@ import com.eucalyptus.ws.stages.UnrollableStage;
 
 
 /**
- * The pipeline for handling HTTP DELETE requests in the ObjectStorageGatewayImpl.
+ * The pipeline for handling HTTP DELETE requests in the ObjectStorageGateway.
  * @author zhill
  *
  */
