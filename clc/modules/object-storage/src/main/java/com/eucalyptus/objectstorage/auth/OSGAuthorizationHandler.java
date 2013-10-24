@@ -197,34 +197,27 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 				aclAllow = aclAllow || objectResourceEntity.can(permission, requestAccount.getCanonicalId());
 			}
 		}
-
+		
 		/* Resource owner only? if so, override any previous acl decisions
 		 * It is not expected that owneronly is set as well as other ACL permissions,
 		 * Regular owner permissions (READ, WRITE, READ_ACP, WRITE_ACP) are handled by the regular acl checks.
 		 * OwnerOnly should be only used for operations not covered by the other Permissions (e.g. logging, or versioning)
 		 */
 		aclAllow = (allowOwnerOnly ? resourceOwnerAccount.getAccountNumber().equals(requestAccount.getAccountNumber()) : aclAllow);
-		
-		/* IAM checks for user */		
-		Boolean iamAllow = true;
+
+		/* IAM checks for user */
+		Boolean iamAllow = true; // the Permissions.isAuthorized() handles the default deny for each action.
 		//Evaluate each iam action required, all must be allowed
 		for(String action : requiredActions ) {
-			/*Permissions.isAuthorized(vendor, resourceType, resourceName, resourceAccount, action, requestUser);
-			Permissions.canAllocate(
-					PolicySpec.VENDOR_S3,
-					PolicySpec.S3_RESOURCE_BUCKET, "",
-					PolicySpec.S3_CREATEBUCKET, ctx.getUser(), 1L)
-					*/
-			iamAllow = Permissions.isAuthorized(PolicySpec.VENDOR_S3,
-					resourceType, resourceId,
-					resourceOwnerAccount , action,
-					requestUser) && Permissions.canAllocate(
-					PolicySpec.VENDOR_S3,
-					resourceType, resourceId,
-					action, requestUser, resourceAllocationSize);
-			//iamAllow = iamAllow && !Lookups.checkPrivilege(action, PolicySpec.VENDOR_S3, resourceType, resourceId, resourceOwnerAccountId);
+			//Any deny overrides an allow
+			iamAllow = iamAllow && 
+					Permissions.isAuthorized(PolicySpec.VENDOR_S3,
+					resourceType, resourceId, resourceOwnerAccount , action, requestUser) 
+					&&  Permissions.canAllocate(PolicySpec.VENDOR_S3, 
+							resourceType, resourceId, action, requestUser, resourceAllocationSize);
 		}
-		
+
+		//Must have both acl and iam allow (account & user)
 		return aclAllow && iamAllow;
 	}
 
