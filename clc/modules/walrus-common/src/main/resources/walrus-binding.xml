@@ -1,65 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Copyright 2009-2012 Eucalyptus Systems, Inc.
-
-  This program is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 3 of the License.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see http://www.gnu.org/licenses/.
-
-  Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
-  CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
-  additional information or have any questions.
-
-  This file may incorporate work covered under the following copyright
-  and permission notice:
-
-    Software License Agreement (BSD License)
-
-    Copyright (c) 2008, Regents of the University of California
-    All rights reserved.
-
-    Redistribution and use of this software in source and binary forms,
-    with or without modification, are permitted provided that the
-    following conditions are met:
-
-      Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-
-      Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer
-      in the documentation and/or other materials provided with the
-      distribution.
-
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-    COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-    POSSIBILITY OF SUCH DAMAGE. USERS OF THIS SOFTWARE ACKNOWLEDGE
-    THE POSSIBLE PRESENCE OF OTHER OPEN SOURCE LICENSED MATERIAL,
-    COPYRIGHTED MATERIAL OR PATENTED MATERIAL IN THIS SOFTWARE,
-    AND IF ANY SUCH MATERIAL IS DISCOVERED THE PARTY DISCOVERING
-    IT MAY INFORM DR. RICH WOLSKI AT THE UNIVERSITY OF CALIFORNIA,
-    SANTA BARBARA WHO WILL THEN ASCERTAIN THE MOST APPROPRIATE REMEDY,
-    WHICH IN THE REGENTS' DISCRETION MAY INCLUDE, WITHOUT LIMITATION,
-    REPLACEMENT OF THE CODE SO IDENTIFIED, LICENSING OF THE CODE SO
-    IDENTIFIED, OR WITHDRAWAL OF THE CODE CAPABILITY TO THE EXTENT
-    NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
-  -->
+<!-- Copyright 2009-2012 Eucalyptus Systems, Inc. This program is free software: 
+	you can redistribute it and/or modify it under the terms of the GNU General 
+	Public License as published by the Free Software Foundation; version 3 of 
+	the License. This program is distributed in the hope that it will be useful, 
+	but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+	or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for 
+	more details. You should have received a copy of the GNU General Public License 
+	along with this program. If not, see http://www.gnu.org/licenses/. Please 
+	contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta CA 93117, USA 
+	or visit http://www.eucalyptus.com/licenses/ if you need additional information 
+	or have any questions. This file may incorporate work covered under the following 
+	copyright and permission notice: Software License Agreement (BSD License) 
+	Copyright (c) 2008, Regents of the University of California All rights reserved. 
+	Redistribution and use of this software in source and binary forms, with 
+	or without modification, are permitted provided that the following conditions 
+	are met: Redistributions of source code must retain the above copyright notice, 
+	this list of conditions and the following disclaimer. Redistributions in 
+	binary form must reproduce the above copyright notice, this list of conditions 
+	and the following disclaimer in the documentation and/or other materials 
+	provided with the distribution. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT 
+	HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, 
+	BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+	FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
+	OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
+	EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
+	OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
+	INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
+	STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN 
+	ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
+	OF SUCH DAMAGE. USERS OF THIS SOFTWARE ACKNOWLEDGE THE POSSIBLE PRESENCE 
+	OF OTHER OPEN SOURCE LICENSED MATERIAL, COPYRIGHTED MATERIAL OR PATENTED 
+	MATERIAL IN THIS SOFTWARE, AND IF ANY SUCH MATERIAL IS DISCOVERED THE PARTY 
+	DISCOVERING IT MAY INFORM DR. RICH WOLSKI AT THE UNIVERSITY OF CALIFORNIA, 
+	SANTA BARBARA WHO WILL THEN ASCERTAIN THE MOST APPROPRIATE REMEDY, WHICH 
+	IN THE REGENTS' DISCRETION MAY INCLUDE, WITHOUT LIMITATION, REPLACEMENT OF 
+	THE CODE SO IDENTIFIED, LICENSING OF THE CODE SO IDENTIFIED, OR WITHDRAWAL 
+	OF THE CODE CAPABILITY TO THE EXTENT NEEDED TO COMPLY WITH ANY SUCH LICENSES 
+	OR RIGHTS. -->
 
 <binding force-classes="true" add-constructors="true"
 	xmlns:tns="http://walrus.s3.amazonaws.com/doc/2006-03-01/" name="walrus_s3_amazonaws_com_doc_2006_03_01">
@@ -70,7 +47,7 @@
 
 	<!-- include the common s3 bindings -->
 	<include path="classpath:s3-2006-03-01-common-binding.xml" />
-		
+
 	<mapping class="com.eucalyptus.walrus.msgs.WalrusRequestType"
 		abstract="true">
 		<value name="AWSAccessKeyId" field="accessKeyID" usage="optional" />
@@ -79,14 +56,16 @@
 		<value name="Credential" field="credential" usage="optional" />
 		<value name="Bucket" field="bucket" usage="optional" />
 		<value name="Key" field="key" usage="optional" />
-	</mapping>	
+	</mapping>
 
-	<mapping class="com.eucalyptus.walrus.msgs.WalrusDataRequestType" abstract="true">
+	<mapping class="com.eucalyptus.walrus.msgs.WalrusDataRequestType"
+		abstract="true">
 		<value name="RandomKey" field="randomKey" usage="optional" />
 		<value name="IsCompressed" field="isCompressed" usage="optional" />
 	</mapping>
-	
-	<mapping class="com.eucalyptus.walrus.msgs.WalrusDataResponseType" abstract="true">
+
+	<mapping class="com.eucalyptus.walrus.msgs.WalrusDataResponseType"
+		abstract="true">
 		<value name="ETag" field="etag" usage="optional" />
 		<value name="LastModified" field="lastModified" usage="optional" />
 		<collection field="metaData"
@@ -96,29 +75,37 @@
 		<value name="ErrorCode" field="errorCode" usage="optional" />
 		<value name="Size" field="size" usage="optional" />
 		<value name="ContentType" field="contentType" usage="optional" />
-		<value name="ContentDisposition" field="contentDisposition" usage="optional" />
+		<value name="ContentDisposition" field="contentDisposition"
+			usage="optional" />
 	</mapping>
-	
+
 
 	<mapping name="ListAllMyBuckets" class="com.eucalyptus.walrus.msgs.ListAllMyBucketsType"
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
-	<mapping name="ListAllMyBucketsResult" class="com.eucalyptus.walrus.msgs.ListAllMyBucketsResponseType">
-			<structure name="Owner" field="owner" type="com.eucalyptus.storage.msgs.s3.CanonicalUser" />
-			<structure name="Buckets" field="bucketList" type="com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList" />
+	<mapping name="ListAllMyBucketsResult"
+		class="com.eucalyptus.walrus.msgs.ListAllMyBucketsResponseType">
+		<structure name="Owner" field="owner"
+			type="com.eucalyptus.storage.msgs.s3.CanonicalUser" />
+		<structure name="Buckets" field="bucketList"
+			type="com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList" />
 	</mapping>
 
-	
-	<mapping name="GetBucketAccessControlPolicy" class="com.eucalyptus.walrus.msgs.GetBucketAccessControlPolicyType"
+
+	<mapping name="GetBucketAccessControlPolicy"
+		class="com.eucalyptus.walrus.msgs.GetBucketAccessControlPolicyType"
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
-	<mapping name="GetBucketAccessControlPolicyResponse" class="com.eucalyptus.walrus.msgs.GetBucketAccessControlPolicyResponseType">
-			<structure field="accessControlPolicy"
-				map-as="com.eucalyptus.storage.msgs.s3.AccessControlPolicy" usage="optional" />		
+	<mapping name="GetBucketAccessControlPolicyResponse"
+		class="com.eucalyptus.walrus.msgs.GetBucketAccessControlPolicyResponseType">
+		<structure field="accessControlPolicy"
+			map-as="com.eucalyptus.storage.msgs.s3.AccessControlPolicy" usage="optional" />
 	</mapping>
 
 	<mapping name="SetBucketAccessControlPolicy"
@@ -200,29 +187,32 @@
 		<value name="Description" field="description" />
 	</mapping>
 
-	<mapping name="Error" class="com.eucalyptus.walrus.msgs.WalrusErrorMessageType">
+	<mapping name="Error"
+		class="com.eucalyptus.walrus.msgs.WalrusErrorMessageType">
 		<value name="Code" field="code" />
 		<value name="Message" field="message" />
 		<value name="Resource" field="resource" />
 		<value name="RequestId" field="requestId" />
 	</mapping>
-	
-	<!-- <mapping name="Error" class="com.eucalyptus.walrus.msgs.WalrusErrorMessageType">
-		<structure map-as="com.eucalyptus.storage.msgs.s3.S3ErrorMessage"/>
-	</mapping>-->
+
+	<!-- <mapping name="Error" class="com.eucalyptus.walrus.msgs.WalrusErrorMessageType"> 
+		<structure map-as="com.eucalyptus.storage.msgs.s3.S3ErrorMessage"/> </mapping> -->
 
 	<mapping name="CreateBucket" class="com.eucalyptus.walrus.msgs.CreateBucketType"
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<structure field="accessControlList"
 			map-as="com.eucalyptus.storage.msgs.s3.AccessControlList" usage="optional" />
-		<value name="LocationConstraint" field="locationConstraint" usage="optional" />
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<value name="LocationConstraint" field="locationConstraint"
+			usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
-	<mapping name="CreateBucketResponse" class="com.eucalyptus.walrus.msgs.CreateBucketResponseType">
+	<mapping name="CreateBucketResponse"
+		class="com.eucalyptus.walrus.msgs.CreateBucketResponseType">
 		<structure name="CreateBucketResponse">
- 			<value name="BucketName" field="bucket" />
- 		</structure>
+			<value name="BucketName" field="bucket" />
+		</structure>
 	</mapping>
 
 	<mapping name="DeleteBucket" class="com.eucalyptus.walrus.msgs.DeleteBucketType"
@@ -231,17 +221,21 @@
 			usage="optional" />
 	</mapping>
 
-	<mapping name="DeleteBucketResponse" class="com.eucalyptus.walrus.msgs.DeleteBucketResponseType">
-			<structure name="DeleteBucketResponse" field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />		
+	<mapping name="DeleteBucketResponse"
+		class="com.eucalyptus.walrus.msgs.DeleteBucketResponseType">
+		<structure name="DeleteBucketResponse" field="status"
+			map-as="com.eucalyptus.storage.msgs.s3.Status" />
 	</mapping>
 
-	<mapping name="PutObjectResponse" class="com.eucalyptus.walrus.msgs.PutObjectResponseType">
+	<mapping name="PutObjectResponse"
+		class="com.eucalyptus.walrus.msgs.PutObjectResponseType">
 		<structure name="PutObjectResponse">
 			<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
 		</structure>
 	</mapping>
 
-	<mapping name="PostResponse" class="com.eucalyptus.walrus.msgs.PostObjectResponseType">
+	<mapping name="PostResponse"
+		class="com.eucalyptus.walrus.msgs.PostObjectResponseType">
 		<value name="Location" field="location" usage="optional" />
 		<value name="Bucket" field="bucket" usage="optional" />
 		<value name="Key" field="key" usage="optional" />
@@ -250,9 +244,20 @@
 		<value name="SuccessActionStatus" field="successCode" usage="optional" />
 	</mapping>
 
-	<mapping name="CopyObjectResponse" class="com.eucalyptus.walrus.msgs.CopyObjectResponseType">
+	<mapping name="CopyObjectResponse"
+		class="com.eucalyptus.walrus.msgs.CopyObjectResponseType">
 		<structure name="CopyObjectResult">
-			<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
+			<value name="ETag" field="etag" usage="optional" />
+			<value name="LastModified" field="lastModified" usage="optional" />
+			<collection field="metaData"
+				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+				<structure map-as="com.eucalyptus.storage.msgs.s3.MetaDataEntry" />
+			</collection>
+			<value name="ErrorCode" field="errorCode" usage="optional" />
+			<value name="Size" field="size" usage="optional" />
+			<value name="ContentType" field="contentType" usage="optional" />
+			<value name="ContentDisposition" field="contentDisposition"
+				usage="optional" />
 		</structure>
 	</mapping>
 
@@ -260,7 +265,7 @@
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<value name="SourceBucket" field="sourceBucket" />
 		<value name="SourceObject" field="sourceObject" />
-		<value name="SourceVersionId" field="sourceVersionId" usage="optional"/>
+		<value name="SourceVersionId" field="sourceVersionId" usage="optional" />
 		<value name="DestinationBucket" field="destinationBucket" />
 		<value name="DestinationObject" field="destinationObject" />
 		<value name="MetadataDirective" field="metadataDirective" />
@@ -291,8 +296,9 @@
 		<value name="ContentType" field="contentType" usage="optional" />
 		<value name="ContentDisposition" field="contentDisposition"
 			usage="optional" />
-		<value name="ContentMD5" field="contentMD5" usage="optional" />			
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<value name="ContentMD5" field="contentMD5" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
 	<mapping name="PostObject" class="com.eucalyptus.walrus.msgs.PostObjectType">
@@ -351,15 +357,18 @@
 		<value name="VersionId" field="versionId" usage="optional" />
 	</mapping>
 
-	<mapping name="GetObjectResponse" class="com.eucalyptus.walrus.msgs.GetObjectResponseType">
+	<mapping name="GetObjectResponse"
+		class="com.eucalyptus.walrus.msgs.GetObjectResponseType">
 		<structure name="GetObjectResponse">
-			<structure name="Status" field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />
+			<structure name="Status" field="status"
+				map-as="com.eucalyptus.storage.msgs.s3.Status" />
 			<value name="Data" field="base64Data" usage="optional" />
 			<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
 		</structure>
 	</mapping>
 
-	<mapping name="GetObjectExtended" class="com.eucalyptus.walrus.msgs.GetObjectExtendedType">
+	<mapping name="GetObjectExtended"
+		class="com.eucalyptus.walrus.msgs.GetObjectExtendedType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataRequestType" />
 		<value name="GetMetadata" field="getMetaData" />
 		<value name="GetData" field="getData" />
@@ -378,14 +387,16 @@
 	<mapping name="GetObjectExtendedResponse"
 		class="com.eucalyptus.walrus.msgs.GetObjectExtendedResponseType">
 		<structure name="GetObjectResponse">
-			<structure name="Status" field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />
+			<structure name="Status" field="status"
+				map-as="com.eucalyptus.storage.msgs.s3.Status" />
 			<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
 		</structure>
 	</mapping>
 
 	<mapping name="DeleteObject" class="com.eucalyptus.walrus.msgs.DeleteObjectType"
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
 	<mapping name="DeleteObjectResponse"
@@ -400,7 +411,7 @@
 		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
 			usage="optional" />
-		<value name="VersionId" field="versionid"/>
+		<value name="VersionId" field="versionid" />
 	</mapping>
 
 	<mapping name="DeleteVersionResponse"
@@ -415,63 +426,75 @@
 		<value name="Marker" field="marker" usage="optional" />
 		<value name="MaxKeys" field="maxKeys" usage="optional" />
 		<value name="Delimiter" field="delimiter" usage="optional" />
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
-	<mapping name="ListBucketResult" class="com.eucalyptus.walrus.msgs.ListBucketResponseType">
-			<collection field="metaData"
-				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-				<structure map-as="com.eucalyptus.storage.msgs.s3.MetaDataEntry" />
-			</collection>
-			<value name="Name" field="name" />
-			<value name="Prefix" field="prefix" />
-			<value name="Marker" field="marker"/>
-			<value name="NextMarker" field="nextMarker" usage="optional" />
-			<value name="MaxKeys" field="maxKeys" />
-			<value name="Delimiter" field="delimiter" usage="optional" />
-			<value name="IsTruncated" field="isTruncated" />
-			<collection field="contents"
-				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-				<structure name="Contents" map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
-			</collection>
-			<collection name="CommonPrefixes" field="commonPrefixes"
-				factory="org.jibx.runtime.Utility.arrayListFactory" test-method="isCommonPrefixesPresent" usage="optional">
-				<structure map-as="com.eucalyptus.storage.msgs.s3.PrefixEntry"/>
-			</collection>
+	<mapping name="ListBucketResult"
+		class="com.eucalyptus.walrus.msgs.ListBucketResponseType">
+		<collection field="metaData"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+			<structure map-as="com.eucalyptus.storage.msgs.s3.MetaDataEntry" />
+		</collection>
+		<value name="Name" field="name" />
+		<value name="Prefix" field="prefix" />
+		<value name="Marker" field="marker" />
+		<value name="NextMarker" field="nextMarker" usage="optional" />
+		<value name="MaxKeys" field="maxKeys" />
+		<value name="Delimiter" field="delimiter" usage="optional" />
+		<value name="IsTruncated" field="isTruncated" />
+		<collection field="contents"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+			<structure name="Contents" map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
+		</collection>
+		<collection name="CommonPrefixes" field="commonPrefixes"
+			factory="org.jibx.runtime.Utility.arrayListFactory" test-method="isCommonPrefixesPresent"
+			usage="optional">
+			<structure map-as="com.eucalyptus.storage.msgs.s3.PrefixEntry" />
+		</collection>
 	</mapping>
 
-	<mapping name="ListVersions" class="com.eucalyptus.walrus.msgs.ListVersionsType" extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
+	<mapping name="ListVersions" class="com.eucalyptus.walrus.msgs.ListVersionsType"
+		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<value name="Prefix" field="prefix" usage="optional" />
 		<value name="KeyMarker" field="keyMarker" usage="optional" />
 		<value name="VersionIdMarker" field="versionIdMarker" usage="optional" />
 		<value name="MaxKeys" field="maxKeys" usage="optional" />
 		<value name="Delimiter" field="delimiter" usage="optional" />
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
-	<mapping name="ListVersionsResult" class="com.eucalyptus.walrus.msgs.ListVersionsResponseType">
+	<mapping name="ListVersionsResult"
+		class="com.eucalyptus.walrus.msgs.ListVersionsResponseType">
 		<value name="Name" field="name" />
 		<value name="Prefix" field="prefix" />
 		<value name="KeyMarker" field="keyMarker" usage="optional" />
 		<value name="VersionIdMarker" field="versionIdMarker" usage="optional" />
 		<value name="NextKeyMarker" field="nextKeyMarker" usage="optional" />
-		<value name="NextVersionIdMarker" field="nextVersionIdMarker" usage="optional" />
+		<value name="NextVersionIdMarker" field="nextVersionIdMarker"
+			usage="optional" />
 		<value name="MaxKeys" field="maxKeys" />
 		<value name="Delimiter" field="delimiter" usage="optional" />
 		<value name="IsTruncated" field="isTruncated" />
-		<collection field="versions" factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-			<structure name="Version" map-as="com.eucalyptus.storage.msgs.s3.VersionEntry" />
+		<collection field="versions"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+			<structure name="Version"
+				map-as="com.eucalyptus.storage.msgs.s3.VersionEntry" />
 		</collection>
-		<collection field="deleteMarkers" factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-			<structure name="DeleteMarker" map-as="com.eucalyptus.storage.msgs.s3.DeleteMarkerEntry" />
+		<collection field="deleteMarkers"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+			<structure name="DeleteMarker"
+				map-as="com.eucalyptus.storage.msgs.s3.DeleteMarkerEntry" />
 		</collection>
-		<collection name="CommonPrefixes" field="commonPrefixes" factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+		<collection name="CommonPrefixes" field="commonPrefixes"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
 			<structure map-as="com.eucalyptus.storage.msgs.s3.PrefixEntry" />
 		</collection>
 	</mapping>
 
-	<mapping name="GetBucketLocation" class="com.eucalyptus.walrus.msgs.GetBucketLocationType"
-		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
+	<mapping name="GetBucketLocation"
+		class="com.eucalyptus.walrus.msgs.GetBucketLocationType" extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
 			usage="optional" />
 	</mapping>
@@ -527,8 +550,9 @@
 	<mapping name="SetBucketVersioningStatusResponse"
 		class="com.eucalyptus.walrus.msgs.SetBucketVersioningStatusResponseType">
 	</mapping>
-	
-	<mapping name="GetDecryptedImage" class="com.eucalyptus.walrus.msgs.GetDecryptedImageType">
+
+	<mapping name="GetDecryptedImage"
+		class="com.eucalyptus.walrus.msgs.GetDecryptedImageType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataRequestType" />
 	</mapping>
 
@@ -539,8 +563,8 @@
 		</structure>
 	</mapping>
 
-	<mapping name="ValidateImage"
-		class="com.eucalyptus.walrus.msgs.ValidateImageType" extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
+	<mapping name="ValidateImage" class="com.eucalyptus.walrus.msgs.ValidateImageType"
+		extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
 			usage="optional" />
 	</mapping>
@@ -559,7 +583,8 @@
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
 	</mapping>
 
-	<mapping name="GetWalrusSnapshot" class="com.eucalyptus.walrus.msgs.GetWalrusSnapshotType">
+	<mapping name="GetWalrusSnapshot"
+		class="com.eucalyptus.walrus.msgs.GetWalrusSnapshotType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataRequestType" />
 	</mapping>
 
@@ -570,18 +595,20 @@
 
 	<mapping name="DeleteWalrusSnapshot"
 		class="com.eucalyptus.walrus.msgs.DeleteWalrusSnapshotType" extends="com.eucalyptus.walrus.msgs.WalrusRequestType">
-		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType" usage="optional" />
+		<structure map-as="com.eucalyptus.walrus.msgs.WalrusRequestType"
+			usage="optional" />
 	</mapping>
 
 	<mapping name="DeleteWalrusSnapshotResponse"
 		class="com.eucalyptus.walrus.msgs.DeleteWalrusSnapshotResponseType">
 	</mapping>
 
-	<mapping name="GetWalrusSnapshotSize" class="com.eucalyptus.walrus.msgs.GetWalrusSnapshotSizeType">
+	<mapping name="GetWalrusSnapshotSize"
+		class="com.eucalyptus.walrus.msgs.GetWalrusSnapshotSizeType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataRequestType" />
 	</mapping>
 
-	<mapping name="GetWalrusSnapshotSizeResponse" 
+	<mapping name="GetWalrusSnapshotSizeResponse"
 		class="com.eucalyptus.walrus.msgs.GetWalrusSnapshotSizeResponseType">
 		<structure map-as="com.eucalyptus.walrus.msgs.WalrusDataResponseType" />
 	</mapping>

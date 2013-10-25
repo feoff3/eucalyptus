@@ -398,9 +398,16 @@ public class CopyObjectType extends ObjectStorageRequestType {
 	Date copySourceIfUnmodifiedSince;
 }
 
-public class CopyObjectResponseType extends ObjectStorageDataResponseType {
-	String copySourceVersionId;
+public class CopyObjectResponseType extends ObjectStorageResponseType {
+	String etag;
+	String lastModified;
+	Long size;
+	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
+	Integer errorCode;
+	String contentType;
+	String contentDisposition;
 	String versionId;
+	String copySourceVersionId;
 }
 
 public class PutObjectInlineType extends ObjectStorageDataRequestType {

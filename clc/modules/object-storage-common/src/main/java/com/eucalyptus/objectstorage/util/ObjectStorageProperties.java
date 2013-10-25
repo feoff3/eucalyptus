@@ -72,7 +72,6 @@ import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.scripting.Groovyness;
 import com.eucalyptus.system.BaseDirectory;
 import com.eucalyptus.util.EucalyptusCloudException;
-import com.eucalyptus.walrus.Walrus;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
@@ -323,7 +322,7 @@ public class ObjectStorageProperties {
 	}
 	
 	public static InetAddress getWalrusAddress() throws EucalyptusCloudException {
-		if (Topology.isEnabled(Walrus.class)) {
+		if (Topology.isEnabled(ObjectStorage.class)) {
 			return Topology.lookup(ObjectStorage.class).getInetAddress();
 		} else {
 			throw new EucalyptusCloudException("Walrus not ENABLED");

@@ -161,6 +161,8 @@ import com.eucalyptus.walrus.Walrus;
 import com.eucalyptus.walrus.exceptions.WalrusException;
 import com.eucalyptus.walrus.msgs.WalrusRequestType;
 import com.eucalyptus.walrus.msgs.WalrusResponseType;
+import com.eucalyptus.walrus.msgs.WalrusDataRequestType;
+import com.eucalyptus.walrus.msgs.WalrusDataResponseType;
 import com.eucalyptus.walrus.util.WalrusProperties;
 import com.amazonaws.services.s3.model.S3Object;
 import java.util.List;
@@ -644,7 +646,12 @@ public class WalrusProviderClient extends S3ProviderClient {
 
 	@Override
 	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {
-		throw new EucalyptusCloudException("Not implemented");
+		try {
+			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.CopyObjectType.class, com.eucalyptus.walrus.msgs.CopyObjectResponseType.class);			
+		} catch (EucalyptusCloudException e) {
+			LOG.error("Error response from Walrus", e);
+			throw e;
+		}
 	}
 
 	@Override
