@@ -11,9 +11,29 @@ import com.google.common.base.Supplier;
  */
 public interface ObjectManager {
 	
+	/**
+	 * Count of objects in the given bucket
+	 * @param bucketName
+	 * @return
+	 * @throws TransactionException
+	 */
+	public long count(String bucketName) throws Exception;
+
+	/**
+	 * Does specified object exist
+	 * @param bucketName
+	 * @param objectKey
+	 * @param versionId
+	 * @return
+	 * @throws TransactionException
+	 */
 	public abstract boolean exists(String bucketName, String objectKey, String versionId) throws TransactionException;
 	
 	public abstract ObjectEntity lookupAndClose(String bucketName, String objectKey, String versionId) throws TransactionException;
+	
+	public abstract PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxRecordCount, String prefix, String delimiter, String startKey) throws TransactionException;
+
+	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws TransactionException;
 	
 	public abstract void delete(String bucketName, String objectKey, String versionId) throws TransactionException;
 	

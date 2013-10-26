@@ -167,10 +167,9 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 			throw new IllegalArgumentException("No requires-permission actions found in request class annotations, cannot process.");
 		}
 
-		/* ACL Checks */
-		//Is the user's account allowed?
-		Boolean aclAllow = false;
-		
+		/* ACL Checks: Is the user's account allowed? */
+		//TODO: zhill - bucketpolicies will supplant the acl check eventually. Will map ACL->bucket_policy.
+		Boolean aclAllow = false;		
 		if(requiredBucketACLPermissions != null && requiredBucketACLPermissions.length > 0) {
 			//Check bucket ACLs
 			
@@ -205,7 +204,7 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		 */
 		aclAllow = (allowOwnerOnly ? resourceOwnerAccount.getAccountNumber().equals(requestAccount.getAccountNumber()) : aclAllow);
 
-		/* IAM checks for user */
+		/* IAM checks: Is the user allowed within the account? */
 		Boolean iamAllow = true; // the Permissions.isAuthorized() handles the default deny for each action.
 		//Evaluate each iam action required, all must be allowed
 		for(String action : requiredActions ) {

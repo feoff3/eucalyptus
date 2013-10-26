@@ -303,6 +303,9 @@ public class CreateBucketResponseType extends ObjectStorageResponseType {
 
 /* DELETE /bucket */
 @AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_DELETEBUCKET])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[]) //No ACLs for deleting a bucket
 public class DeleteBucketType extends ObjectStorageDeleteType {}
 public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {}
 
@@ -312,6 +315,10 @@ public class ObjectStorageDataGetResponseType extends ObjectStorageDataResponseT
 }
 
 /* PUT /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_PUTOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET) //NOTE: s3 docs seem to imply this should be OBJECT
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
 public class PutObjectType extends ObjectStorageDataRequestType {
 	String contentLength;
 	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
@@ -342,6 +349,55 @@ public class PostObjectResponseType extends ObjectStorageDataResponseType {
 	String location;
 	String bucket;
 	String key;
+}
+
+/* GET /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_GETOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
+public class GetObjectType extends ObjectStorageDataGetRequestType {
+	Boolean getMetaData;
+	Boolean getData;
+	Boolean inlineData;
+	Boolean deleteAfterGet;
+	Boolean getTorrent;
+	String versionId;
+
+	def GetObjectType() {
+	}
+
+	def GetObjectType(final String bucketName, final String key, final Boolean getData, final Boolean getMetaData, final Boolean inlineData) {
+		super( bucketName, key );
+		this.getData = getData;
+		this.getMetaData = getMetaData;
+		this.inlineData = inlineData;
+	}
+}
+
+public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
+	Status status;
+	String base64Data;
+}
+
+/* GET /bucket/object */
+
+//TODO: zhill -- remove this request type and fold into regular GetObject
+public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
+	Boolean getData;
+	Boolean getMetaData;
+	Boolean inlineData;
+	Long byteRangeStart;
+	Long byteRangeEnd;
+	Date ifModifiedSince;
+	Date ifUnmodifiedSince;
+	String ifMatch;
+	String ifNoneMatch;
+	Boolean returnCompleteObjectOnConditionFailure;
+}
+
+public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {
+	Status status;
 }
 
 /* PUT /bucket/object with x-amz-copy-src header */
@@ -378,6 +434,10 @@ public class PutObjectInlineType extends ObjectStorageDataRequestType {
 public class PutObjectInlineResponseType extends ObjectStorageDataResponseType {}
 
 /* DELETE /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_DELETEOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
 public class DeleteObjectType extends ObjectStorageDeleteType {}
 public class DeleteObjectResponseType extends ObjectStorageDeleteResponseType {
 	String code;
@@ -395,6 +455,10 @@ public class DeleteVersionResponseType extends ObjectStorageDeleteResponseType {
 }
 
 /* GET /bucket */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_LISTBUCKET])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.READ])
 public class ListBucketType extends ObjectStorageRequestType {
 	String prefix;
 	String marker;
@@ -494,51 +558,6 @@ public class SetRESTObjectAccessControlPolicyType extends ObjectStorageRequestTy
 public class SetRESTObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
 	String code;
 	String description;
-}
-
-/* GET /bucket/object */
-public class GetObjectType extends ObjectStorageDataGetRequestType {
-	Boolean getMetaData;
-	Boolean getData;
-	Boolean inlineData;
-	Boolean deleteAfterGet;
-	Boolean getTorrent;
-	String versionId;
-
-	def GetObjectType() {
-	}
-
-	def GetObjectType(final String bucketName, final String key, final Boolean getData, final Boolean getMetaData, final Boolean inlineData) {
-		super( bucketName, key );
-		this.getData = getData;
-		this.getMetaData = getMetaData;
-		this.inlineData = inlineData;
-	}
-}
-
-public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
-	Status status;
-	String base64Data;
-}
-
-/* GET /bucket/object */
-
-//TODO: zhill -- remove this request type and fold into regular GetObject
-public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
-	Boolean getData;
-	Boolean getMetaData;
-	Boolean inlineData;
-	Long byteRangeStart;
-	Long byteRangeEnd;
-	Date ifModifiedSince;
-	Date ifUnmodifiedSince;
-	String ifMatch;
-	String ifNoneMatch;
-	Boolean returnCompleteObjectOnConditionFailure;
-}
-
-public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {
-	Status status;
 }
 
 /* GET /bucket?location */

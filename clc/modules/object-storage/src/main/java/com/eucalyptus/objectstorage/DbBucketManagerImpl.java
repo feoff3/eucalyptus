@@ -172,25 +172,54 @@ public class DbBucketManagerImpl implements BucketManager {
 			}
 			throw ex;
 		}
+		
 		return result;			
 	}
 	
 	@Override
-	public void delete(String bucketName, 
-			ReversableOperation<?,?> resourceModifier) {
-		// TODO Auto-generated method stub
+	public <T> T delete(String bucketName, 
+			ReversableOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
 		
+		Bucket searchEntity = new Bucket(bucketName);
+		try {
+			Transactions.find(searchEntity);
+		} catch(TransactionException e) {
+			LOG.error("Transaction error during bucket lookup for " + bucketName);
+			throw e;
+		} catch(NoSuchElementException e) {
+			LOG.debug("Nothing to do to delete bucket " + bucketName + " not found in db.");
+			//Nothing to do. continue to resource modification
+		}
+		
+		return delete(searchEntity, resourceModifier);
 	}
 
 	@Override
-	public void delete(Bucket bucketEntity, 
-			ReversableOperation<?,?> resourceModifier) throws BucketNotEmptyException {
-		try {
-			//TODO: add emptiness check
+	public <T> T delete(Bucket bucketEntity, 
+			ReversableOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
+		try {			
 			Transactions.delete(bucketEntity);
 		} catch(TransactionException e) {
-			
+			LOG.error("Error deleting bucket in DB",e);
+			throw e;
+		} catch(NoSuchElementException e) {
+			//Ok, continue.			
 		}
+		
+		T result = null;
+		try {
+			result = resourceModifier.call();
+			return result;
+		} catch(Throwable e) {
+			LOG.error("Error in backend call for delete bucket: " + bucketEntity.getBucketName(), e);
+			try {
+				resourceModifier.rollback(result);
+			} catch(Throwable ex ) {
+				LOG.error("Error in rollback after failed delete call on bucket " + bucketEntity.getBucketName(),e);
+			}
+			throw new InternalErrorException(e.getMessage());
+		}
+		
 	}
 
 	@Override

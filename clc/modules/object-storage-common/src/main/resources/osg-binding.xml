@@ -132,10 +132,6 @@
 	</mapping>
 
 	<mapping name="ListBucketResult" class="com.eucalyptus.objectstorage.msgs.ListBucketResponseType">
-			<collection field="metaData"
-				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-				<structure map-as="com.eucalyptus.storage.msgs.s3.MetaDataEntry" />
-			</collection>
 			<value name="Name" field="name" />
 			<value name="Prefix" field="prefix" />
 			<value name="Marker" field="marker"/>

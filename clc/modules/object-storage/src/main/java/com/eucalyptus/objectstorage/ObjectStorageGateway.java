@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
@@ -33,6 +34,7 @@ import org.apache.log4j.Logger;
 import org.apache.tools.ant.util.DateUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
@@ -55,8 +57,10 @@ import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.auth.OSGAuthorizationHandler;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
+import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
@@ -128,6 +132,8 @@ import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
+import com.eucalyptus.storage.msgs.s3.ListEntry;
+import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.system.Ats;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.google.common.base.Function;
@@ -514,21 +520,62 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#DeleteBucket(com.eucalyptus.objectstorage.msgs.DeleteBucketType)
 	 */
 	@Override
-	public DeleteBucketResponseType DeleteBucket(DeleteBucketType request) throws EucalyptusCloudException {
+	public DeleteBucketResponseType DeleteBucket(final DeleteBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
+		Bucket bucket = null;
 		try {
-			Bucket bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
-			if(bucket == null) {
-				throw new NoSuchBucketException(request.getBucket());
-			}		
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//Ok, bucket not found.
+			bucket = null;
+		}
+		
+		if(bucket == null) {
+			//Bucket does not exist, so return success. This is per s3-spec.
+			DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
+			reply.setStatus(HttpResponseStatus.NO_CONTENT);
+			reply.setStatusMessage("No Content");
+			return reply;
+		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-				return ospClient.deleteBucket(request);
+				long objectCount = 0;
+				try {
+					objectCount = ObjectManagerFactory.getInstance().count(bucket.getBucketName());
+				} catch(Exception e) {
+					//Bail if we can't confirm bucket is empty.
+					LOG.error("Error fetching object count for bucket " + bucket.getBucketName());
+					throw new InternalErrorException(bucket.getBucketName());
+				}
+				
+				if(objectCount > 0) {
+					throw new BucketNotEmptyException(bucket.getBucketName());
+				} else {
+					try {
+						return BucketManagerFactory.getInstance().delete(bucket, new ReversableOperation<DeleteBucketResponseType, Boolean>() {
+							
+							@Override
+							public DeleteBucketResponseType call() throws Exception {
+								return ospClient.deleteBucket(request);
+							}
+							
+							@Override
+							public Boolean rollback(DeleteBucketResponseType arg)
+									throws Exception {
+								//No rollback for bucket deletion
+								return true;
+							}					
+						});
+					} catch(TransactionException e) {
+						LOG.error("Transaction error deleting bucket " + request.getBucket(),e);
+						throw new InternalErrorException(request.getBucket());
+					}
+				}				
 			} else {
 				throw new AccessDeniedException(request.getBucket());			
 			}
-		} catch(TransactionException e) {
-			throw new InternalErrorException(request.getBucket());
 		}
 	}
 	
@@ -630,9 +677,80 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public ListBucketResponseType ListBucket(ListBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.listBucket(request);
+		Bucket listBucket = null;
+		try {
+			listBucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			listBucket = null;
+		}
+		
+		if(listBucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {				
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
+				ListBucketResponseType response = (ListBucketResponseType) request.getReply();
+				response.setMarker(request.getMarker());
+				response.setDelimiter(request.getDelimiter());
+				response.setPrefix(request.getPrefix());
+				response.setIsTruncated(false);
+				
+				/*
+				 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.
+				 */
+				String canonicalId = null;
+				try {
+					canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
+				} catch (NoSuchContextException e) {
+					try {
+						canonicalId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getAccount().getCanonicalId();
+					} catch(AuthException ex) {
+						LOG.error("Could not retrieve canonicalId for user with accessKey: " + request.getAccessKeyID());
+						throw new InternalErrorException();
+					}
+				}
+				try {
+					int maxKeys = Strings.isNullOrEmpty(request.getMaxKeys()) ? ObjectStorageProperties.MAX_KEYS: Integer.parseInt(request.getMaxKeys());
+					String prefix = Strings.isNullOrEmpty(request.getPrefix()) ? "" : request.getPrefix();
+					String delimiter = Strings.isNullOrEmpty(request.getDelimiter()) ? "" : request.getDelimiter();
+					String keyMarker = Strings.isNullOrEmpty(request.getMarker()) ? "" : request.getMarker();					
+					PaginatedResult<ObjectEntity> result = ObjectManagerFactory.getInstance().listPaginated(listBucket.getBucketName(), maxKeys, prefix, delimiter, keyMarker);
+					if(result != null) {								
+						response.setCommonPrefixes(new ArrayList<PrefixEntry>());
+						response.setContents(new ArrayList<ListEntry>());
+						response.setIsTruncated(result.getIsTruncated());
+						for(ObjectEntity obj : result.getEntityList()) {
+							response.getContents().add(new ListEntry(
+									obj.getObjectKey(), 
+									DateUtils.format(obj.getLastModified().getTime(), DateUtils.ALT_ISO8601_DATE_PATTERN),
+									obj.getEtag(),
+									obj.getSize(),
+									new CanonicalUser(obj.getOwnerCanonicalId(), getAccountEmailAddress(obj.getOwnerCanonicalId())),
+									obj.getStorageClass()));
+						}
+						
+						for(String commonPrefix : result.getCommonPrefixes()) {
+							response.getCommonPrefixes().add(new PrefixEntry(commonPrefix));
+						}
+						
+						if(response.isIsTruncated()) {
+							response.setNextMarker(response.getContents().get(response.getContents().size() -1).getKey());
+						}
+					}
+					
+					return response;
+				} catch(TransactionException e) {
+					throw new InternalErrorException();
+				}
+			} else {
+				throw new AccessDeniedException(request.getBucket());
+			}
+		}
 	}
-
+	
 	/* (non-Javadoc)
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObjectAccessControlPolicy(com.eucalyptus.objectstorage.msgs.GetObjectAccessControlPolicyType)
 	 */

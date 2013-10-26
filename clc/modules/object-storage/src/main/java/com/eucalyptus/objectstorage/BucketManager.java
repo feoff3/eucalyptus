@@ -112,20 +112,23 @@ public interface BucketManager {
 			ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
-	 * Delete the bucket by name. Idempotent operation
+	 * Delete the bucket by name. Idempotent operation.
+	 * Does *NOT* enforce emptiness checks or any other policy on the bucket
 	 * @param bucketName
 	 */
-	public abstract void delete( String bucketName,  
-			ReversableOperation<?,?> resourceModifier)  throws S3Exception, TransactionException;
+	public abstract <T> T delete( String bucketName,  
+			ReversableOperation<T,?> resourceModifier)  throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
 	 * This method may use it's own transaction, so the caller is
 	 * not required to provide one or pass a loaded or attached entity
+	 *
+	 * Does *NOT* enforce emptiness checks or any other policy on the bucket
 	 * @param bucketEntity
 	 */
-	public abstract void delete(Bucket bucketEntity, 
-			ReversableOperation<?,?> resourceModifier)  throws TransactionException, BucketNotEmptyException;
+	public abstract <T> T delete(Bucket bucketEntity, 
+			ReversableOperation<T,?> resourceModifier)  throws TransactionException, S3Exception;
 	
 	public abstract void updateVersioningState(String bucketName, 
 			ObjectStorageProperties.VersioningStatus newState, 
