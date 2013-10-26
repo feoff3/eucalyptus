@@ -2,6 +2,8 @@ package com.eucalyptus.objectstorage;
 
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.google.common.base.Supplier;
 
 /**
@@ -43,6 +45,6 @@ public interface ObjectManager {
 	 * @param object
 	 * @param versionIdSupplier
 	 */
-	public abstract void create(String bucketName, ObjectEntity object, Supplier<String> versionIdSupplier) throws TransactionException;
+	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T,F> resourceModifier) throws S3Exception, TransactionException;
 	
 }

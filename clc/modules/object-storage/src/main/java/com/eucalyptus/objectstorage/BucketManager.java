@@ -53,7 +53,7 @@ public interface BucketManager {
 			 String ownerIamUserId,
 			 String acl, 
 			 String location,			
-			 ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
+			 ReversibleOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
@@ -62,7 +62,7 @@ public interface BucketManager {
 	 */
 	public abstract Bucket get( String bucketName,
 			 boolean includeHidden,
-			 ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	/**
 	 * Returns list of buckets owned by id. Buckets are detached from any persistence session.
 	 * @param ownerCanonicalId
@@ -71,7 +71,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> list( String ownerCanonicalId, 
 			 boolean includeHidden, 
-			 ReversableOperation<?,?> resourceModifier) throws TransactionException;
+			 ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 
 	/**
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -79,7 +79,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> listByUser( String userIamId, 
 			boolean includeHidden,  
-			ReversableOperation<?,?> resourceModifier) throws TransactionException;
+			ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Returns count of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -87,14 +87,14 @@ public interface BucketManager {
 	 */
 	public abstract long countByUser( String userIamId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws ExecutionException;
+			ReversibleOperation<?,?> resourceModifier) throws S3Exception, ExecutionException;
 	/**
 	 * Returns count of buckets owned by account id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */	
 	public abstract long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws ExecutionException;
+			ReversibleOperation<?,?> resourceModifier) throws ExecutionException;
 	
 	/**
 	 * Checks if bucket exists.
@@ -102,7 +102,7 @@ public interface BucketManager {
 	 * @return
 	 */
 	public abstract boolean exists( String bucketName,  
-			ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket by name. Idempotent operation.
@@ -110,7 +110,7 @@ public interface BucketManager {
 	 * @param bucketName
 	 */
 	public abstract <T> T delete( String bucketName,  
-			ReversableOperation<T,?> resourceModifier)  throws S3Exception, TransactionException;
+			ReversibleOperation<T,?> resourceModifier)  throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
@@ -121,9 +121,9 @@ public interface BucketManager {
 	 * @param bucketEntity
 	 */
 	public abstract <T> T delete(Bucket bucketEntity, 
-			ReversableOperation<T,?> resourceModifier)  throws TransactionException, S3Exception;
+			ReversibleOperation<T,?> resourceModifier)  throws TransactionException, S3Exception;
 	
 	public abstract void updateVersioningState(String bucketName, 
 			ObjectStorageProperties.VersioningStatus newState, 
-			ReversableOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException; 	
+			ReversibleOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException; 	
 }

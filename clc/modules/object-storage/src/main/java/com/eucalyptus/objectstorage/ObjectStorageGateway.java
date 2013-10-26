@@ -103,6 +103,7 @@ import com.eucalyptus.objectstorage.msgs.ListBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ListBucketType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
+import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
@@ -136,6 +137,7 @@ import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.system.Ats;
 import com.eucalyptus.util.EucalyptusCloudException;
+import com.eucalyptus.util.Exceptions;
 import com.google.common.base.Function;
 import com.google.common.base.Strings;
 
@@ -302,13 +304,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		return reply;
 	}
 
+	/* PUT object */
 	@ServiceOperation
 	public enum HandleFirstChunk implements Function<PutObjectType, Object> {
 		INSTANCE;
-
+			
 		@Override
 		public Object apply(PutObjectType request) {
-			LOG.debug("Processing PutObject request (direct dispatch) " + request.toString() + " id: " + request.getCorrelationId());
+			logRequest(request);
 			ChannelBuffer b =  ChannelBuffers.dynamicBuffer();
 			if(!streamDataMap.containsKey(request.getCorrelationId())) {
 				byte[] firstChunk = request.getData();
@@ -319,12 +322,32 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				LOG.error("CorrelationId lookup in data map found duplicate. Unexpected error");
 				return null;
 			}
+			
+			Bucket bucket = null;
 			try {
-				Object o = ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
-				return o;
-			} catch (EucalyptusCloudException ex) {
-				LOG.error(ex);
-				return null;
+				try {
+					//Handle the pass-through
+					bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+				} catch (TransactionException e) {
+					LOG.error(e);
+				} catch(NoSuchElementException e) {
+					throw new NoSuchBucketException(request.getBucket());
+				}
+				
+				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+					//TODO: fix this to create new object entity
+					//ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), );
+					//return ObjectManagerFactory.getInstance().create(request.getBucket(),
+					//objectEntity,
+					return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
+				} else {
+					throw new AccessDeniedException(request.getBucket());			
+				}
+				
+			} catch(Exception ex) {
+				//Convert since Function() can't throw exceptions
+				//Should probably convert this to error response
+				throw Exceptions.toUndeclared(ex);
 			}
 		}
 	}
@@ -365,7 +388,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * A terse request logging function to log request entry at INFO level.
 	 * @param request
 	 */
-	private <I extends ObjectStorageRequestType>void logRequest(I request) {
+	protected static <I extends ObjectStorageRequestType> void logRequest(I request) {
 		StringBuilder canonicalLogEntry = new StringBuilder("osg handling request:" );
 		try {			
 			String accnt = null;
@@ -484,7 +507,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						userId,
 						S3AccessControlledEntity.marshallACPToString(acPolicy), 
 						request.getLocationConstraint(),
-						new ReversableOperation<CreateBucketResponseType, Boolean>() {
+						new ReversibleOperation<CreateBucketResponseType, Boolean>() {
 					public CreateBucketResponseType call() throws Exception {
 						return ospClient.createBucket(request);
 					}
@@ -554,7 +577,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new BucketNotEmptyException(bucket.getBucketName());
 				} else {
 					try {
-						return BucketManagerFactory.getInstance().delete(bucket, new ReversableOperation<DeleteBucketResponseType, Boolean>() {
+						return BucketManagerFactory.getInstance().delete(bucket, new ReversibleOperation<DeleteBucketResponseType, Boolean>() {
 							
 							@Override
 							public DeleteBucketResponseType call() throws Exception {

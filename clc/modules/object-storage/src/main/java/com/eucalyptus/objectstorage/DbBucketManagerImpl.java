@@ -88,7 +88,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public Bucket get(@Nonnull String bucketName,
 			@Nonnull boolean includeHidden,
-			@Nullable ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
 		try {
 			Bucket searchExample = new Bucket(bucketName);
 			searchExample.setHidden(includeHidden);
@@ -101,7 +101,7 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public boolean exists(@Nonnull String bucketName,
-			@Nullable ReversableOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
 		try {
 			return (Transactions.find(new Bucket(bucketName)) != null);
 		} catch (TransactionException e) {
@@ -116,7 +116,7 @@ public class DbBucketManagerImpl implements BucketManager {
 			@Nonnull String ownerIamUserId,
 			@Nonnull String acl, 
 			@Nonnull String location,
-			@Nullable ReversableOperation<T,R> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable ReversibleOperation<T,R> resourceModifier) throws S3Exception, TransactionException {
 
 		Bucket newBucket = new Bucket(bucketName);
 		try {
@@ -178,7 +178,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	
 	@Override
 	public <T> T delete(String bucketName, 
-			ReversableOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
+			ReversibleOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
 		
 		Bucket searchEntity = new Bucket(bucketName);
 		try {
@@ -196,7 +196,7 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public <T> T delete(Bucket bucketEntity, 
-			ReversableOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
+			ReversibleOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
 		try {			
 			Transactions.delete(bucketEntity);
 		} catch(TransactionException e) {
@@ -225,7 +225,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public void updateVersioningState(String bucketName,
 			VersioningStatus newState, 
-			ReversableOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException {
+			ReversibleOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException {
 		
 		EntityTransaction db = Entities.get(Bucket.class);
 		try {
@@ -250,7 +250,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public List<Bucket> list(String ownerCanonicalId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws TransactionException {
+			ReversibleOperation<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
 		searchBucket.setHidden(includeHidden);
@@ -267,7 +267,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public List<Bucket> listByUser(String userIamId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws TransactionException {
+			ReversibleOperation<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -284,7 +284,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public long countByUser(String userIamId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws ExecutionException {
+			ReversibleOperation<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -302,7 +302,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			ReversableOperation<?,?> resourceModifier) throws ExecutionException {
+			ReversibleOperation<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerCanonicalId(canonicalId);

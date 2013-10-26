@@ -1,12 +1,14 @@
 package com.eucalyptus.objectstorage;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import javax.persistence.EntityTransaction;
 
+import org.apache.commons.httpclient.util.DateUtil;
 import org.apache.log4j.Logger;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
@@ -18,6 +20,9 @@ import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 
@@ -75,12 +80,37 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public void create(String bucketName, ObjectEntity object, Supplier<String> versionIdSupplier) throws TransactionException {
+	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {
+		T result = null;
 		try {
-			Transactions.saveDirect(object);
-		} catch (TransactionException e) {
-			LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
+			if(resourceModifier != null) {
+				result = resourceModifier.call();
+				object.setVersionId(result.getVersionId());
+				object.setEtag(result.getEtag());
+				object.setLastModified(DateUtil.parseDate(result.getLastModified()));
+			} else {
+				//nothing to call, so just save
+			}
+			try {
+				Transactions.saveDirect(object);
+				return result;
+			} catch (TransactionException e) {
+				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
+				throw e;
+			}			
+		} catch(S3Exception e) {
+			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
+			try {
+				if(resourceModifier != null) {
+					resourceModifier.rollback(result);
+				}
+			} catch(Exception ex) {
+				LOG.error("Error rolling back object create",ex);
+			}
 			throw e;
+		} catch(Exception e) {
+			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
+			throw new InternalErrorException(object.getBucketName() + "/" + object.getObjectKey());
 		}
 	}
 
