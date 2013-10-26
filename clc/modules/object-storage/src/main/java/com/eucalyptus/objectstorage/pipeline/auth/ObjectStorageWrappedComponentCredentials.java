@@ -60,30 +60,32 @@
  *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
-package com.eucalyptus.objectstorage.exceptions;
+package com.eucalyptus.objectstorage.pipeline.auth;
 
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
+import com.eucalyptus.auth.login.WrappedCredentials;
 
+public class ObjectStorageWrappedComponentCredentials extends WrappedCredentials<String> {
+	private String queryId;
+	private String signature;
+	private String certMD5Fingerprint;
+	
+	public ObjectStorageWrappedComponentCredentials(String correlationId, String data,
+			String accessKeyId, String signature, String certFingerprint) {
+		super( correlationId, data );
+		this.queryId = accessKeyId;
+		this.signature = signature;
+		this.certMD5Fingerprint = certFingerprint;
+	}
 
-@SuppressWarnings("serial")
-public class NotAuthorizedException extends ObjectStorageException {
+	public String getQueryId() {
+		return this.queryId;
+	}
 
-  public NotAuthorizedException()
-  {
-    super( "Unauthorized" );
-  }
-  
-  public NotAuthorizedException(String value)
-  {
-	  super("Unauthorized", "You are not authorized to perform this operation", "Reason", value, HttpResponseStatus.UNAUTHORIZED);
-  }
+	public String getSignature() {
+		return this.signature;
+	}
 
-  public NotAuthorizedException(Throwable ex)
-  {
-    super("Unauthorized", ex);
-  }
-  public NotAuthorizedException(String message, Throwable ex)
-  {
-    super(message,ex);
-  }
+	public String getCertMD5Fingerprint() {
+		return this.certMD5Fingerprint;
+	}
 }

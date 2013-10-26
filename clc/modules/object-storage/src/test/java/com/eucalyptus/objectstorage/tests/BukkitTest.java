@@ -67,6 +67,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import com.eucalyptus.auth.util.Hashes;
+import com.eucalyptus.objectstorage.ObjectStorageService;
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -81,7 +82,7 @@ import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsType;
 @Ignore("Manual development test")
 public class BukkitTest {
 
-	static ObjectStorageGateway bukkit;
+	static ObjectStorageService bukkit;
 
 	@Test
 	public void testWalrusControl() throws Exception {

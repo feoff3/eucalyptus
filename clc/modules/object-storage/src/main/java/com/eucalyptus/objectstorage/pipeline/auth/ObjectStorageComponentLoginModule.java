@@ -60,7 +60,7 @@
  *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
-package com.eucalyptus.objectstorage.auth;
+package com.eucalyptus.objectstorage.pipeline.auth;
 
 import java.io.IOException;
 import java.security.PrivateKey;

@@ -172,6 +172,11 @@ public class ObjectStorageProperties {
 		aws_exec_read { public String toString() { return "aws-exec-read"; }}
 	}
 	
+	public enum STORAGE_CLASS {
+		STANDARD,
+		REDUCED_REDUNDANCY;
+	}
+	
 	public enum Permission {
 		READ, WRITE, READ_ACP, WRITE_ACP, FULL_CONTROL
 	}

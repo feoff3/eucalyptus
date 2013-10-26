@@ -1,5 +1,5 @@
 /*************************************************************************
- * Copyright 2009-2012 Eucalyptus Systems, Inc.
+ * Copyright 2009-2013 Eucalyptus Systems, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,48 +16,6 @@
  * Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
  * CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
  * additional information or have any questions.
- *
- * This file may incorporate work covered under the following copyright
- * and permission notice:
- *
- *   Software License Agreement (BSD License)
- *
- *   Copyright (c) 2008, Regents of the University of California
- *   All rights reserved.
- *
- *   Redistribution and use of this software in source and binary forms,
- *   with or without modification, are permitted provided that the
- *   following conditions are met:
- *
- *     Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *
- *     Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer
- *     in the documentation and/or other materials provided with the
- *     distribution.
- *
- *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *   FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *   COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *   BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *   POSSIBILITY OF SUCH DAMAGE. USERS OF THIS SOFTWARE ACKNOWLEDGE
- *   THE POSSIBLE PRESENCE OF OTHER OPEN SOURCE LICENSED MATERIAL,
- *   COPYRIGHTED MATERIAL OR PATENTED MATERIAL IN THIS SOFTWARE,
- *   AND IF ANY SUCH MATERIAL IS DISCOVERED THE PARTY DISCOVERING
- *   IT MAY INFORM DR. RICH WOLSKI AT THE UNIVERSITY OF CALIFORNIA,
- *   SANTA BARBARA WHO WILL THEN ASCERTAIN THE MOST APPROPRIATE REMEDY,
- *   WHICH IN THE REGENTS' DISCRETION MAY INCLUDE, WITHOUT LIMITATION,
- *   REPLACEMENT OF THE CODE SO IDENTIFIED, LICENSING OF THE CODE SO
- *   IDENTIFIED, OR WITHDRAWAL OF THE CODE CAPABILITY TO THE EXTENT
- *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
 package com.eucalyptus.objectstorage.msgs
@@ -72,6 +30,7 @@ import org.jboss.netty.handler.codec.http.DefaultHttpMessage;
 import com.eucalyptus.auth.policy.PolicySpec;
 import com.eucalyptus.component.annotation.ComponentMessage;
 import com.eucalyptus.objectstorage.ObjectStorage;
+import com.eucalyptus.objectstorage.policy.AdminOverrideAllowed;
 import com.eucalyptus.objectstorage.policy.RequiresPermission;
 import com.eucalyptus.objectstorage.policy.RequiresACLPermission;
 import com.eucalyptus.objectstorage.policy.ResourceType;
@@ -103,6 +62,8 @@ import edu.ucsb.eucalyptus.msgs.EucalyptusData;
 import edu.ucsb.eucalyptus.msgs.StatEventRecord;
 
 public class ObjectStorageResponseType extends ObjectStorageRequestType {
+	HttpResponseStatus status; //Most should be 200-ok, but for deletes etc it may be 204-No Content
+	
 	def ObjectStorageResponseType() {}
 }
 
@@ -160,6 +121,48 @@ public class ObjectStorageRequestType extends BaseMessage {
 	}
 	public Date getTimestamp() {
 		return this.timeStamp;
+	}
+}
+
+public class ObjectStorageDataRequestType extends ObjectStorageRequestType {
+	String randomKey;
+	Boolean isCompressed;
+
+	def ObjectStorageDataRequestType() {
+	}
+
+	def ObjectStorageDataRequestType( String bucket, String key ) {
+		super( bucket, key );
+	}
+
+}
+
+public class ObjectStorageDataResponseType extends ObjectStorageStreamingResponseType {
+	String etag;
+	String lastModified;
+	Long size;
+	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
+	Integer errorCode;
+	String contentType;
+	String contentDisposition;
+	String versionId;
+}
+
+public class ObjectStorageDataGetRequestType extends ObjectStorageDataRequestType {
+	protected Channel channel;
+
+	public Channel getChannel() {
+		return channel;
+	}
+
+	public void setChannel(Channel channel) {
+		this.channel = channel;
+	}
+
+	def ObjectStorageDataGetRequestType() {}
+
+	def ObjectStorageDataGetRequestType(String bucket, String key) {
+		super(bucket, key);
 	}
 }
 
@@ -232,7 +235,8 @@ public class ObjectStorageRedirectMessageType extends ObjectStorageErrorMessageT
 	}
 }
 
-
+/* GET /bucket?acl */
+@AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_GETBUCKETACL])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ_ACP], bucket=[])
@@ -242,35 +246,42 @@ public class GetBucketAccessControlPolicyResponseType extends ObjectStorageRespo
 	AccessControlPolicy accessControlPolicy;
 }
 
+/* GET /bucket/object?acl */
+@AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_GETOBJECTACL])
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ_ACP], bucket=[])
 public class GetObjectAccessControlPolicyType extends ObjectStorageRequestType {
 	String versionId;
 }
-
 public class GetObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
 	AccessControlPolicy accessControlPolicy;
 }
 
+/* GET / */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_LISTALLMYBUCKETS])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 public class ListAllMyBucketsType extends ObjectStorageRequestType {}
 public class ListAllMyBucketsResponseType extends ObjectStorageResponseType {
 	CanonicalUser owner;
-	ListAllMyBucketsList bucketList;
+	ListAllMyBucketsList bucketList;	
 }
 
-
-//TODO: zhill, remove these, should be handled by verb-specific pipelines
+//TODO: zhill -- remove this type, pipeline should handle this
 public class ObjectStorageHeadRequestType extends ObjectStorageRequestType {}
 public class ObjectStorageHeadResponseType extends ObjectStorageResponseType {}
 
-
+/* HEAD /bucket */
+@AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_GETOBJECT])
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
 public class HeadBucketType extends ObjectStorageHeadRequestType {}
 public class HeadBucketResponseType extends ObjectStorageHeadResponseType{}
 
+/* PUT /bucket */
+@AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_CREATEBUCKET])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 @RequiresACLPermission(object=[], bucket=[]) //No ACLs for creating a bucket
@@ -279,8 +290,7 @@ public class CreateBucketType extends ObjectStorageRequestType {
 	String locationConstraint;
 
 	//For unit testing
-	public CreateBucketType() {
-	}
+	public CreateBucketType() {}
 
 	public CreateBucketType(String bucket) {
 		this.bucket = bucket;
@@ -291,76 +301,24 @@ public class CreateBucketResponseType extends ObjectStorageResponseType {
 	String bucket;
 }
 
-public class DeleteBucketType extends ObjectStorageDeleteType {
-}
+/* DELETE /bucket */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_DELETEBUCKET])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[]) //No ACLs for deleting a bucket
+public class DeleteBucketType extends ObjectStorageDeleteType {}
+public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {}
 
-public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {
-	Status status;
-}
-
-public class ObjectStorageDataRequestType extends ObjectStorageRequestType {
-	String randomKey;
-	Boolean isCompressed;
-
-	def ObjectStorageDataRequestType() {
-	}
-
-	def ObjectStorageDataRequestType( String bucket, String key ) {
-		super( bucket, key );
-	}
-
-}
-
-public class ObjectStorageDataResponseType extends ObjectStorageStreamingResponseType {
-	String etag;
-	String lastModified;
-	Long size;
-	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
-	Integer errorCode;
-	String contentType;
-	String contentDisposition;
-	String versionId;
-}
-
-public class ObjectStorageDataGetRequestType extends ObjectStorageDataRequestType {
-	protected Channel channel;
-
-	public Channel getChannel() {
-		return channel;
-	}
-
-	public void setChannel(Channel channel) {
-		this.channel = channel;
-	}
-
-	def ObjectStorageDataGetRequestType() {}
-
-	def ObjectStorageDataGetRequestType(String bucket, String key) {
-		super(bucket, key);
-	}
-}
 
 public class ObjectStorageDataGetResponseType extends ObjectStorageDataResponseType {
-
 	def ObjectStorageDataGetResponseType() {}
 }
 
-public class PutObjectResponseType extends ObjectStorageDataResponseType {}
-
-public class PostObjectResponseType extends ObjectStorageDataResponseType {
-	String redirectUrl;
-	Integer successCode;
-	String location;
-	String bucket;
-	String key;
-}
-
-public class PutObjectInlineResponseType extends ObjectStorageDataResponseType {}
-
-public class PutChunkType extends ObjectStorageDataRequestType {}
-
-public class PutChunkResponseType extends ObjectStorageDataResponseType {}
-
+/* PUT /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_PUTOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET) //NOTE: s3 docs seem to imply this should be OBJECT
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
 public class PutObjectType extends ObjectStorageDataRequestType {
 	String contentLength;
 	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
@@ -373,7 +331,9 @@ public class PutObjectType extends ObjectStorageDataRequestType {
 
 	def PutObjectType() {}
 }
+public class PutObjectResponseType extends ObjectStorageDataResponseType {}
 
+/* POST /bucket/object */
 public class PostObjectType extends ObjectStorageDataRequestType {
 	String contentLength;
 	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
@@ -383,6 +343,64 @@ public class PostObjectType extends ObjectStorageDataRequestType {
 	Integer successActionStatus;
 	String contentType;
 }
+public class PostObjectResponseType extends ObjectStorageDataResponseType {
+	String redirectUrl;
+	Integer successCode;
+	String location;
+	String bucket;
+	String key;
+}
+
+/* GET /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_GETOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
+public class GetObjectType extends ObjectStorageDataGetRequestType {
+	Boolean getMetaData;
+	Boolean getData;
+	Boolean inlineData;
+	Boolean deleteAfterGet;
+	Boolean getTorrent;
+	String versionId;
+
+	def GetObjectType() {
+	}
+
+	def GetObjectType(final String bucketName, final String key, final Boolean getData, final Boolean getMetaData, final Boolean inlineData) {
+		super( bucketName, key );
+		this.getData = getData;
+		this.getMetaData = getMetaData;
+		this.inlineData = inlineData;
+	}
+}
+
+public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
+	Status status;
+	String base64Data;
+}
+
+/* GET /bucket/object */
+
+//TODO: zhill -- remove this request type and fold into regular GetObject
+public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
+	Boolean getData;
+	Boolean getMetaData;
+	Boolean inlineData;
+	Long byteRangeStart;
+	Long byteRangeEnd;
+	Date ifModifiedSince;
+	Date ifUnmodifiedSince;
+	String ifMatch;
+	String ifNoneMatch;
+	Boolean returnCompleteObjectOnConditionFailure;
+}
+
+public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {
+	Status status;
+}
+
+/* PUT /bucket/object with x-amz-copy-src header */
 public class CopyObjectType extends ObjectStorageRequestType {
 	String sourceBucket;
 	String sourceObject;
@@ -410,6 +428,7 @@ public class CopyObjectResponseType extends ObjectStorageResponseType {
 	String copySourceVersionId;
 }
 
+/* SOAP put object */
 public class PutObjectInlineType extends ObjectStorageDataRequestType {
 	String contentLength;
 	ArrayList<MetaDataEntry> metaData  = new ArrayList<MetaDataEntry>();
@@ -419,14 +438,20 @@ public class PutObjectInlineType extends ObjectStorageDataRequestType {
 	String contentType;
 	String contentDisposition;
 }
+public class PutObjectInlineResponseType extends ObjectStorageDataResponseType {}
 
+/* DELETE /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_DELETEOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
 public class DeleteObjectType extends ObjectStorageDeleteType {}
-
 public class DeleteObjectResponseType extends ObjectStorageDeleteResponseType {
 	String code;
 	String description;
 }
 
+/* DELETE /bucket/object?versionid=x */
 public class DeleteVersionType extends ObjectStorageDeleteType {
 	String versionid;
 }
@@ -436,6 +461,11 @@ public class DeleteVersionResponseType extends ObjectStorageDeleteResponseType {
 	String description;
 }
 
+/* GET /bucket */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_LISTBUCKET])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.READ])
 public class ListBucketType extends ObjectStorageRequestType {
 	String prefix;
 	String marker;
@@ -457,7 +487,6 @@ public class ListBucketResponseType extends ObjectStorageResponseType {
 	int maxKeys;
 	String delimiter;
 	boolean isTruncated;
-	ArrayList<MetaDataEntry> metaData;
 	ArrayList<ListEntry> contents;
 	ArrayList<PrefixEntry> commonPrefixes = new ArrayList<PrefixEntry>();
 
@@ -466,6 +495,7 @@ public class ListBucketResponseType extends ObjectStorageResponseType {
 	}
 }
 
+/* GET /bucket?versions */
 public class ListVersionsType extends ObjectStorageRequestType {
 	String prefix;
 	String keyMarker;
@@ -493,6 +523,7 @@ public class ListVersionsResponseType extends ObjectStorageResponseType {
 	ArrayList<PrefixEntry> commonPrefixes;
 }
 
+/* Currently these are SOAP variants of acl calls */
 public class SetBucketAccessControlPolicyType extends ObjectStorageRequestType {
 	AccessControlList accessControlList;
 }
@@ -512,6 +543,8 @@ public class SetObjectAccessControlPolicyResponseType extends ObjectStorageRespo
 	String description;
 }
 
+/* PUT /bucket?acl */
+//TODO: zhill -- remove this and have a single setACL type now that SOAP is removed
 public class SetRESTBucketAccessControlPolicyType extends ObjectStorageRequestType {
 	AccessControlPolicy accessControlPolicy;
 }
@@ -521,80 +554,47 @@ public class SetRESTBucketAccessControlPolicyResponseType extends ObjectStorageR
 	String description;
 }
 
+/* PUT /bucket/object?acl */
 public class SetRESTObjectAccessControlPolicyType extends ObjectStorageRequestType {
 	AccessControlPolicy accessControlPolicy;
 	String versionId;
 }
 
+//TODO: zhill -- remove this and have a single setACL type now that SOAP is removed
 public class SetRESTObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
 	String code;
 	String description;
 }
 
-public class GetObjectType extends ObjectStorageDataGetRequestType {
-	Boolean getMetaData;
-	Boolean getData;
-	Boolean inlineData;
-	Boolean deleteAfterGet;
-	Boolean getTorrent;
-	String versionId;
-
-	def GetObjectType() {
-	}
-
-	def GetObjectType(final String bucketName, final String key, final Boolean getData, final Boolean getMetaData, final Boolean inlineData) {
-		super( bucketName, key );
-		this.getData = getData;
-		this.getMetaData = getMetaData;
-		this.inlineData = inlineData;
-	}
-}
-
-public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
-	Status status;
-	String base64Data;
-}
-
-public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
-	Boolean getData;
-	Boolean getMetaData;
-	Boolean inlineData;
-	Long byteRangeStart;
-	Long byteRangeEnd;
-	Date ifModifiedSince;
-	Date ifUnmodifiedSince;
-	String ifMatch;
-	String ifNoneMatch;
-	Boolean returnCompleteObjectOnConditionFailure;
-}
-
-public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {
-	Status status;
-}
-
+/* GET /bucket?location */
 public class GetBucketLocationType extends ObjectStorageRequestType {}
-
 public class GetBucketLocationResponseType extends ObjectStorageResponseType {
 	String locationConstraint;
 }
 
-public class GetBucketLoggingStatusType extends ObjectStorageRequestType {
-}
-
+/* GET /bucket?versioning */
+public class GetBucketLoggingStatusType extends ObjectStorageRequestType {}
 public class GetBucketLoggingStatusResponseType extends ObjectStorageResponseType {
 	LoggingEnabled loggingEnabled;
 }
 
+/* PUT /bucket?logging */
 public class SetBucketLoggingStatusType extends ObjectStorageRequestType {
 	LoggingEnabled loggingEnabled;
 }
 public class SetBucketLoggingStatusResponseType extends ObjectStorageResponseType {}
 
+/* GET /bucket?versioning */
 public class GetBucketVersioningStatusType extends ObjectStorageRequestType {}
 public class GetBucketVersioningStatusResponseType extends ObjectStorageResponseType {
 	String versioningStatus;
 }
 
+/* PUT /bucket?versioning */
+@AdminOverrideAllowed
+@RequiresPermission([])
+@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[],ownerOnly=true)
 public class SetBucketVersioningStatusType extends ObjectStorageRequestType {
 	String versioningStatus;
 }

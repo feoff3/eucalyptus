@@ -22,7 +22,6 @@ package com.eucalyptus.objectstorage.tests;
 import java.io.File;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -30,12 +29,11 @@ import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 
-import com.eucalyptus.auth.login.AuthenticationException;
 import com.eucalyptus.blockstorage.HttpReader;
 import com.eucalyptus.blockstorage.HttpWriter;
 import com.eucalyptus.blockstorage.util.StorageProperties;
 import com.eucalyptus.http.MappingHttpRequest;
-import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
+import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataMessage;
 import com.eucalyptus.objectstorage.pipeline.handlers.ObjectStorageAuthenticationHandler;
 import com.eucalyptus.util.EucalyptusCloudException;

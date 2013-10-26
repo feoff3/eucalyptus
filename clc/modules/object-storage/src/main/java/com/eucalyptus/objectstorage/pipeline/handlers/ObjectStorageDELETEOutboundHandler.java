@@ -60,30 +60,54 @@
  *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
-package com.eucalyptus.objectstorage.exceptions;
+package com.eucalyptus.objectstorage.pipeline.handlers;
 
+import org.apache.log4j.Logger;
+import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelPipelineCoverage;
+import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
+import com.eucalyptus.http.MappingHttpResponse;
+import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
+import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.ws.handlers.MessageStackHandler;
 
-@SuppressWarnings("serial")
-public class ContentMismatchException extends ObjectStorageException {
+import edu.ucsb.eucalyptus.msgs.BaseMessage;
+import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
+import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
-  public ContentMismatchException()
-  {
-    super( "ContentMismatch" );
-  }
-  
-  public ContentMismatchException(String value)
-  {
-    super("ContentMismatch", "The Content-MD5 you specified did not match what was received.", "Object",  value, HttpResponseStatus.BAD_REQUEST);
-  }
+@ChannelPipelineCoverage("one")
+public class ObjectStorageDELETEOutboundHandler extends MessageStackHandler {
+	private static Logger LOG = Logger.getLogger( ObjectStorageDELETEOutboundHandler.class );	
 
-  public ContentMismatchException(Throwable ex)
-  {
-    super("ContentMismatch", ex);
-  }
-  public ContentMismatchException(String message, Throwable ex)
-  {
-    super(message,ex);
-  }
+	@Override
+	public void outgoingMessage( ChannelHandlerContext ctx, MessageEvent event ) throws Exception {
+		if ( event.getMessage( ) instanceof MappingHttpResponse ) {
+			MappingHttpResponse httpResponse = ( MappingHttpResponse ) event.getMessage( );
+			BaseMessage msg = (BaseMessage) httpResponse.getMessage( );
+
+			if(msg instanceof EucalyptusErrorMessageType) {      
+				EucalyptusErrorMessageType errorMessage = (EucalyptusErrorMessageType) msg;
+				BaseMessage errMsg = OSGUtil.convertErrorMessage(errorMessage);
+				if(errMsg instanceof ObjectStorageErrorMessageType) {
+					ObjectStorageErrorMessageType objErrorMsg = (ObjectStorageErrorMessageType) errMsg;
+					httpResponse.setStatus(objErrorMsg.getStatus());
+				}
+			} else if(msg instanceof ExceptionResponseType) {      
+				ExceptionResponseType errorMessage = (ExceptionResponseType) msg;
+				BaseMessage errMsg = OSGUtil.convertErrorMessage(errorMessage);
+				if(errMsg instanceof ObjectStorageErrorMessageType) {
+					ObjectStorageErrorMessageType objErrorMsg = (ObjectStorageErrorMessageType) errMsg;
+					httpResponse.setStatus(objErrorMsg.getStatus());
+				}				
+			} else {
+				//Normal response
+				httpResponse.setStatus(HttpResponseStatus.NO_CONTENT);
+				//Since a DELETE response, never include a body
+				httpResponse.setMessage(null);
+			}
+		}
+	}
+
 }

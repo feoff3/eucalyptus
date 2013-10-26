@@ -97,10 +97,10 @@ import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.http.MappingHttpRequest;
-import com.eucalyptus.objectstorage.auth.ObjectStorageWrappedComponentCredentials;
-import com.eucalyptus.objectstorage.auth.ObjectStorageWrappedCredentials;
-import com.eucalyptus.objectstorage.exceptions.AccessDeniedException;
+import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.pipeline.UploadPolicyChecker;
+import com.eucalyptus.objectstorage.pipeline.auth.ObjectStorageWrappedComponentCredentials;
+import com.eucalyptus.objectstorage.pipeline.auth.ObjectStorageWrappedCredentials;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.ws.handlers.MessageStackHandler;
@@ -344,7 +344,7 @@ public class ObjectStorageAuthenticationHandler extends MessageStackHandler {
 				certString = authMap.get(AuthorizationField.CertFingerPrint);
 			}
 			else {
-				throw new AccessDeniedException("Invalid Authorization Header");
+				throw new AccessDeniedException();
 			}
 			
 			String verb = httpRequest.getMethod().getName();
@@ -361,7 +361,7 @@ public class ObjectStorageAuthenticationHandler extends MessageStackHandler {
 				SecurityContext.getLoginContext(new ObjectStorageWrappedComponentCredentials(httpRequest.getCorrelationId(), data, AWSAccessKeyID, signature, certString)).login();
 			} catch(Exception ex) {
 				LOG.error(ex);
-				throw new AccessDeniedException(ex);
+				throw new AccessDeniedException();
 			}
 		}
 		
@@ -564,11 +564,11 @@ public class ObjectStorageAuthenticationHandler extends MessageStackHandler {
 						SecurityContext.getLoginContext(new ObjectStorageWrappedCredentials(httpRequest.getCorrelationId(), data, accessKeyId, signature, securityToken)).login();
 					} catch(Exception ex2) {
 						LOG.error(ex2);
-						throw new AccessDeniedException(ex2);					
+						throw new AccessDeniedException();					
 					}
 				} else {
 					LOG.error(ex);
-					throw new AccessDeniedException(ex);
+					throw new AccessDeniedException();
 				}
 			}
 		}
@@ -615,11 +615,11 @@ public class ObjectStorageAuthenticationHandler extends MessageStackHandler {
 								SecurityContext.getLoginContext(new ObjectStorageWrappedCredentials(httpRequest.getCorrelationId(), stringToSign, accesskeyid, signature, securityToken)).login();
 							} catch(Exception ex2) {
 								LOG.error(ex2);
-								throw new AccessDeniedException(ex2);					
+								throw new AccessDeniedException();					
 							}
 						} else {
 							LOG.error(ex);
-							throw new AccessDeniedException(ex);
+							throw new AccessDeniedException();
 						}
 					}
 				} else {
@@ -804,7 +804,7 @@ public class ObjectStorageAuthenticationHandler extends MessageStackHandler {
 					ctx.setUser(Principals.nobodyUser());
 				} catch (NoSuchContextException e) {
 					LOG.error(e, e);
-					throw new AccessDeniedException(e);
+					throw new AccessDeniedException();
 				}				
 			}
 		}

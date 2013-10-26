@@ -200,29 +200,6 @@ public class WalrusProviderClient extends S3ProviderClient {
 		this.setUsePathStyle(true);
 	}
 
-	@Override
-	public void check() throws EucalyptusCloudException {}
-
-	@Override
-	public void start() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub
-	}
-
-	@Override
-	public void stop() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
-	@Override
-	public void enable() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
-	@Override
-	public void disable() throws EucalyptusCloudException {
-		// TODO Auto-generated method stub		
-	}
-
 	/**
 	 * Simply looks up the currently enabled Walrus service.
 	 * @return
@@ -246,29 +223,26 @@ public class WalrusProviderClient extends S3ProviderClient {
 	@Override
 	protected AmazonS3Client getS3Client(User requestUser, String requestAWSAccessKeyId) {
 		//TODO: this should be enhanced to share clients/use a pool for efficiency.
-		if (walrusDataClient != null) {
-			return walrusDataClient;
-		} else {	
-			ClientConfiguration config = new ClientConfiguration();
-			config.setProtocol(Protocol.HTTP);
-			config.setConnectionTimeout(CONNECTION_TIMEOUT_MS); //very short timeout
-			AWSCredentials credentials = mapCredentials(requestUser, requestAWSAccessKeyId);
-			AmazonS3Client client = new AmazonS3Client(credentials, config);
-			ServiceConfiguration walrus = Topology.lookup(Walrus.class);
-			client.setEndpoint(walrus.getUri().toString());		
-			client.setS3ClientOptions(new S3ClientOptions().withPathStyleAccess(this.usePathStyle));
-			return client;
+		if (walrusDataClient == null) {
+			synchronized(this) {
+				if(walrusDataClient == null) {
+					ClientConfiguration config = new ClientConfiguration();
+					config.setProtocol(Protocol.HTTP);
+					config.setConnectionTimeout(CONNECTION_TIMEOUT_MS); //very short timeout
+					AWSCredentials credentials = mapCredentials(requestUser, requestAWSAccessKeyId);
+					AmazonS3Client client = new AmazonS3Client(credentials, config);
+					ServiceConfiguration walrus = Topology.lookup(Walrus.class);
+					client.setEndpoint(walrus.getUri().toString());		
+					client.setS3ClientOptions(new S3ClientOptions().withPathStyleAccess(this.usePathStyle));
+					walrusDataClient = client;
+				}
+			}
 		}
-
+		return walrusDataClient;
 	}
 
 	/**
-	 * Maps the request credentials to another set of credentials.
-	 * @param requestUser The Eucalyptus user that generated the request
-	 * @param requestAccessKeyId The access key id used for this request
-	 * @return a BasicAWSCredentials object initialized with the credentials to use
-	 * @throws NoSuchElementException
-	 * @throws IllegalArgumentException
+	 * Walrus provider mapping is the identity function (users map to themselves)
 	 */
 	@Override
 	protected  BasicAWSCredentials mapCredentials(User requestUser, String requestAWSAccessKeyId) throws NoSuchElementException, IllegalArgumentException {
@@ -485,32 +459,8 @@ public class WalrusProviderClient extends S3ProviderClient {
 	 * Object Operations
 	 * ------------------------- 
 	 */
-
-	@Override
-	public PutObjectResponseType putObject(PutObjectType request, InputStream inputData) throws EucalyptusCloudException {
-		try {
-			walrusDataClient = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
-			PutObjectResult result = null;
-			try {
-				ObjectMetadata metadata = getS3ObjectMetadata(request);
-				result = walrusDataClient.putObject(request.getBucket(), request.getKey(), inputData, metadata);
-			} catch(Exception e) {
-				LOG.error("Error putting object to backend",e);
-				throw e;
-			}
-
-			PutObjectResponseType reply = (PutObjectResponseType)request.getReply();			
-			if(result == null) {
-				throw new EucalyptusCloudException("Null result. Internal error");
-			} else {
-				reply.setEtag(result.getETag());
-				reply.setVersionId(result.getVersionId());				
-			}
-			return reply;
-		} catch(Exception e) {
-			throw new EucalyptusCloudException(e);
-		}
-	}
+	
+	//GET and PUT object are the same as the base S3ProviderClient.
 
 	@Override
 	public PostObjectResponseType postObject(PostObjectType request) throws EucalyptusCloudException {
@@ -525,123 +475,6 @@ public class WalrusProviderClient extends S3ProviderClient {
 	@Override
 	public AddObjectResponseType addObject(AddObjectType request) throws EucalyptusCloudException {
 		throw new EucalyptusCloudException("Not implemented");
-	}
-
-	@Override
-	public GetObjectResponseType getObject(final GetObjectType request) throws EucalyptusCloudException {
-		walrusDataClient = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
-		GetObjectRequest getRequest = new GetObjectRequest(request.getBucket(), request.getKey());
-		try {
-			S3Object response = walrusDataClient.getObject(getRequest);
-			S3ObjectInputStream input = response.getObjectContent();
-			DefaultHttpResponse httpResponse = createHttpResponse(response.getObjectMetadata());
-			Channel channel = request.getChannel();
-			channel.write(httpResponse);
-			final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
-			channel.write(dataStream).addListener(new ChannelFutureListener( ) {
-				@Override public void operationComplete( ChannelFuture future ) throws Exception {			
-					Contexts.clear(request.getCorrelationId());
-					dataStream.close();
-				}
-			});
-			return null;
-		} catch(Exception ex) {
-			LOG.error(ex, ex);
-			return null;
-		}
-	}
-
-	/**
-	 * Common get routine used by simple and extended GETs.
-	 * 
-	 * @param request
-	 * @param getRequest
-	 * @return
-	 */
-
-	private DefaultHttpResponse createHttpResponse(ObjectMetadata metadata) {
-		DefaultHttpResponse httpResponse = new DefaultHttpResponse(
-				HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-		long contentLength = metadata.getContentLength();
-		String contentType = metadata.getContentType();
-		String etag = metadata.getETag();
-		Date lastModified = metadata.getLastModified();
-		String contentDisposition = metadata.getContentDisposition();
-		httpResponse.addHeader( HttpHeaders.Names.CONTENT_TYPE, contentType != null ? contentType : "binary/octet-stream" );
-		if(etag != null)
-			httpResponse.addHeader(HttpHeaders.Names.ETAG, etag);
-		httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, lastModified);
-		if(contentDisposition != null) {
-			httpResponse.addHeader("Content-Disposition", contentDisposition);
-		}
-		httpResponse.addHeader( HttpHeaders.Names.CONTENT_LENGTH, String.valueOf(contentLength));
-		String versionId = metadata.getVersionId();
-		if(versionId != null) {
-			httpResponse.addHeader(WalrusProperties.X_AMZ_VERSION_ID, versionId);
-		}
-		return httpResponse;
-	}
-
-	@Override
-	public GetObjectExtendedResponseType getObjectExtended(final GetObjectExtendedType request) throws EucalyptusCloudException {
-		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
-		Boolean getMetaData = request.getGetMetaData();
-		Boolean inlineData = request.getInlineData();
-		Long byteRangeStart = request.getByteRangeStart();
-		Long byteRangeEnd = request.getByteRangeEnd();
-		Date ifModifiedSince = request.getIfModifiedSince();
-		Date ifUnmodifiedSince = request.getIfUnmodifiedSince();
-		String ifMatch = request.getIfMatch();
-		String ifNoneMatch = request.getIfNoneMatch();
-
-		GetObjectRequest getRequest = new GetObjectRequest(request.getBucket(), request.getKey());
-		if(byteRangeStart == null) {
-			byteRangeStart = 0L;
-		}
-		if(byteRangeEnd != null) {
-			getRequest.setRange(byteRangeStart, byteRangeEnd);
-		}
-		if(getMetaData != null) {
-			//Get object metadata
-		}
-		if(ifModifiedSince != null) {
-			getRequest.setModifiedSinceConstraint(ifModifiedSince);
-		}
-		if(ifUnmodifiedSince != null) {
-			getRequest.setUnmodifiedSinceConstraint(ifUnmodifiedSince);
-		}
-		if(ifMatch != null) {
-			List matchList = new ArrayList();
-			matchList.add(ifMatch);
-			getRequest.setMatchingETagConstraints(matchList);
-		}
-		if(ifNoneMatch != null) {
-			List nonMatchList = new ArrayList();
-			nonMatchList.add(ifNoneMatch);
-			getRequest.setNonmatchingETagConstraints(nonMatchList);
-		}
-		try {
-			S3Object response = walrusDataClient.getObject(getRequest);
-			DefaultHttpResponse httpResponse = createHttpResponse(response.getObjectMetadata());
-			//write extra headers
-			if(byteRangeEnd != null) {
-				httpResponse.addHeader("Content-Range", byteRangeStart + "-" + byteRangeEnd + "/" + response.getObjectMetadata().getContentLength());
-			}
-			Channel channel = request.getChannel();
-			channel.write(httpResponse);
-			S3ObjectInputStream input = response.getObjectContent();
-			final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
-			channel.write(dataStream).addListener(new ChannelFutureListener( ) {
-				@Override public void operationComplete( ChannelFuture future ) throws Exception {			
-					Contexts.clear(request.getCorrelationId());
-					dataStream.close();
-				}
-			});
-			return null;
-		} catch(Exception ex) {
-			LOG.error(ex, ex);
-			return null;
-		}
 	}
 
 	@Override

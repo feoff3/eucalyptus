@@ -72,18 +72,18 @@ import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
-import com.eucalyptus.objectstorage.entities.BucketInfo;
-import com.eucalyptus.objectstorage.entities.ObjectInfo;
+import com.eucalyptus.objectstorage.entities.Bucket;
+import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.google.common.base.Objects;
 
 public class ObjectStorageQuotaUtil {
 
   public static long countBucketByAccount( String accountId ) throws AuthException {
-    EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-    BucketInfo searchBucket = new BucketInfo();
+    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
+    Bucket searchBucket = new Bucket();
     searchBucket.setOwnerIamUserId(accountId);
     try {
-      List<BucketInfo> bucketInfoList = db.query(searchBucket);
+      List<Bucket> bucketInfoList = db.query(searchBucket);
       db.commit();
       return bucketInfoList.size();
     } catch (Exception e) {
@@ -93,11 +93,11 @@ public class ObjectStorageQuotaUtil {
   }
   
   public static long countBucketByUser( String userId ) throws AuthException {
-    EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-    BucketInfo searchBucket = new BucketInfo();
+    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
+    Bucket searchBucket = new Bucket();
     searchBucket.setOwnerIamUserId(userId);
     try {
-      List<BucketInfo> bucketInfoList = db.query(searchBucket);
+      List<Bucket> bucketInfoList = db.query(searchBucket);
       db.commit();
       return bucketInfoList.size();
     } catch (Exception e) {
@@ -107,13 +107,13 @@ public class ObjectStorageQuotaUtil {
   }
   
   public static long countBucketObjectNumber(String bucketName) throws AuthException {
-    EntityWrapper<ObjectInfo> db = EntityWrapper.get(ObjectInfo.class);
-    ObjectInfo searchObjectInfo = new ObjectInfo();
+    EntityWrapper<ObjectEntity> db = EntityWrapper.get(ObjectEntity.class);
+    ObjectEntity searchObjectInfo = new ObjectEntity();
     searchObjectInfo.setBucketName(bucketName);
     searchObjectInfo.setDeleted(false);
     searchObjectInfo.setLast(true);
     try {
-      List<ObjectInfo> objectInfos = db.query(searchObjectInfo);
+      List<ObjectEntity> objectInfos = db.query(searchObjectInfo);
       db.commit();
       return objectInfos.size();
     } catch (Exception e) {
@@ -123,11 +123,11 @@ public class ObjectStorageQuotaUtil {
   }
   
   public static long countBucketSize(String bucketName) throws AuthException {
-    EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-    BucketInfo searchBucket = new BucketInfo(bucketName);
+    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
+    Bucket searchBucket = new Bucket(bucketName);
     try {
       long size = 0;
-      List<BucketInfo> bucketInfoList = db.query(searchBucket);
+      List<Bucket> bucketInfoList = db.query(searchBucket);
       if (bucketInfoList.size() > 0) {
         size = bucketInfoList.get(0).getBucketSize();
       }
@@ -141,13 +141,13 @@ public class ObjectStorageQuotaUtil {
   
   public static long countTotalObjectSizeByAccount(String accountId) throws AuthException {
 	  String canonicalId = Accounts.lookupAccountById(accountId).getCanonicalId();
-    EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-    BucketInfo searchBucket = new BucketInfo();
+    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
+    Bucket searchBucket = new Bucket();
     searchBucket.setOwnerCanonicalId(accountId);
     try {
-      List<BucketInfo> bucketInfoList = db.query(searchBucket);
+      List<Bucket> bucketInfoList = db.query(searchBucket);
       long size = 0;
-      for (BucketInfo b : bucketInfoList) {
+      for (Bucket b : bucketInfoList) {
         size += b.getBucketSize();
       }
       db.commit();
@@ -159,13 +159,13 @@ public class ObjectStorageQuotaUtil {
   }
   
   public static long countTotalObjectSizeByUser(String userId) throws AuthException {
-    EntityWrapper<BucketInfo> db = EntityWrapper.get(BucketInfo.class);
-    BucketInfo searchBucket = new BucketInfo();
+    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
+    Bucket searchBucket = new Bucket();
     searchBucket.setOwnerIamUserId(userId);
     try {
-      List<BucketInfo> bucketInfoList = db.query(searchBucket);
+      List<Bucket> bucketInfoList = db.query(searchBucket);
       long size = 0;
-      for (BucketInfo b : bucketInfoList) {
+      for (Bucket b : bucketInfoList) {
         size += b.getBucketSize();
       }
       db.commit();
@@ -183,9 +183,9 @@ public class ObjectStorageQuotaUtil {
    */
   public static long countTotalObjectSize() {
     long size = -1;
-    final EntityTransaction db = Entities.get( BucketInfo.class );
+    final EntityTransaction db = Entities.get( Bucket.class );
     try {
-      size = Objects.firstNonNull( (Number) Entities.createCriteria( BucketInfo.class )
+      size = Objects.firstNonNull( (Number) Entities.createCriteria( Bucket.class )
           .setProjection( Projections.sum( "bucketSize" ) )
           .setReadOnly( true )
           .uniqueResult(), 0 ).longValue();

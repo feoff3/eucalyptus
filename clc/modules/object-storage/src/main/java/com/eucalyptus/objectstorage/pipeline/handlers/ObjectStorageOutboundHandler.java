@@ -71,12 +71,9 @@ import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.http.MappingHttpResponse;
-import com.eucalyptus.objectstorage.exceptions.HeadExceptionInterface;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDeleteResponseType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageHeadResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
@@ -146,20 +143,7 @@ public class ObjectStorageOutboundHandler extends MessageStackHandler {
 				if(errMsg instanceof ObjectStorageErrorMessageType) {
 					ObjectStorageErrorMessageType walrusErrorMsg = (ObjectStorageErrorMessageType) errMsg;
 					httpResponse.setStatus(walrusErrorMsg.getStatus());
-				}
-				// Fix for EUCA-2782. If the exception occurred on HEAD request, http response body should be empty
-				if(errorMessage.getException() instanceof HeadExceptionInterface) {
-					httpResponse.setMessage(null);
-				} else {
-					httpResponse.setMessage(errMsg);	
-				}
-			} else if (msg instanceof ObjectStorageDeleteResponseType) {
-				httpResponse.setStatus(HttpResponseStatus.NO_CONTENT);
-				httpResponse.setMessage(null);
-			} else if (msg instanceof ObjectStorageHeadResponseType) {
-				//This is a HEAD request, don't put a body
-				httpResponse.setStatus(HttpResponseStatus.OK);
-				httpResponse.setMessage(null);
+				}	
 			} else if (msg instanceof CreateBucketResponseType) {
 				httpResponse.setStatus(HttpResponseStatus.OK);
 				httpResponse.setMessage(null);

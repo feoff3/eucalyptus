@@ -136,8 +136,7 @@ import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.util.LogUtil;
 import com.eucalyptus.util.XMLParser;
-import com.eucalyptus.objectstorage.exceptions.NotImplementedException;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.ws.InvalidOperationException;
 import com.eucalyptus.ws.handlers.RestfulMarshallingHandler;
 import com.google.common.collect.Lists;
@@ -806,7 +805,11 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						delimiter = "/";
 					}
 				}
-				throw new NotImplementedException(unsupportedOp + " is not implemented", resourceType, resource);
+				NotImplementedException e = new NotImplementedException();
+				e.setResource(resource);
+				e.setResourceType(resourceType);
+				e.setMessage(unsupportedOp + " is not implemented");
+				throw e;				
 			}
 		}
 		

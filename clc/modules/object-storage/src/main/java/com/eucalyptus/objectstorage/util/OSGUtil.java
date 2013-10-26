@@ -66,6 +66,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.util.Internets;
 
@@ -76,40 +77,41 @@ import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
 public class OSGUtil {
 
-  public static BaseMessage convertErrorMessage(ExceptionResponseType errorMessage) {
-    Throwable ex = errorMessage.getException();
-    String correlationId = errorMessage.getCorrelationId( );
-    BaseMessage errMsg = null;
-    if( ( errMsg = convertException( correlationId, ex ) ) == null ) {
-      errMsg = errorMessage;
-    }
-    return errMsg;
-  }
-	public static BaseMessage convertErrorMessage(EucalyptusErrorMessageType errorMessage) {
+	public static BaseMessage convertErrorMessage(ExceptionResponseType errorMessage) {
 		Throwable ex = errorMessage.getException();
 		String correlationId = errorMessage.getCorrelationId( );
-    BaseMessage errMsg = null;
+		BaseMessage errMsg = null;
 		if( ( errMsg = convertException( correlationId, ex ) ) == null ) {
-		  errMsg = errorMessage;
+			errMsg = errorMessage;
 		}
 		return errMsg;
 	}
-  private static BaseMessage convertException( String correlationId, Throwable ex ) {
-    BaseMessage errMsg;
-    if(ex instanceof ObjectStorageException) {
+	public static BaseMessage convertErrorMessage(EucalyptusErrorMessageType errorMessage) {
+		Throwable ex = errorMessage.getException();
+		String correlationId = errorMessage.getCorrelationId( );
+		BaseMessage errMsg = null;
+		if( ( errMsg = convertException( correlationId, ex ) ) == null ) {
+			errMsg = errorMessage;
+		}
+		return errMsg;
+	}
+	
+	private static BaseMessage convertException( String correlationId, Throwable ex ) {
+		BaseMessage errMsg;
+		if(ex instanceof ObjectStorageException) {
 			ObjectStorageException e = (ObjectStorageException) ex;
 			errMsg = new ObjectStorageErrorMessageType(e.getMessage(), e.getCode(), e.getStatus(), e.getResourceType(), e.getResource(), correlationId, Internets.localHostAddress( ), e.getLogData());
 			errMsg.setCorrelationId( correlationId );
 			return errMsg;
 		} else {
-		  return null;
+			return null;
 		}
-  }
+	}
 	
 	public static String URLdecode(String objectKey) throws UnsupportedEncodingException {
 		return URLDecoder.decode(objectKey, "UTF-8");
 	}
-
+	
 	public static String[] getTarget(String operationPath) {
 		operationPath = operationPath.replaceAll("/{2,}", "/");
 		if(operationPath.startsWith("/"))

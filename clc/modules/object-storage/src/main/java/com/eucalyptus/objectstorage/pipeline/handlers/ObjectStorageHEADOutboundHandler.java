@@ -66,7 +66,6 @@ import org.apache.log4j.Logger;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
 import org.jboss.netty.channel.MessageEvent;
-
 import com.eucalyptus.http.MappingHttpResponse;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
@@ -78,7 +77,7 @@ import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
 @ChannelPipelineCoverage("one")
 public class ObjectStorageHEADOutboundHandler extends MessageStackHandler {
-	private static Logger LOG = Logger.getLogger( ObjectStorageHEADOutboundHandler.class );
+	private static Logger LOG = Logger.getLogger( ObjectStorageHEADOutboundHandler.class );	
 
 	@Override
 	public void outgoingMessage( ChannelHandlerContext ctx, MessageEvent event ) throws Exception {

@@ -63,29 +63,7 @@
 package com.eucalyptus.objectstorage.pipeline.handlers;
 
 import org.apache.log4j.Logger;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.handler.codec.http.HttpHeaders;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
-
-import com.eucalyptus.http.MappingHttpResponse;
-import com.eucalyptus.objectstorage.exceptions.HeadExceptionInterface;
-import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDeleteResponseType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageHeadResponseType;
-import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
-import com.eucalyptus.objectstorage.util.OSGUtil;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
-import com.eucalyptus.ws.handlers.MessageStackHandler;
-
-import edu.ucsb.eucalyptus.msgs.BaseMessage;
-import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
-import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
 @ChannelPipelineCoverage("one")
 public class ObjectStorageGETOutboundHandler extends ObjectStorageBasicOutboundHandler {

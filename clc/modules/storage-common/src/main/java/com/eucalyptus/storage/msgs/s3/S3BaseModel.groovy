@@ -303,6 +303,17 @@ public class ListEntry extends EucalyptusData {
 	long size;
 	CanonicalUser owner;
 	String storageClass;
+	
+	def ListEntry() {}
+	
+	def ListEntry(String objKey, String modified, String eTag, long objSize, CanonicalUser objOwner, String objStorageClass) {
+		this.key = objKey;
+		this.lastModified = modified;
+		this.etag = eTag;
+		this.size = objSize;
+		this.owner = objOwner;
+		this.storageClass = objStorageClass;
+	}
 }
 
 public class PrefixEntry extends EucalyptusData {

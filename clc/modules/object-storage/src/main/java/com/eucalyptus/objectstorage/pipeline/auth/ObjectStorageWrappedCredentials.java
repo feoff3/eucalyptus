@@ -60,63 +60,39 @@
  *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
-package com.eucalyptus.objectstorage.auth;
+package com.eucalyptus.objectstorage.pipeline.auth;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
+import javax.annotation.Nullable;
 
-import org.apache.log4j.Logger;
-import org.apache.xml.security.utils.Base64;
+import com.eucalyptus.auth.login.WrappedCredentials;
 
-import com.eucalyptus.auth.AccessKeys;
-import com.eucalyptus.auth.api.BaseLoginModule;
-import com.eucalyptus.auth.login.AuthenticationException;
-import com.eucalyptus.auth.principal.AccessKey;
-import com.eucalyptus.auth.principal.User;
-import com.eucalyptus.crypto.Hmac;
+public class ObjectStorageWrappedCredentials extends WrappedCredentials<String> {
+  private final String queryId;
+  private final String signature;
+  private final String securityToken;
 
-public class ObjectStorageLoginModule extends BaseLoginModule<ObjectStorageWrappedCredentials> {
-	private static Logger LOG = Logger.getLogger( ObjectStorageLoginModule.class );
-	public ObjectStorageLoginModule() {}
+  public ObjectStorageWrappedCredentials(
+      final String correlationId,
+      final String data,
+      final String accessKeyId,
+      final String signature,
+      final String securityToken ) {
+    super( correlationId, data );
+    this.queryId = accessKeyId;
+    this.signature = signature;
+    this.securityToken = securityToken;
+  }
 
-	@Override
-	public boolean accepts( ) {
-		return super.getCallbackHandler( ) instanceof ObjectStorageWrappedCredentials;
-	}
+  public String getQueryId() {
+    return this.queryId;
+  }
 
-	@Override
-	public boolean authenticate( ObjectStorageWrappedCredentials credentials ) throws Exception {
-		String signature = credentials.getSignature().replaceAll("=", "");
-    final AccessKey key = AccessKeys.lookupAccessKey( credentials.getQueryId(), credentials.getSecurityToken() );
-		final User user = key.getUser();
-		final String queryKey = key.getSecretKey();
-		final String authSig = checkSignature( queryKey, credentials.getLoginData() );
-		if (authSig.equals(signature)) {
-			super.setCredential(credentials.getQueryId());
-			super.setPrincipal(user);
-			//super.getGroups().addAll(Groups.lookupUserGroups( super.getPrincipal()));
-			return true;	
-		}
-		return false;
-	}
+  public String getSignature() {
+    return this.signature;
+  }
 
-	@Override
-	public void reset( ) {}
-
-	protected String checkSignature( final String queryKey, final String subject ) throws AuthenticationException
-	{
-		SecretKeySpec signingKey = new SecretKeySpec( queryKey.getBytes(), Hmac.HmacSHA1.toString() );
-		try
-		{
-			Mac mac = Mac.getInstance( Hmac.HmacSHA1.toString() );
-			mac.init( signingKey );
-			byte[] rawHmac = mac.doFinal( subject.getBytes() );
-			return new String(Base64.encode( rawHmac )).replaceAll( "=", "" );
-		}
-		catch ( Exception e )
-		{
-			LOG.error( e, e );
-			throw new AuthenticationException( "Failed to compute signature" );
-		}
-	}
+  @Nullable
+  public String getSecurityToken() {
+    return securityToken;
+  }
 }
