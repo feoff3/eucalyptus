@@ -1,44 +1,23 @@
 package com.eucalyptus.objectstorage;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
-import org.apache.tools.ant.util.DateUtils;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 
-import com.eucalyptus.auth.Accounts;
-import com.eucalyptus.auth.AuthException;
-import com.eucalyptus.auth.policy.PolicySpec;
-import com.eucalyptus.context.Contexts;
 import com.eucalyptus.entities.Entities;
-import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
-import com.eucalyptus.storage.msgs.BucketLogData;
-import com.eucalyptus.storage.msgs.s3.CanonicalUser;
-import com.eucalyptus.storage.msgs.s3.ListEntry;
-import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
-import com.eucalyptus.storage.msgs.s3.PrefixEntry;
-import com.eucalyptus.util.EucalyptusCloudException;
-import com.eucalyptus.util.Lookups;
-import com.eucalyptus.walrus.entities.BucketInfo;
-import com.eucalyptus.walrus.entities.ObjectInfo;
-import com.eucalyptus.walrus.exceptions.AccessDeniedException;
-import com.eucalyptus.walrus.exceptions.NoSuchBucketException;
-import com.eucalyptus.walrus.util.WalrusProperties;
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 
@@ -108,7 +87,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	@Override
 	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey)
 			throws TransactionException {
-		return listVersionsPaginated(bucketName, maxKeys, prefix, delimiter, startKey, null, false);
+		return listVersionsPaginated(bucketName, maxKeys, prefix, delimiter, startKey, null, true);
 		
 	}
 
@@ -119,7 +98,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			String delimiter,
 			String fromKeyMarker,
 			String fromVersionId,
-			boolean includeDeleteMarkers)
+			boolean latestOnly)
 			throws TransactionException {
 		
 		
@@ -132,9 +111,13 @@ public class DbObjectManagerImpl implements ObjectManager {
 				final int queryStrideSize = maxVersions+ 1;
 				ObjectEntity searchObj = new ObjectEntity();
 				searchObj.setBucketName(bucketName);
-				//Only find objects, not version entries, for that use listVersionsPaginated()
-				searchObj.setLast(true);
-				searchObj.setDeleted(false);
+				searchObj.setLast(latestOnly);				
+				//Return latest version, so exclude delete markers as well.
+				//This makes listVersion act like listObjects
+				if(latestOnly) {			
+					searchObj.setDeleted(false);
+				} else {
+				}
 				
 				Criteria objCriteria = Entities.createCriteria(ObjectEntity.class);
 				objCriteria.add(Example.create(searchObj));

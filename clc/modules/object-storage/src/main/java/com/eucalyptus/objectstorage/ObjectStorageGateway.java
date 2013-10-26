@@ -693,10 +693,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		} else {				
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
 				ListBucketResponseType response = (ListBucketResponseType) request.getReply();
-				response.setMarker(request.getMarker());
-				response.setDelimiter(request.getDelimiter());
-				response.setPrefix(request.getPrefix());
-				response.setIsTruncated(false);
+				response.setName(request.getBucket());
 				
 				/*
 				 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.
@@ -717,11 +714,19 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					String prefix = Strings.isNullOrEmpty(request.getPrefix()) ? "" : request.getPrefix();
 					String delimiter = Strings.isNullOrEmpty(request.getDelimiter()) ? "" : request.getDelimiter();
 					String keyMarker = Strings.isNullOrEmpty(request.getMarker()) ? "" : request.getMarker();					
+					
+					response.setMaxKeys(maxKeys);
+					response.setPrefix(prefix);
+					response.setMarker(keyMarker);
+					response.setDelimiter(delimiter);
+					response.setIsTruncated(false);
+					
 					PaginatedResult<ObjectEntity> result = ObjectManagerFactory.getInstance().listPaginated(listBucket.getBucketName(), maxKeys, prefix, delimiter, keyMarker);
-					if(result != null) {								
+					if(result != null) {							
 						response.setCommonPrefixes(new ArrayList<PrefixEntry>());
 						response.setContents(new ArrayList<ListEntry>());
 						response.setIsTruncated(result.getIsTruncated());
+						
 						for(ObjectEntity obj : result.getEntityList()) {
 							response.getContents().add(new ListEntry(
 									obj.getObjectKey(), 

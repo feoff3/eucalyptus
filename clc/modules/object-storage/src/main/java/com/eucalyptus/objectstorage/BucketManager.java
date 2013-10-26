@@ -21,20 +21,13 @@
 package com.eucalyptus.objectstorage;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
-import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
-import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
-import com.google.common.base.Predicate;
 
 /**
  * Interface to operate on buckets
