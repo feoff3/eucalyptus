@@ -480,7 +480,6 @@ public class ListBucketResponseType extends ObjectStorageResponseType {
 	int maxKeys;
 	String delimiter;
 	boolean isTruncated;
-	ArrayList<MetaDataEntry> metaData;
 	ArrayList<ListEntry> contents;
 	ArrayList<PrefixEntry> commonPrefixes = new ArrayList<PrefixEntry>();
 
