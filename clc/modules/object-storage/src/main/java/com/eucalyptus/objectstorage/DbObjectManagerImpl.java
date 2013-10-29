@@ -23,6 +23,10 @@ import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.google.common.base.Strings;
 
+/**
+ * Database backed implementation of ObjectManager
+ *
+ */
 public class DbObjectManagerImpl implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(DbObjectManagerImpl.class);
 	

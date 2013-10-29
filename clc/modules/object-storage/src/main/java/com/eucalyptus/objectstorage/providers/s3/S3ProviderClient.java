@@ -518,7 +518,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public ListBucketResponseType listBucket(ListBucketType request) throws EucalyptusCloudException {
 		ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
 		try {
-			AmazonS3Client s3Client = getS3Client(Contexts.lookup(request.getCorrelationId()).getUser(), request.getAccessKeyID());
+			AmazonS3Client s3Client = getS3Client(Contexts.lookup(request.getCorrelationId()).getUser(), Contexts.lookup(request.getCorrelationId()).getUser().getUserId());
 			ListObjectsRequest listRequest = new ListObjectsRequest();
 			listRequest.setBucketName(request.getBucket());
 			listRequest.setDelimiter(request.getDelimiter());
