@@ -159,12 +159,6 @@ public abstract class ObjectStorageProviderClient {
 	public abstract PostObjectResponseType postObject(PostObjectType request)
 			throws EucalyptusCloudException;
 
-	public abstract PutObjectInlineResponseType putObjectInline(
-			PutObjectInlineType request) throws EucalyptusCloudException;
-
-	public abstract AddObjectResponseType addObject(AddObjectType request)
-			throws EucalyptusCloudException;
-
 	public abstract DeleteObjectResponseType deleteObject(
 			DeleteObjectType request) throws EucalyptusCloudException;
 

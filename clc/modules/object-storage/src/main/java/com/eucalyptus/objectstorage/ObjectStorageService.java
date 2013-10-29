@@ -1,7 +1,5 @@
 package com.eucalyptus.objectstorage;
 
-import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.AddObjectType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -38,8 +36,6 @@ import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusResponseType;
@@ -57,101 +53,95 @@ import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
 import com.eucalyptus.util.EucalyptusCloudException;
 
 /**
- * Primary interface for the OSG component.
+ * Primary interface for the OSG component. The set of S3 operations supported by Eucalyptus
  * @author zhill
  *
  */
 public interface ObjectStorageService {
 
-	public abstract UpdateObjectStorageConfigurationResponseType UpdateObjectStorageConfiguration(
+	public abstract UpdateObjectStorageConfigurationResponseType updateObjectStorageConfiguration(
 			UpdateObjectStorageConfigurationType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetObjectStorageConfigurationResponseType GetObjectStorageConfiguration(
+	public abstract GetObjectStorageConfigurationResponseType getObjectStorageConfiguration(
 			GetObjectStorageConfigurationType request)
 			throws EucalyptusCloudException;
 
-	public abstract HeadBucketResponseType HeadBucket(HeadBucketType request)
+	public abstract HeadBucketResponseType headBucket(HeadBucketType request)
 			throws EucalyptusCloudException;
 
-	public abstract CreateBucketResponseType CreateBucket(
+	public abstract CreateBucketResponseType createBucket(
 			CreateBucketType request) throws EucalyptusCloudException;
 
-	public abstract DeleteBucketResponseType DeleteBucket(
+	public abstract DeleteBucketResponseType deleteBucket(
 			DeleteBucketType request) throws EucalyptusCloudException;
 
-	public abstract ListAllMyBucketsResponseType ListAllMyBuckets(
+	public abstract ListAllMyBucketsResponseType listAllMyBuckets(
 			ListAllMyBucketsType request) throws EucalyptusCloudException;
 
-	public abstract GetBucketAccessControlPolicyResponseType GetBucketAccessControlPolicy(
+	public abstract GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(
 			GetBucketAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract PostObjectResponseType PostObject(PostObjectType request)
+	public abstract PostObjectResponseType postObject(PostObjectType request)
 			throws EucalyptusCloudException;
 
-	public abstract PutObjectInlineResponseType PutObjectInline(
-			PutObjectInlineType request) throws EucalyptusCloudException;
-
-	public abstract AddObjectResponseType AddObject(AddObjectType request)
-			throws EucalyptusCloudException;
-
-	public abstract DeleteObjectResponseType DeleteObject(
+	public abstract DeleteObjectResponseType deleteObject(
 			DeleteObjectType request) throws EucalyptusCloudException;
 
-	public abstract ListBucketResponseType ListBucket(ListBucketType request)
+	public abstract ListBucketResponseType listBucket(ListBucketType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetObjectAccessControlPolicyResponseType GetObjectAccessControlPolicy(
+	public abstract GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
 			GetObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract SetBucketAccessControlPolicyResponseType SetBucketAccessControlPolicy(
+	public abstract SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(
 			SetBucketAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract SetObjectAccessControlPolicyResponseType SetObjectAccessControlPolicy(
+	public abstract SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(
 			SetObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract SetRESTBucketAccessControlPolicyResponseType SetRESTBucketAccessControlPolicy(
+	public abstract SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(
 			SetRESTBucketAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract SetRESTObjectAccessControlPolicyResponseType SetRESTObjectAccessControlPolicy(
+	public abstract SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(
 			SetRESTObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetObjectResponseType GetObject(GetObjectType request)
+	public abstract GetObjectResponseType getObject(GetObjectType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetObjectExtendedResponseType GetObjectExtended(
+	public abstract GetObjectExtendedResponseType getObjectExtended(
 			GetObjectExtendedType request) throws EucalyptusCloudException;
 
-	public abstract GetBucketLocationResponseType GetBucketLocation(
+	public abstract GetBucketLocationResponseType getBucketLocation(
 			GetBucketLocationType request) throws EucalyptusCloudException;
 
-	public abstract CopyObjectResponseType CopyObject(CopyObjectType request)
+	public abstract CopyObjectResponseType copyObject(CopyObjectType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetBucketLoggingStatusResponseType GetBucketLoggingStatus(
+	public abstract GetBucketLoggingStatusResponseType getBucketLoggingStatus(
 			GetBucketLoggingStatusType request) throws EucalyptusCloudException;
 
-	public abstract SetBucketLoggingStatusResponseType SetBucketLoggingStatus(
+	public abstract SetBucketLoggingStatusResponseType setBucketLoggingStatus(
 			SetBucketLoggingStatusType request) throws EucalyptusCloudException;
 
-	public abstract GetBucketVersioningStatusResponseType GetBucketVersioningStatus(
+	public abstract GetBucketVersioningStatusResponseType getBucketVersioningStatus(
 			GetBucketVersioningStatusType request)
 			throws EucalyptusCloudException;
 
-	public abstract SetBucketVersioningStatusResponseType SetBucketVersioningStatus(
+	public abstract SetBucketVersioningStatusResponseType setBucketVersioningStatus(
 			SetBucketVersioningStatusType request)
 			throws EucalyptusCloudException;
 
-	public abstract ListVersionsResponseType ListVersions(
+	public abstract ListVersionsResponseType listVersions(
 			ListVersionsType request) throws EucalyptusCloudException;
 
-	public abstract DeleteVersionResponseType DeleteVersion(
+	public abstract DeleteVersionResponseType deleteVersion(
 			DeleteVersionType request) throws EucalyptusCloudException;
 
 }

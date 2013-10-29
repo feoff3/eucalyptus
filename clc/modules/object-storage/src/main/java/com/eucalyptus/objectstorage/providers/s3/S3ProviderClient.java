@@ -46,23 +46,28 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.CanonicalGrantee;
+import com.amazonaws.services.s3.model.EmailAddressGrantee;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GroupGrantee;
 import com.amazonaws.services.s3.model.ListBucketsRequest;
+import com.amazonaws.services.s3.model.ListObjectsRequest;
+import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.User;
-import com.eucalyptus.component.ServiceConfiguration;
-import com.eucalyptus.component.Topology;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
+import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.objectstorage.ObjectStorageProviderClient;
 import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderClientProperty;
-import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.AddObjectType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -97,8 +102,6 @@ import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
@@ -113,15 +116,24 @@ import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
+import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.common.ChunkedDataStream;
+import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
+import com.eucalyptus.storage.msgs.s3.Grant;
+import com.eucalyptus.storage.msgs.s3.Grantee;
+import com.eucalyptus.storage.msgs.s3.Group;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
+import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
+import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.util.EucalyptusCloudException;
-import com.eucalyptus.walrus.Walrus;
 import com.eucalyptus.walrus.util.WalrusProperties;
+import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.google.common.base.Strings;
 
 /**
@@ -183,6 +195,37 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		return s3Client;
 	}
 
+	/**
+	 * Returns the S3 ACL in euca object form. Does not modify the results,
+	 * so owner information will be preserved.
+	 * @param s3Acl
+	 * @return
+	 */
+	protected static AccessControlPolicy sdkAclToEucaAcl(com.amazonaws.services.s3.model.AccessControlList s3Acl) {
+		if(s3Acl == null) { return null; }		
+		AccessControlPolicy acp = new AccessControlPolicy();
+		
+		acp.setOwner(new CanonicalUser(acp.getOwner().getID(), acp.getOwner().getDisplayName()));
+		if(acp.getAccessControlList() == null) {
+			acp.setAccessControlList(new AccessControlList());
+		}
+		Grantee grantee = null;
+		for(com.amazonaws.services.s3.model.Grant g : s3Acl.getGrants()) {
+			
+			grantee = new Grantee();
+			if(g.getGrantee() instanceof CanonicalGrantee) {
+				grantee.setCanonicalUser(new CanonicalUser(g.getGrantee().getIdentifier(),((CanonicalGrantee)g.getGrantee()).getDisplayName()));
+			} else if(g.getGrantee() instanceof GroupGrantee) {
+				grantee.setGroup(new Group(g.getGrantee().getIdentifier()));
+			} else if(g.getGrantee() instanceof EmailAddressGrantee) {
+				grantee.setEmailAddress(g.getGrantee().getIdentifier());
+			}
+			
+			acp.getAccessControlList().getGrants().add(new Grant(grantee, g.getPermission().toString()));
+		}
+		
+		return acp;
+	}
 	
 	/**
 	 * Maps the request credentials to another set of credentials. This implementation maps
@@ -285,9 +328,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			//Map s3 client result to euca response message
 			List<Bucket> result = s3Client.listBuckets(listRequest);
 			for(Bucket b : result) {
-				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), 
-						DateUtils.format(b.getCreationDate().getTime(),
-								DateUtils.ALT_ISO8601_DATE_PATTERN)));
+				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToFormattedString(b.getCreationDate())));
 			}
 			
 			reply.setBucketList(myBucketList);
@@ -308,7 +349,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	 */
 	@Override
 	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("HeadBucket");
 	}
 
 	@Override
@@ -350,17 +391,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public DeleteBucketResponseType deleteBucket(DeleteBucketType request) throws EucalyptusCloudException {
 		DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
 		User requestUser = null;
-		String canonicalId = null;
 		try {
 			Context ctx = Contexts.lookup(request.getCorrelationId());
-			canonicalId = ctx.getAccount().getCanonicalId();
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
 			
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
-				canonicalId = requestUser.getAccount().getCanonicalId();
 			} catch(Exception ex) {
 				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -387,7 +425,36 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(
 			GetBucketAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		// call the storage manager to save the bucket to disk
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			com.amazonaws.services.s3.model.AccessControlList acl = s3Client.getBucketAcl(request.getBucket());
+			reply.setAccessControlPolicy(sdkAclToEucaAcl(acl));			
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 	
 	@Override
@@ -397,7 +464,12 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			PutObjectResult result = null;
 			try {
 				ObjectMetadata metadata = getS3ObjectMetadata(request);
-				result = s3Client.putObject(request.getBucket(), request.getKey(), inputData, metadata);
+				//Set the acl to private.
+				PutObjectRequest putRequest = new PutObjectRequest(request.getBucket(), 
+						request.getKey(), 
+						inputData, 
+						metadata).withCannedAcl(CannedAccessControlList.Private);
+				result = s3Client.putObject(putRequest);
 			} catch(Exception e) {
 				LOG.error("Error putting object to backend",e);
 				throw e;
@@ -419,39 +491,117 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public PostObjectResponseType postObject(PostObjectType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
-	}
-
-	@Override
-	public PutObjectInlineResponseType putObjectInline(
-			PutObjectInlineType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
-	}
-
-	@Override
-	public AddObjectResponseType addObject(AddObjectType request)
-			throws EucalyptusCloudException {
-
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("PostObject");
 	}
 
 	@Override
 	public DeleteObjectResponseType deleteObject(DeleteObjectType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		try {
+			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			try {
+				//Set the acl to private.
+				s3Client.deleteObject(request.getBucket(), request.getKey());
+			} catch(Exception e) {
+				LOG.error("Error putting object to backend",e);
+				throw e;
+			}
+
+			DeleteObjectResponseType reply = (DeleteObjectResponseType)request.getReply();
+			return reply;
+		} catch(Exception e) {
+			throw new EucalyptusCloudException(e);
+		}
 	}
 
 	@Override
 	public ListBucketResponseType listBucket(ListBucketType request) throws EucalyptusCloudException {
 		ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
-		throw new NotImplementedException("NO U CANNOT HAS");
+		try {
+			AmazonS3Client s3Client = getS3Client(Contexts.lookup(request.getCorrelationId()).getUser(), request.getAccessKeyID());
+			ListObjectsRequest listRequest = new ListObjectsRequest();
+			listRequest.setBucketName(request.getBucket());
+			listRequest.setDelimiter(request.getDelimiter());
+			listRequest.setMarker(request.getMarker());
+			listRequest.setMaxKeys((request.getMaxKeys() == null ? null : Integer.parseInt(request.getMaxKeys())));
+			listRequest.setPrefix(request.getPrefix());
+			
+			ObjectListing response = s3Client.listObjects(listRequest);
+			reply.setBucket(request.getBucket());
+			reply.setMarker(response.getMarker());
+			reply.setNextMarker(response.getNextMarker());
+			reply.setIsTruncated(response.isTruncated());
+			reply.setMarker(response.getMarker());
+			if(reply.getContents() == null) {
+				reply.setContents(new ArrayList<ListEntry>());
+			}
+			if(reply.getCommonPrefixes() == null) {
+				reply.setCommonPrefixes(new ArrayList<PrefixEntry>());
+			}
+			
+			for(S3ObjectSummary obj : response.getObjectSummaries()) {
+				//Add entry, note that the canonical user is set based on requesting user, not returned user
+				reply.getContents().add(new ListEntry(
+						obj.getKey(),
+						OSGUtil.dateToFormattedString(obj.getLastModified()),
+						obj.getETag(),
+						obj.getSize(),
+						ObjectStorageGateway.buildCanonicalUser(Contexts.lookup(request.getCorrelationId()).getAccount()),
+						obj.getStorageClass()));
+			}
+			
+			for(String commonPrefix : response.getCommonPrefixes()) {
+				reply.getCommonPrefixes().add(new PrefixEntry(commonPrefix));
+			}
+			
+			return reply;
+		} catch(AmazonServiceException e) {
+			throw new S3Exception(e.getErrorCode(), e.getMessage(), HttpResponseStatus.valueOf(e.getStatusCode()));
+		} catch(AmazonClientException e) {
+			InternalErrorException ex = new InternalErrorException();
+			ex.initCause(e);
+			ex.setMessage(e.getMessage());
+			throw ex;
+		} catch(Exception e) {
+			LOG.error("Error listing bucket from s3", e);
+			throw new EucalyptusCloudException("Unknown error", e);
+		}
 	}
 
 	@Override
 	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
 			GetObjectAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		GetObjectAccessControlPolicyResponseType reply = (GetObjectAccessControlPolicyResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		// call the storage manager to save the bucket to disk
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			com.amazonaws.services.s3.model.AccessControlList acl = s3Client.getObjectAcl(request.getBucket(),request.getKey(), request.getVersionId());
+			reply.setAccessControlPolicy(sdkAclToEucaAcl(acl));			
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override
@@ -601,7 +751,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public GetBucketLocationResponseType getBucketLocation(
-			GetBucketLocationType request) throws EucalyptusCloudException {
+			GetBucketLocationType request) throws EucalyptusCloudException {		
 		throw new NotImplementedException("NO U CANNOT HAS");
 	}
 

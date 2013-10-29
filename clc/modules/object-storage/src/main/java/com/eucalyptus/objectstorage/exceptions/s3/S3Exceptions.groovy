@@ -8,7 +8,16 @@ import org.jboss.netty.handler.codec.http.HttpResponseStatus;
  * S3 Error codes. See http://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html
  */
 
-class S3Exception extends ObjectStorageException {}
+class S3Exception extends ObjectStorageException {
+	def S3Exception() {}
+
+	def S3Exception(String errorCode, String description, HttpResponseStatus statusCode) {
+		super();
+		this.code = errorCode;
+		this.message = description;
+		this.status = statusCode;
+	}
+}
 
 class S3ClientException extends S3Exception {
 	def S3ClientException() {

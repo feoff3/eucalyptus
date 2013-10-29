@@ -20,26 +20,16 @@
 
 package com.eucalyptus.objectstorage.entities;
 
-import java.util.Date;
-import java.util.Map;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.Lob;
 import javax.persistence.PersistenceContext;
-import javax.persistence.PrePersist;
 import javax.persistence.Table;
-
-import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
 
 import org.apache.log4j.Logger;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 import org.hibernate.annotations.OptimisticLocking;
-import org.hibernate.annotations.Type;
-
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 
 @Entity
@@ -55,40 +45,19 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     private String bucketName;
     
     @Column(name="version_id")
-    private String versionId;
-
-    @Column(name="etag")
-    private String etag;
-    
-    @Column(name="contentMD5")
-    private String contentMD5;
-
-    @Column(name="last_modified")
-    private Date lastModified;
+    private String versionId; //VersionId is required to uniquely identify ACLs and auth
 
     @Column(name="size")
     private Long size;
 
     @Column(name="storage_class")
     private String storageClass;
-    
-    @Column(name="content_type")
-    private String contentType;
-
-    @Column(name="content_disposition")
-    private String contentDisposition;
 
     @Column(name="is_deleted")
     private Boolean deleted;
     
     @Column(name="is_last")
     private Boolean last;
-
-	//The user-metadata map in json string form, empty is {}
-    @Column(name="user_metadata") //8K max per S3 spec
-    @Type(type="org.hibernate.type.StringClobType")
-    @Lob
-    private String userMetadata;
             
     /**
      * Used to denote the object as a snapshot, for special access-control considerations.
@@ -98,14 +67,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
  
  
     private static Logger LOG = Logger.getLogger( ObjectEntity.class );
-
-    @PrePersist
-    public void checkNulls() {
-    	//Because Lob types don't like nulls
-    	if(this.userMetadata == null) {
-    		this.userMetadata = "{}";
-    	}
-    }
     
     public ObjectEntity() {}
 
@@ -115,14 +76,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.versionId = versionId;
     }
     
-    public String getContentMD5() {
-		return contentMD5;
-	}
-
-	public void setContentMD5(String contentMD5) {
-		this.contentMD5 = contentMD5;
-	}
-
 	@Override
 	protected String getResourceFullName() {
 		return getBucketName() + "/" + getObjectKey();
@@ -144,22 +97,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.bucketName = bucketName;
     }
 
-    public String getEtag() {
-        return etag;
-    }
-
-    public void setEtag(String etag) {
-        this.etag = etag;
-    }
-
-    public Date getLastModified() {
-        return lastModified;
-    }
-
-    public void setLastModified(Date lastModified) {
-        this.lastModified = lastModified;
-    }
-
     public Long getSize() {
         return size;
     }
@@ -175,35 +112,13 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     public void setStorageClass(String storageClass) {
         this.storageClass = storageClass;
     }
-
-    public String getUserMetadata() {
-        return this.userMetadata;
-    }
     
+    /*
     public Map<String, String> getUserMetadataMap() throws Exception {    	    	
     	JSONObject jsonMap = (JSONObject)JSONSerializer.toJSON(this.getUserMetadata());
     	return (Map<String,String>)jsonMap;
     }
-
-    public void setUserMetadata(String metaData) {
-        this.userMetadata = metaData;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public String getContentDisposition() {
-        return contentDisposition;
-    }
-
-    public void setContentDisposition(String contentDisposition) {
-        this.contentDisposition = contentDisposition;
-    }
+    */
     
     public Boolean getDeleted() {
 		return deleted;

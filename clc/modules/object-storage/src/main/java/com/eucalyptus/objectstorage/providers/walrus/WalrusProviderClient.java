@@ -62,30 +62,15 @@
 
 package com.eucalyptus.objectstorage.providers.walrus;
 
-import java.io.InputStream;
-import java.io.PushbackInputStream;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
-import org.apache.tools.ant.util.DateUtils;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
-import org.jboss.netty.handler.codec.http.HttpHeaders;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
-import org.jboss.netty.handler.codec.http.HttpVersion;
-
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Protocol;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.AccessKey;
 import com.eucalyptus.auth.principal.User;
@@ -96,8 +81,7 @@ import com.eucalyptus.context.Contexts;
 import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderClientProperty;
 import com.eucalyptus.context.ServiceDispatchException;
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
-import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.AddObjectType;
+import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -118,12 +102,6 @@ import com.eucalyptus.objectstorage.msgs.GetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.GetBucketVersioningStatusType;
 import com.eucalyptus.objectstorage.msgs.GetObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectAccessControlPolicyType;
-import com.eucalyptus.objectstorage.msgs.GetObjectExtendedResponseType;
-import com.eucalyptus.objectstorage.msgs.GetObjectExtendedType;
-import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDataGetRequestType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDataGetResponseType;
-import com.eucalyptus.objectstorage.msgs.GetObjectType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketType;
 import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsResponseType;
@@ -136,10 +114,6 @@ import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
-import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusResponseType;
@@ -153,7 +127,6 @@ import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.providers.s3.S3ProviderClient;
-import com.eucalyptus.storage.common.ChunkedDataStream;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.SynchronousClient;
 import com.eucalyptus.util.SynchronousClient.SynchronousClientException;
@@ -161,11 +134,6 @@ import com.eucalyptus.walrus.Walrus;
 import com.eucalyptus.walrus.exceptions.WalrusException;
 import com.eucalyptus.walrus.msgs.WalrusRequestType;
 import com.eucalyptus.walrus.msgs.WalrusResponseType;
-import com.eucalyptus.walrus.util.WalrusProperties;
-import com.amazonaws.services.s3.model.S3Object;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Date;
 
 /**
  * The provider client that is used by the OSG to communicate with the Walrus backend.
@@ -462,22 +430,24 @@ public class WalrusProviderClient extends S3ProviderClient {
 
 	@Override
 	public PostObjectResponseType postObject(PostObjectType request) throws EucalyptusCloudException {
-		throw new EucalyptusCloudException("Not implemented");
+		/*try {
+			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.PostObjectType.class, com.eucalyptus.walrus.msgs.PostObjectResponseType.class);			
+		} catch (EucalyptusCloudException e) {
+			LOG.error("Error response from Walrus", e);
+			throw e;
+		}*/
+		throw new NotImplementedException("PostObject");
 	}
 
 	@Override
-	public PutObjectInlineResponseType putObjectInline(PutObjectInlineType request) throws EucalyptusCloudException {
-		throw new EucalyptusCloudException("Not implemented");
-	}
-
-	@Override
-	public AddObjectResponseType addObject(AddObjectType request) throws EucalyptusCloudException {
-		throw new EucalyptusCloudException("Not implemented");
-	}
-
-	@Override
-	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {
-		throw new EucalyptusCloudException("Not implemented");
+	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {		
+		/*try {
+			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.CopyObjectType.class, com.eucalyptus.walrus.msgs.CopyObjectResponseType.class);			
+		} catch (EucalyptusCloudException e) {
+			LOG.error("Error response from Walrus", e);
+			throw e;
+		}*/
+		throw new NotImplementedException("CopyObject");
 	}
 
 	@Override

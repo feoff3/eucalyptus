@@ -128,6 +128,7 @@ import com.eucalyptus.objectstorage.policy.AdminOverrideAllowed;
 import com.eucalyptus.objectstorage.policy.RequiresACLPermission;
 import com.eucalyptus.objectstorage.policy.RequiresPermission;
 import com.eucalyptus.objectstorage.policy.ResourceType;
+import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
@@ -167,6 +168,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public static void configure() {		
 		synchronized(ObjectStorageGateway.class) {
 			if(ospClient == null) {		
+				//TODO: zhill - wtf? Is this just priming the config? why is it unused.
 				ObjectStorageGatewayInfo osgInfo = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo();
 				try {
 					ospClient = ObjectStorageProviders.getInstance();
@@ -257,19 +259,15 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		return true;
 	}
 	
-	protected String getAccountEmailAddress(String canonicalId) {
-		try {
-			return Accounts.lookupAccountByCanonicalId(canonicalId).lookupAdmin().getInfo(USR_EMAIL_KEY);
-		} catch(Exception e) {
-			return "";
-		}
+	public static CanonicalUser buildCanonicalUser(Account accnt) {
+		return new CanonicalUser(accnt.getCanonicalId(), accnt.getName());
 	}
 
 	/* (non-Javadoc)
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#UpdateObjectStorageConfiguration(com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType)
 	 */
 	@Override
-	public UpdateObjectStorageConfigurationResponseType UpdateObjectStorageConfiguration(UpdateObjectStorageConfigurationType request) throws EucalyptusCloudException {
+	public UpdateObjectStorageConfigurationResponseType updateObjectStorageConfiguration(UpdateObjectStorageConfigurationType request) throws EucalyptusCloudException {
 		UpdateObjectStorageConfigurationResponseType reply = (UpdateObjectStorageConfigurationResponseType) request.getReply();
 		if(ComponentIds.lookup(Eucalyptus.class).name( ).equals(request.getEffectiveUserId()))
 			throw new AccessDeniedException("Only admin can change walrus properties.");
@@ -294,7 +292,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObjectStorageConfiguration(com.eucalyptus.objectstorage.msgs.GetObjectStorageConfigurationType)
 	 */
 	@Override
-	public GetObjectStorageConfigurationResponseType GetObjectStorageConfiguration(GetObjectStorageConfigurationType request) throws EucalyptusCloudException {
+	public GetObjectStorageConfigurationResponseType getObjectStorageConfiguration(GetObjectStorageConfigurationType request) throws EucalyptusCloudException {
 		GetObjectStorageConfigurationResponseType reply = (GetObjectStorageConfigurationResponseType) request.getReply();
 		ConfigurableClass configurableClass = ObjectStorageGatewayInfo.class.getAnnotation(ConfigurableClass.class);
 		if(configurableClass != null) {
@@ -428,7 +426,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#HeadBucket(com.eucalyptus.objectstorage.msgs.HeadBucketType)
 	 */
 	@Override
-	public HeadBucketResponseType HeadBucket(HeadBucketType request) throws EucalyptusCloudException {
+	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		try {	
 			Bucket bucket = BucketManagerFactory.getInstance().get(request.getBucket(), Contexts.lookup().hasAdministrativePrivileges(), null);
@@ -451,7 +449,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#CreateBucket(com.eucalyptus.objectstorage.msgs.CreateBucketType)
 	 */
 	@Override
-	public CreateBucketResponseType CreateBucket(final CreateBucketType request) throws EucalyptusCloudException {
+	public CreateBucketResponseType createBucket(final CreateBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
 		String userId = null;
@@ -543,7 +541,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#DeleteBucket(com.eucalyptus.objectstorage.msgs.DeleteBucketType)
 	 */
 	@Override
-	public DeleteBucketResponseType DeleteBucket(final DeleteBucketType request) throws EucalyptusCloudException {
+	public DeleteBucketResponseType deleteBucket(final DeleteBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
 		Bucket bucket = null;
@@ -616,7 +614,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#ListAllMyBuckets(com.eucalyptus.objectstorage.msgs.ListAllMyBucketsType)
 	 */
 	@Override
-	public ListAllMyBucketsResponseType ListAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {
+	public ListAllMyBucketsResponseType listAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
@@ -624,21 +622,24 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			/*
 			 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.
 			 */
-			String canonicalId = null;
+			Account accnt = null;
 			try {
-				canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
+				accnt = Contexts.lookup(request.getCorrelationId()).getAccount();
+				if(accnt == null) {
+					throw new NoSuchContextException();
+				}
 			} catch (NoSuchContextException e) {
 				try {
-					canonicalId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getAccount().getCanonicalId();
+					accnt = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getAccount();
 				} catch(AuthException ex) {
 					LOG.error("Could not retrieve canonicalId for user with accessKey: " + request.getAccessKeyID());
 					throw new InternalErrorException();
 				}
 			}
 			try {
-				List<Bucket> listing = BucketManagerFactory.getInstance().list(canonicalId, false, null);
+				List<Bucket> listing = BucketManagerFactory.getInstance().list(accnt.getCanonicalId(), false, null);
 				response.setBucketList(generateBucketListing(listing));
-				response.setOwner(new CanonicalUser(canonicalId, getAccountEmailAddress(canonicalId)));				
+				response.setOwner(buildCanonicalUser(accnt));
 				return response;
 			} catch(TransactionException e) {
 				throw new InternalErrorException();
@@ -652,7 +653,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetBucketAccessControlPolicy(com.eucalyptus.objectstorage.msgs.GetBucketAccessControlPolicyType)
 	 */
 	@Override
-	public GetBucketAccessControlPolicyResponseType GetBucketAccessControlPolicy(GetBucketAccessControlPolicyType request) throws EucalyptusCloudException
+	public GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(GetBucketAccessControlPolicyType request) throws EucalyptusCloudException
 	{
 		logRequest(request);
 		return ospClient.getBucketAccessControlPolicy(request);
@@ -662,34 +663,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#PostObject(com.eucalyptus.objectstorage.msgs.PostObjectType)
 	 */
 	@Override
-	public PostObjectResponseType PostObject (PostObjectType request) throws EucalyptusCloudException {
+	public PostObjectResponseType postObject (PostObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.postObject(request);
-	}
-
-	/* (non-Javadoc)
-	 * @see com.eucalyptus.objectstorage.ObjectStorageService#PutObjectInline(com.eucalyptus.objectstorage.msgs.PutObjectInlineType)
-	 */
-	@Override
-	public PutObjectInlineResponseType PutObjectInline (PutObjectInlineType request) throws EucalyptusCloudException {
-		logRequest(request);
-		return ospClient.putObjectInline(request);
-	}
-
-	/* (non-Javadoc)
-	 * @see com.eucalyptus.objectstorage.ObjectStorageService#AddObject(com.eucalyptus.objectstorage.msgs.AddObjectType)
-	 */
-	@Override
-	public AddObjectResponseType AddObject (AddObjectType request) throws EucalyptusCloudException {
-		logRequest(request);
-		return ospClient.addObject(request);
 	}
 
 	/* (non-Javadoc)
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#DeleteObject(com.eucalyptus.objectstorage.msgs.DeleteObjectType)
 	 */
 	@Override
-	public DeleteObjectResponseType DeleteObject (DeleteObjectType request) throws EucalyptusCloudException {
+	public DeleteObjectResponseType deleteObject (DeleteObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.deleteObject(request);
 	}
@@ -698,7 +681,32 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#ListBucket(com.eucalyptus.objectstorage.msgs.ListBucketType)
 	 */
 	@Override
-	public ListBucketResponseType ListBucket(ListBucketType request) throws EucalyptusCloudException {
+	public ListBucketResponseType listBucket(ListBucketType request) throws EucalyptusCloudException {
+		logRequest(request);
+		Bucket listBucket = null;
+		try {
+			listBucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			listBucket = null;
+		}
+		
+		if(listBucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {				
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
+				//Get the listing from the back-end and copy results in.
+				return ospClient.listBucket(request);
+			} else {
+				throw new AccessDeniedException(request.getBucket());
+			}
+		}
+	}
+	
+	public ListBucketResponseType listBucketOld(ListBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		Bucket listBucket = null;
 		try {
@@ -717,6 +725,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
 				ListBucketResponseType response = (ListBucketResponseType) request.getReply();
 				response.setName(request.getBucket());
+				
 				
 				/*
 				 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.
@@ -751,13 +760,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						response.setIsTruncated(result.getIsTruncated());
 						
 						for(ObjectEntity obj : result.getEntityList()) {
-							response.getContents().add(new ListEntry(
+							/*response.getContents().add(new ListEntry(
 									obj.getObjectKey(), 
-									DateUtils.format(obj.getLastModified().getTime(), DateUtils.ALT_ISO8601_DATE_PATTERN),
+									OSGUtil.dateToFormattedString(obj.getLastModified()),
 									obj.getEtag(),
 									obj.getSize(),
-									new CanonicalUser(obj.getOwnerCanonicalId(), getAccountEmailAddress(obj.getOwnerCanonicalId())),
+									buildCanonicalUser(accnt),
 									obj.getStorageClass()));
+									*/
 						}
 						
 						for(String commonPrefix : result.getCommonPrefixes()) {
@@ -783,7 +793,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObjectAccessControlPolicy(com.eucalyptus.objectstorage.msgs.GetObjectAccessControlPolicyType)
 	 */
 	@Override
-	public GetObjectAccessControlPolicyResponseType GetObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.getObjectAccessControlPolicy(request);
 	}
@@ -792,7 +802,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetBucketAccessControlPolicy(com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType)
 	 */
 	@Override
-	public SetBucketAccessControlPolicyResponseType SetBucketAccessControlPolicy(SetBucketAccessControlPolicyType request) throws EucalyptusCloudException {
+	public SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(SetBucketAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setBucketAccessControlPolicy(request);
 	}
@@ -801,7 +811,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetObjectAccessControlPolicy(com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyType)
 	 */
 	@Override
-	public SetObjectAccessControlPolicyResponseType SetObjectAccessControlPolicy(SetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+	public SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(SetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setObjectAccessControlPolicy(request);
 	}
@@ -810,7 +820,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetRESTBucketAccessControlPolicy(com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType)
 	 */
 	@Override
-	public SetRESTBucketAccessControlPolicyResponseType SetRESTBucketAccessControlPolicy(SetRESTBucketAccessControlPolicyType request) throws EucalyptusCloudException {
+	public SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(SetRESTBucketAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setRESTBucketAccessControlPolicy(request);
 	}
@@ -819,7 +829,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetRESTObjectAccessControlPolicy(com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType)
 	 */
 	@Override
-	public SetRESTObjectAccessControlPolicyResponseType SetRESTObjectAccessControlPolicy(SetRESTObjectAccessControlPolicyType request) throws EucalyptusCloudException {
+	public SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(SetRESTObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setRESTObjectAccessControlPolicy(request);
 	}
@@ -828,7 +838,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObject(com.eucalyptus.objectstorage.msgs.GetObjectType)
 	 */
 	@Override
-	public GetObjectResponseType GetObject(GetObjectType request) throws EucalyptusCloudException {
+	public GetObjectResponseType getObject(GetObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ospClient.getObject(request);
 		//ObjectGetter getter = new ObjectGetter(request);
@@ -855,7 +865,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObjectExtended(com.eucalyptus.objectstorage.msgs.GetObjectExtendedType)
 	 */
 	@Override
-	public GetObjectExtendedResponseType GetObjectExtended(GetObjectExtendedType request) throws EucalyptusCloudException {
+	public GetObjectExtendedResponseType getObjectExtended(GetObjectExtendedType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.getObjectExtended(request);
 	}
@@ -864,7 +874,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetBucketLocation(com.eucalyptus.objectstorage.msgs.GetBucketLocationType)
 	 */
 	@Override
-	public GetBucketLocationResponseType GetBucketLocation(GetBucketLocationType request) throws EucalyptusCloudException {
+	public GetBucketLocationResponseType getBucketLocation(GetBucketLocationType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.getBucketLocation(request);
 	}
@@ -873,7 +883,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#CopyObject(com.eucalyptus.objectstorage.msgs.CopyObjectType)
 	 */
 	@Override
-	public CopyObjectResponseType CopyObject(CopyObjectType request) throws EucalyptusCloudException {
+	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.copyObject(request);
 	}
@@ -882,7 +892,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetBucketLoggingStatus(com.eucalyptus.objectstorage.msgs.GetBucketLoggingStatusType)
 	 */
 	@Override
-	public GetBucketLoggingStatusResponseType GetBucketLoggingStatus(GetBucketLoggingStatusType request) throws EucalyptusCloudException {
+	public GetBucketLoggingStatusResponseType getBucketLoggingStatus(GetBucketLoggingStatusType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.getBucketLoggingStatus(request);
 	}
@@ -891,7 +901,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetBucketLoggingStatus(com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusType)
 	 */
 	@Override
-	public SetBucketLoggingStatusResponseType SetBucketLoggingStatus(SetBucketLoggingStatusType request) throws EucalyptusCloudException {
+	public SetBucketLoggingStatusResponseType setBucketLoggingStatus(SetBucketLoggingStatusType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setBucketLoggingStatus(request);
 	}
@@ -900,7 +910,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetBucketVersioningStatus(com.eucalyptus.objectstorage.msgs.GetBucketVersioningStatusType)
 	 */
 	@Override
-	public GetBucketVersioningStatusResponseType GetBucketVersioningStatus(GetBucketVersioningStatusType request) throws EucalyptusCloudException {
+	public GetBucketVersioningStatusResponseType getBucketVersioningStatus(GetBucketVersioningStatusType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.getBucketVersioningStatus(request);
 	}
@@ -909,7 +919,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#SetBucketVersioningStatus(com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusType)
 	 */
 	@Override
-	public SetBucketVersioningStatusResponseType SetBucketVersioningStatus(SetBucketVersioningStatusType request) throws EucalyptusCloudException {
+	public SetBucketVersioningStatusResponseType setBucketVersioningStatus(SetBucketVersioningStatusType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.setBucketVersioningStatus(request);
 	}
@@ -918,7 +928,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#ListVersions(com.eucalyptus.objectstorage.msgs.ListVersionsType)
 	 */
 	@Override
-	public ListVersionsResponseType ListVersions(ListVersionsType request) throws EucalyptusCloudException {
+	public ListVersionsResponseType listVersions(ListVersionsType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.listVersions(request);
 	}
@@ -927,7 +937,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#DeleteVersion(com.eucalyptus.objectstorage.msgs.DeleteVersionType)
 	 */
 	@Override
-	public DeleteVersionResponseType DeleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
+	public DeleteVersionResponseType deleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
 		logRequest(request);
 		return ospClient.deleteVersion(request);
 	}

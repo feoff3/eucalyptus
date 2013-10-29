@@ -64,6 +64,9 @@ package com.eucalyptus.objectstorage.util;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.util.Date;
+
+import org.apache.tools.ant.util.DateUtils;
 
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -117,5 +120,18 @@ public class OSGUtil {
 		if(operationPath.startsWith("/"))
 			operationPath = operationPath.substring(1);
 		return operationPath.split("/");
+	}
+	
+	/**
+	 * Helper to do the ISO8601 formatting
+	 * @param d
+	 * @return
+	 */
+	public static String dateToFormattedString(Date d) {
+		if(d == null) { 
+			return null;
+		} else {		
+			return DateUtils.format(d.getTime(), DateUtils.ALT_ISO8601_DATE_PATTERN);
+		}
 	}
 }

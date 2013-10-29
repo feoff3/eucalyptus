@@ -85,22 +85,34 @@ public class DbObjectManagerImpl implements ObjectManager {
 		try {
 			if(resourceModifier != null) {
 				result = resourceModifier.call();
-				object.setVersionId(result.getVersionId());
-				object.setEtag(result.getEtag());
-				object.setLastModified(DateUtil.parseDate(result.getLastModified()));
 			} else {
 				//nothing to call, so just save
 			}
+			
+			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {
-				Transactions.saveDirect(object);
+				//Do record swap if existing record is found.
+				ObjectEntity extantEntity = null;
+				extantEntity = Entities.merge(object);
+				
+				if(result != null) {
+					extantEntity.setVersionId(result.getVersionId());
+					extantEntity.setSize(result.getSize());
+				}
+				db.commit();
 				return result;
-			} catch (TransactionException e) {
+			} catch (Exception e) {
 				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
 				throw e;
-			}			
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
 			try {
+				//Call the rollback. It is up to the provider to ensure the rollback is correct for that backend
 				if(resourceModifier != null) {
 					resourceModifier.rollback(result);
 				}
@@ -110,6 +122,14 @@ public class DbObjectManagerImpl implements ObjectManager {
 			throw e;
 		} catch(Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
+			
+			try {
+				if(resourceModifier != null) {
+					resourceModifier.rollback(result);
+				}
+			} catch(Exception ex) {
+				LOG.error("Error rolling back object create",ex);
+			}			
 			throw new InternalErrorException(object.getBucketName() + "/" + object.getObjectKey());
 		}
 	}
