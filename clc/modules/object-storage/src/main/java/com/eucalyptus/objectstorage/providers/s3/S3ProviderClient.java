@@ -518,10 +518,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup(request.getCorrelationId()).getUser(), Contexts.lookup(request.getCorrelationId()).getUser().getUserId());
 			ListObjectsRequest listRequest = new ListObjectsRequest();
 			listRequest.setBucketName(request.getBucket());
-			listRequest.setDelimiter(request.getDelimiter());
-			listRequest.setMarker(request.getMarker());
+			listRequest.setDelimiter(Strings.isNullOrEmpty(request.getDelimiter()) ? null : request.getDelimiter());
+			listRequest.setMarker(Strings.isNullOrEmpty(request.getMarker()) ? null : request.getMarker());
 			listRequest.setMaxKeys((request.getMaxKeys() == null ? null : Integer.parseInt(request.getMaxKeys())));
-			listRequest.setPrefix(request.getPrefix());
+			listRequest.setPrefix(Strings.isNullOrEmpty(request.getPrefix()) ? null : request.getPrefix());
 			
 			ObjectListing response = s3Client.listObjects(listRequest);
 			reply.setBucket(request.getBucket());
