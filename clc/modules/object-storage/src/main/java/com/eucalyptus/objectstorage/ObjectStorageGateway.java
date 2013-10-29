@@ -672,9 +672,49 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#DeleteObject(com.eucalyptus.objectstorage.msgs.DeleteObjectType)
 	 */
 	@Override
-	public DeleteObjectResponseType deleteObject (DeleteObjectType request) throws EucalyptusCloudException {
+	public DeleteObjectResponseType deleteObject (final DeleteObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.deleteObject(request);
+		Bucket bucket = null;
+		try {
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			bucket = null;
+		}
+		
+		if(bucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {				
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
+				//Get the listing from the back-end and copy results in.
+				try {
+					ObjectManagerFactory.getInstance().delete(
+							request.getBucket(), 
+							request.getKey(), 
+							null,  
+							new ReversibleOperation<DeleteObjectResponseType,Boolean>() {
+								public DeleteObjectResponseType call() throws S3Exception, Exception {
+									return ospClient.deleteObject(request);
+								}
+								
+								public Boolean rollback(DeleteObjectResponseType arg) throws S3Exception, Exception {
+									//Can't roll-back a delete
+									return true;
+								}
+							});
+					DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
+					return reply;
+				} catch (TransactionException e) {
+					LOG.error("Transaction error during delete object: " + request.getBucket() + "/" + request.getKey(), e);
+					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+				}
+			} else {
+				throw new AccessDeniedException(request.getBucket() + "/" + request.getKey());
+			}
+		}
 	}
 
 	/* (non-Javadoc)

@@ -29,7 +29,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract boolean exists(String bucketName, String objectKey, String versionId) throws TransactionException;
+	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException;
 	
 	public abstract ObjectEntity lookupAndClose(String bucketName, String objectKey, String versionId) throws TransactionException;
 	
@@ -37,7 +37,7 @@ public interface ObjectManager {
 
 	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws TransactionException;
 	
-	public abstract void delete(String bucketName, String objectKey, String versionId) throws TransactionException;
+	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state

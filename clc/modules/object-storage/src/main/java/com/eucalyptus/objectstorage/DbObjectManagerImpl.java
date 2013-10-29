@@ -65,7 +65,28 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public void delete(String bucketName, String objectKey, String versionId) throws TransactionException {
+	public <T, F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {	
+		
+		if(resourceModifier != null) {
+			T result = null;		
+			try {
+				result = resourceModifier.call();
+			} catch(S3Exception e) {
+				LOG.error("S3 Error calling modify resource in object delete", e);
+				try {
+					resourceModifier.rollback(result);
+				} catch(Exception ex) {
+					LOG.error("Error in rollback during error recovery of object delete",e);
+				}
+				throw e;
+			} catch(Exception e) {
+				LOG.error("Error calling modify resource in object delete", e);
+				InternalErrorException intEx = new InternalErrorException(bucketName + "/" + objectKey + (versionId == null ? "" : "?versionId=" + versionId));
+				intEx.initCause(e);
+				throw intEx;
+			}
+		}
+		
 		try {
 			ObjectEntity objectExample = new ObjectEntity(bucketName, objectKey, versionId);			
 			Transactions.delete(objectExample);
