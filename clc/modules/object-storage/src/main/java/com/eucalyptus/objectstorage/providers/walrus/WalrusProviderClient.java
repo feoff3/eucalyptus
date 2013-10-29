@@ -430,24 +430,17 @@ public class WalrusProviderClient extends S3ProviderClient {
 
 	@Override
 	public PostObjectResponseType postObject(PostObjectType request) throws EucalyptusCloudException {
-		/*try {
-			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.PostObjectType.class, com.eucalyptus.walrus.msgs.PostObjectResponseType.class);			
-		} catch (EucalyptusCloudException e) {
-			LOG.error("Error response from Walrus", e);
-			throw e;
-		}*/
 		throw new NotImplementedException("PostObject");
 	}
 
 	@Override
 	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {		
-		/*try {
+		try {
 			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.CopyObjectType.class, com.eucalyptus.walrus.msgs.CopyObjectResponseType.class);			
 		} catch (EucalyptusCloudException e) {
 			LOG.error("Error response from Walrus", e);
 			throw e;
-		}*/
-		throw new NotImplementedException("CopyObject");
+		}
 	}
 
 	@Override

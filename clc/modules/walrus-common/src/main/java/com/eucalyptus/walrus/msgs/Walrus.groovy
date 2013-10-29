@@ -376,6 +376,7 @@ public class PostObjectType extends WalrusDataRequestType {
 	Integer successActionStatus;
 	String contentType;
 }
+
 public class CopyObjectType extends WalrusRequestType {
 	String sourceBucket;
 	String sourceObject;
@@ -391,9 +392,16 @@ public class CopyObjectType extends WalrusRequestType {
 	Date copySourceIfUnmodifiedSince;
 }
 
-public class CopyObjectResponseType extends WalrusDataResponseType {
-	String copySourceVersionId;
+public class CopyObjectResponseType extends WalrusResponseType {
+	String etag;
+	String lastModified;
+	Long size;
+	ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
+	Integer errorCode;
+	String contentType;
+	String contentDisposition;
 	String versionId;
+	String copySourceVersionId;
 }
 
 public class PutObjectInlineType extends WalrusDataRequestType {

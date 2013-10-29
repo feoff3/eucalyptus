@@ -45,10 +45,12 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
+import com.amazonaws.services.s3.internal.DeleteObjectsResponse;
 import com.amazonaws.services.s3.model.Bucket;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.EmailAddressGrantee;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GroupGrantee;
 import com.amazonaws.services.s3.model.ListBucketsRequest;
@@ -495,21 +497,16 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	}
 
 	@Override
-	public DeleteObjectResponseType deleteObject(DeleteObjectType request)
-			throws EucalyptusCloudException {
+	public DeleteObjectResponseType deleteObject(DeleteObjectType request) throws EucalyptusCloudException {
 		try {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
-			try {
-				//Set the acl to private.
-				s3Client.deleteObject(request.getBucket(), request.getKey());
-			} catch(Exception e) {
-				LOG.error("Error putting object to backend",e);
-				throw e;
-			}
-
-			DeleteObjectResponseType reply = (DeleteObjectResponseType)request.getReply();
+			s3Client.deleteObject(request.getBucket(), request.getKey());
+			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
+			reply.setCode("200");
+			reply.setDescription("OK");
 			return reply;
 		} catch(Exception e) {
+			LOG.error("Unable to delete object", e);
 			throw new EucalyptusCloudException(e);
 		}
 	}
@@ -689,6 +686,26 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public GetObjectExtendedResponseType getObjectExtended(final GetObjectExtendedType request) throws EucalyptusCloudException {
+        //TODO: This is common. Stop repeating.
+		User requestUser = null;
+		String canonicalId = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			canonicalId = ctx.getAccount().getCanonicalId();
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+				canonicalId = requestUser.getAccount().getCanonicalId();
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			
+		}	
+
 		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
 		Boolean getMetaData = request.getGetMetaData();
 		Boolean inlineData = request.getInlineData();
@@ -726,6 +743,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			getRequest.setNonmatchingETagConstraints(nonMatchList);
 		}
 		try {
+			AmazonS3Client s3Client = this.getS3Client(requestUser, requestUser.getUserId());
 			S3Object response = s3Client.getObject(getRequest);
 			DefaultHttpResponse httpResponse = createHttpResponse(response.getObjectMetadata());
 			//write extra headers

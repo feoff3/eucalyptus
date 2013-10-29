@@ -24,7 +24,33 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import eucadmin.registerrequest
+import sys
+from . import describeservices
 
 class RegisterObjectStorageGateway(eucadmin.registerrequest.RegisterRequest):
     ServiceName = 'ObjectStorageGateway'
     Description = 'Register a new Object Storage Gateway.'
+
+    def main(self, **args):
+        debug = self.args.get('debug', False) or args.get('debug')
+
+        self.osg_preexists = self.check_for_extant_osg(debug)
+
+        return eucadmin.registerrequest.RegisterRequest.main(self, **args)
+
+    def check_for_extant_osg(self, debug=False):
+        obj = describeservices.DescribeServices()
+        response = obj.main(filter_partition='objectstorage', filter_type='objectstorage',
+                            debug=debug)
+        statuses = (response.get('euca:DescribeServicesResponseType', {})
+                            .get('euca:serviceStatuses', []))
+        return len(statuses) > 0
+
+    def cli_formatter(self, data):
+        eucadmin.registerrequest.RegisterRequest.cli_formatter(self, data)
+        if not self.osg_preexists:
+            print >> sys.stderr, \
+                    ('Registered the first Object Storage Gateway. '
+                     'You must choose a object storage back end client with '
+                     '``euca-modify-property -p objectstorage.providerclient=$PROVIDER '
+                     '(e.g. walrus or s3)')

@@ -2,8 +2,6 @@ package com.eucalyptus.objectstorage;
 
 import java.io.InputStream;
 
-import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.AddObjectType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -38,8 +36,6 @@ import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;

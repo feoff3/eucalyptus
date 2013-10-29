@@ -11,6 +11,8 @@ import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Strings;
 import com.eucalyptus.walrus.msgs.WalrusRequestType;
 import com.eucalyptus.walrus.msgs.WalrusResponseType;
+import com.eucalyptus.walrus.msgs.WalrusDataRequestType;
+import com.eucalyptus.walrus.msgs.WalrusDataResponseType;
 import com.eucalyptus.walrus.exceptions.WalrusException;
 
 /**
@@ -33,7 +35,7 @@ public enum MessageMapper {
 		outputRequest.regardingUserRequest(request);
 		return outputRequest;
 	}
-
+	
 	/**
 	 * Maps the response from walrus to the appropriate response type for OSG
 	 * @param initialRequest

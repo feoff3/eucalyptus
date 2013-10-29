@@ -66,15 +66,21 @@ import org.apache.log4j.Logger;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.Principals;
+import com.eucalyptus.component.ServiceConfiguration;
 import com.eucalyptus.component.Topology;
 import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.scripting.Groovyness;
 import com.eucalyptus.system.BaseDirectory;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 
 import java.net.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public class ObjectStorageProperties {
@@ -319,12 +325,35 @@ public class ObjectStorageProperties {
 		}
 		return TRACKER_URL;
 	}
-
+	
 	public static InetAddress getWalrusAddress() throws EucalyptusCloudException {
 		if (Topology.isEnabled(ObjectStorage.class)) {
 			return Topology.lookup(ObjectStorage.class).getInetAddress();
 		} else {
+			throw new EucalyptusCloudException("Walrus not ENABLED");
+		}	    
+	}
+	
+	private static Iterator<ServiceConfiguration> rrStores;
+	private static Iterable<ServiceConfiguration> currentStores;
+	
+	public static List<InetAddress> getObjectStorageAddress() throws EucalyptusCloudException {
+		if (Topology.isEnabled(ObjectStorage.class)) {
+			Iterable<ServiceConfiguration> newStores = Topology.lookupMany(ObjectStorage.class);
+			List<InetAddress> addresses = new ArrayList<InetAddress>();
+			if(rrStores == null || (!Iterables.elementsEqual(currentStores, newStores))) {
+				currentStores = newStores;
+				rrStores = Iterators.cycle(currentStores);
+			}
+			Iterator<ServiceConfiguration> current = currentStores.iterator();
+			while(current.hasNext()) {
+				current.next();
+				addresses.add(rrStores.next().getInetAddress());
+			}
+			return addresses;
+		} else {
 			throw new EucalyptusCloudException("ObjectStorage not ENABLED");
 		}	    
 	}
+	
 }
