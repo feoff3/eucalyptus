@@ -27,9 +27,6 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
 import org.apache.log4j.Logger;
 import org.apache.tools.ant.util.DateUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -38,11 +35,7 @@ import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
-import com.eucalyptus.auth.Permissions;
-import com.eucalyptus.auth.policy.PolicySpec;
 import com.eucalyptus.auth.principal.Account;
-import com.eucalyptus.auth.principal.Principals;
-import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.component.ComponentIds;
 import com.eucalyptus.component.annotation.ServiceOperation;
 import com.eucalyptus.component.id.Eucalyptus;
@@ -67,8 +60,6 @@ import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
-import com.eucalyptus.objectstorage.msgs.AddObjectResponseType;
-import com.eucalyptus.objectstorage.msgs.AddObjectType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.CopyObjectType;
 import com.eucalyptus.objectstorage.msgs.CreateBucketResponseType;
@@ -103,12 +94,10 @@ import com.eucalyptus.objectstorage.msgs.ListBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ListBucketType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
-import com.eucalyptus.objectstorage.msgs.PutObjectInlineType;
+import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
@@ -124,19 +113,11 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
-import com.eucalyptus.objectstorage.policy.AdminOverrideAllowed;
-import com.eucalyptus.objectstorage.policy.RequiresACLPermission;
-import com.eucalyptus.objectstorage.policy.RequiresPermission;
-import com.eucalyptus.objectstorage.policy.ResourceType;
-import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
-import com.eucalyptus.storage.msgs.s3.ListEntry;
-import com.eucalyptus.storage.msgs.s3.PrefixEntry;
-import com.eucalyptus.system.Ats;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Exceptions;
 import com.google.common.base.Function;
@@ -308,9 +289,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		INSTANCE;
 			
 		@Override
-		public Object apply(PutObjectType request) {
+		public Object apply(final PutObjectType request) {
 			logRequest(request);
-			ChannelBuffer b =  ChannelBuffers.dynamicBuffer();
+			final ChannelBuffer b =  ChannelBuffers.dynamicBuffer();
 			if(!streamDataMap.containsKey(request.getCorrelationId())) {
 				byte[] firstChunk = request.getData();
 				b.writeBytes(firstChunk);
@@ -333,11 +314,28 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 				
 				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-					//TODO: fix this to create new object entity
-					//ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), );
-					//return ObjectManagerFactory.getInstance().create(request.getBucket(),
-					//objectEntity,
-					return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
+					ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);					
+					return ObjectManagerFactory.getInstance().create(request.getBucket(),
+							objectEntity,
+							new ReversibleOperation<PutObjectResponseType,Boolean>() {
+
+								@Override
+								public PutObjectResponseType call() throws S3Exception, Exception {
+									return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
+								}
+
+								@Override
+								public Boolean rollback(PutObjectResponseType arg) throws S3Exception,
+										Exception {									
+									//Options: 1. delete the put object based on versionId. 2. Nothing.
+									//Due to concurrency issues, we can't be sure that what we delete is the
+									// same as what we put. In that case it wouldn't be a rollback.
+									//Need delete-by-etag support in S3 api.
+									return true;
+								}						
+							}
+							);
+					
 				} else {
 					throw new AccessDeniedException(request.getBucket());			
 				}
