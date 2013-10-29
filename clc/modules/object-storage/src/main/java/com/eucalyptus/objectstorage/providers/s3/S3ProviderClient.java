@@ -524,11 +524,17 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			listRequest.setPrefix(Strings.isNullOrEmpty(request.getPrefix()) ? null : request.getPrefix());
 			
 			ObjectListing response = s3Client.listObjects(listRequest);
+			/* Non-optional, must have non-null values */
 			reply.setName(request.getBucket());
-			reply.setMarker(response.getMarker());
-			reply.setNextMarker(response.getNextMarker());
+			reply.setMaxKeys(response.getMaxKeys());
+			reply.setMarker(response.getMarker() == null ? "" : response.getMarker());
+			reply.setPrefix(response.getPrefix() == null ? "" : response.getPrefix());
 			reply.setIsTruncated(response.isTruncated());
-			reply.setMarker(response.getMarker());
+
+			/* Optional */
+			reply.setNextMarker(response.getNextMarker());			
+			reply.setDelimiter(response.getDelimiter());
+			
 			if(reply.getContents() == null) {
 				reply.setContents(new ArrayList<ListEntry>());
 			}
