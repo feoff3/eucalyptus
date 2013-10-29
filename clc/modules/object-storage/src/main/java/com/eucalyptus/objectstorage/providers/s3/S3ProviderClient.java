@@ -539,6 +539,26 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public GetObjectExtendedResponseType getObjectExtended(final GetObjectExtendedType request) throws EucalyptusCloudException {
+        //TODO: This is common. Stop repeating.
+		User requestUser = null;
+		String canonicalId = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			canonicalId = ctx.getAccount().getCanonicalId();
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+				canonicalId = requestUser.getAccount().getCanonicalId();
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			
+		}	
+
 		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
 		Boolean getMetaData = request.getGetMetaData();
 		Boolean inlineData = request.getInlineData();
@@ -576,6 +596,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			getRequest.setNonmatchingETagConstraints(nonMatchList);
 		}
 		try {
+			AmazonS3Client s3Client = this.getS3Client(requestUser, requestUser.getUserId());
 			S3Object response = s3Client.getObject(getRequest);
 			DefaultHttpResponse httpResponse = createHttpResponse(response.getObjectMetadata());
 			//write extra headers
