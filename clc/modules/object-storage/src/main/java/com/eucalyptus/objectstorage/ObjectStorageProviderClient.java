@@ -162,6 +162,7 @@ public abstract class ObjectStorageProviderClient {
 	public abstract PutObjectInlineResponseType putObjectInline(
 			PutObjectInlineType request) throws EucalyptusCloudException;
 
+	@Deprecated
 	public abstract AddObjectResponseType addObject(AddObjectType request)
 			throws EucalyptusCloudException;
 

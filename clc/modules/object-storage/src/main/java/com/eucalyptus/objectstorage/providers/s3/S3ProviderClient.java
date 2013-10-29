@@ -45,7 +45,9 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
+import com.amazonaws.services.s3.internal.DeleteObjectsResponse;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ListBucketsRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -422,6 +424,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		throw new NotImplementedException("NO U CANNOT HAS");
 	}
 
+	/* This is SOAP only and will not be used*/
+	
 	@Override
 	public PutObjectInlineResponseType putObjectInline(
 			PutObjectInlineType request) throws EucalyptusCloudException {
@@ -438,7 +442,17 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public DeleteObjectResponseType deleteObject(DeleteObjectType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		try {
+			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			s3Client.deleteObject(request.getBucket(), request.getKey());
+			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
+			reply.setCode("200");
+			reply.setDescription("OK");
+			return reply;
+		} catch(Exception e) {
+			LOG.error("Unable to delete object", e);
+			throw new EucalyptusCloudException(e);
+		}
 	}
 
 	@Override
