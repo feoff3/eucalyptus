@@ -524,7 +524,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			listRequest.setPrefix(Strings.isNullOrEmpty(request.getPrefix()) ? null : request.getPrefix());
 			
 			ObjectListing response = s3Client.listObjects(listRequest);
-			reply.setBucket(request.getBucket());
+			reply.setName(request.getBucket());
 			reply.setMarker(response.getMarker());
 			reply.setNextMarker(response.getNextMarker());
 			reply.setIsTruncated(response.isTruncated());
