@@ -1,14 +1,12 @@
 package com.eucalyptus.objectstorage;
 
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import javax.persistence.EntityTransaction;
 
-import org.apache.commons.httpclient.util.DateUtil;
 import org.apache.log4j.Logger;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
@@ -24,13 +22,12 @@ import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.google.common.base.Strings;
-import com.google.common.base.Supplier;
 
 public class DbObjectManagerImpl implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(DbObjectManagerImpl.class);
 	
 	@Override
-	public boolean exists(String bucketName, String objectKey, String versionId) throws TransactionException {
+	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException {
 		return lookupAndClose(bucketName, objectKey, versionId) != null;
 	}
 
