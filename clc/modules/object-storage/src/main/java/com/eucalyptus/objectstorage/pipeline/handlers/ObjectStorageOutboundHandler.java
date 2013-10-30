@@ -143,7 +143,8 @@ public class ObjectStorageOutboundHandler extends MessageStackHandler {
 				if(errMsg instanceof ObjectStorageErrorMessageType) {
 					ObjectStorageErrorMessageType walrusErrorMsg = (ObjectStorageErrorMessageType) errMsg;
 					httpResponse.setStatus(walrusErrorMsg.getStatus());
-				}	
+				}
+				httpResponse.setMessage(errMsg);	
 			} else if (msg instanceof CreateBucketResponseType) {
 				httpResponse.setStatus(HttpResponseStatus.OK);
 				httpResponse.setMessage(null);
