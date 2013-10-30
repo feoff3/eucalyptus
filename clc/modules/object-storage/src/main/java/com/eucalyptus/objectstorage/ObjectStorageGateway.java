@@ -36,6 +36,7 @@ import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.Account;
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.component.ComponentIds;
 import com.eucalyptus.component.annotation.ServiceOperation;
 import com.eucalyptus.component.id.Eucalyptus;
@@ -304,6 +305,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			
 			Bucket bucket = null;
 			try {
+				User requestUser = Contexts.lookup().getUser();
+				
 				try {
 					//Handle the pass-through
 					bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
@@ -314,7 +317,13 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 				
 				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-					ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);					
+					ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
+					//Construct and set the ACP properly
+					AccessControlPolicy acp = new AccessControlPolicy();
+					acp.setOwner(buildCanonicalUser(requestUser.getAccount()));
+					acp.setAccessControlList(request.getAccessControlList());
+					objectEntity.setAcl(acp);
+					
 					return ObjectManagerFactory.getInstance().create(request.getBucket(),
 							objectEntity,
 							new ReversibleOperation<PutObjectResponseType,Boolean>() {
