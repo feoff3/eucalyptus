@@ -1,3 +1,23 @@
+/*************************************************************************
+* Copyright 2009-2013 Eucalyptus Systems, Inc.
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; version 3 of the License.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see http://www.gnu.org/licenses/.
+*
+* Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
+* CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
+* additional information or have any questions.
+************************************************************************/
+
 package com.eucalyptus.storage.msgs.s3
 
 import java.util.ArrayList;
@@ -25,7 +45,7 @@ public class ListBucketRequest extends S3Request {
 	String maxKeys;
 	String delimiter;
 
-	def ListBucketType() {
+	def ListBucketRequest() {
 		prefix = "";
 		marker = "";
 		delimiter = "";
@@ -64,7 +84,7 @@ public class ListVersionsRequest extends S3Request {
 	String maxKeys;
 	String delimiter;
 
-	def ListVersionsType() {
+	def ListVersionsRequest() {
 		prefix = "";
 	}
 }
@@ -127,8 +147,8 @@ public class GetBucketLocationResponse extends S3Response {
 /*
  * DELETE /bucket
  */
-public class DeleteBucketType extends S3Request {}
-public class DeleteBucketResponseType extends S3Response {}
+public class DeleteBucketRequest extends S3Request {}
+public class DeleteBucketResponse extends S3Response {}
 
 
 /*

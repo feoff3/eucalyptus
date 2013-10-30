@@ -56,6 +56,7 @@ import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
+import com.eucalyptus.objectstorage.exceptions.s3.NoSuchKeyException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
@@ -663,7 +664,34 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(GetBucketAccessControlPolicyType request) throws EucalyptusCloudException
 	{
 		logRequest(request);
-		return ospClient.getBucketAccessControlPolicy(request);
+		Bucket bucket = null;
+		try {
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			bucket = null;
+		}
+		
+		if(bucket == null) {
+			throw new NoSuchKeyException(request.getBucket());
+		} else {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+				//Get the listing from the back-end and copy results in.
+				GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType)request.getReply();
+				reply.setBucket(request.getBucket());
+				try {
+					reply.setAccessControlPolicy(bucket.getAccessControlPolicy());
+				} catch(Exception e) {
+					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+				}
+				return reply;
+			} else {
+				throw new AccessDeniedException(request.getBucket());
+			}
+		}
 	}
 
 	/* (non-Javadoc)
@@ -759,7 +787,34 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.getObjectAccessControlPolicy(request);
+		ObjectEntity objectEntity = null;
+		try {
+			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+		} catch(TransactionException e) {
+			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			objectEntity = null;
+		}
+		
+		if(objectEntity == null) {
+			throw new NoSuchKeyException(request.getBucket());
+		} else {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+				//Get the listing from the back-end and copy results in.
+				GetObjectAccessControlPolicyResponseType reply = (GetObjectAccessControlPolicyResponseType)request.getReply();
+				reply.setBucket(request.getBucket());
+				try {
+					reply.setAccessControlPolicy(objectEntity.getAccessControlPolicy());
+				} catch(Exception e) {
+					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+				}
+				return reply;
+			} else {
+				throw new AccessDeniedException(request.getBucket());
+			}
+		}
 	}
 
 	/* (non-Javadoc)
