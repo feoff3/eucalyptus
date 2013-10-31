@@ -32,7 +32,7 @@ import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
  * @author zhill
  *
  */
-public interface ReversibleOperation<T,R> {
+public interface CallableWithRollback<T,R> {
 	/**
 	 * Do the operation
 	 * @return

@@ -27,11 +27,14 @@ import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
+import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 
 /**
  * Interface to operate on buckets
- * Each operation includes a 'resourceModifier' ReversibleOperation that can optionally be used to invoke another operation that
+ * Each operation includes a 'resourceModifier' CallableWithRollback that can optionally be used to invoke another operation that
  * must succeed in order for the metadata/db operation to be committed (e.g. creating a bucket on a filesystem or backend).
  * The intent is to allow wrapping the backend operation in a transaction as necessary.
  * 
@@ -53,7 +56,7 @@ public interface BucketManager {
 			 String ownerIamUserId,
 			 String acl, 
 			 String location,			
-			 ReversibleOperation<T,R> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
@@ -62,7 +65,7 @@ public interface BucketManager {
 	 */
 	public abstract Bucket get( String bucketName,
 			 boolean includeHidden,
-			 ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
 	/**
 	 * Returns list of buckets owned by id. Buckets are detached from any persistence session.
 	 * @param ownerCanonicalId
@@ -71,7 +74,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> list( String ownerCanonicalId, 
 			 boolean includeHidden, 
-			 ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
 
 	/**
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -79,7 +82,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> listByUser( String userIamId, 
 			boolean includeHidden,  
-			ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Returns count of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -87,14 +90,14 @@ public interface BucketManager {
 	 */
 	public abstract long countByUser( String userIamId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws S3Exception, ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws S3Exception, ExecutionException;
 	/**
 	 * Returns count of buckets owned by account id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */	
 	public abstract long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws ExecutionException;
 	
 	/**
 	 * Checks if bucket exists.
@@ -102,7 +105,7 @@ public interface BucketManager {
 	 * @return
 	 */
 	public abstract boolean exists( String bucketName,  
-			ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket by name. Idempotent operation.
@@ -110,7 +113,7 @@ public interface BucketManager {
 	 * @param bucketName
 	 */
 	public abstract <T> T delete( String bucketName,  
-			ReversibleOperation<T,?> resourceModifier)  throws S3Exception, TransactionException;
+			CallableWithRollback<T,?> resourceModifier)  throws S3Exception, TransactionException;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
@@ -121,9 +124,9 @@ public interface BucketManager {
 	 * @param bucketEntity
 	 */
 	public abstract <T> T delete(Bucket bucketEntity, 
-			ReversibleOperation<T,?> resourceModifier)  throws TransactionException, S3Exception;
-	
-	public abstract void updateVersioningState(String bucketName, 
-			ObjectStorageProperties.VersioningStatus newState, 
-			ReversibleOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException; 	
+			CallableWithRollback<T,?> resourceModifier) throws TransactionException, S3Exception;
+		
+	public abstract <T> T setAcl(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
+	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;
+	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;	
 }

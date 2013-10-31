@@ -51,7 +51,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(DbObjectManagerImpl.class);
 	
 	@Override
-	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException {
+	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws TransactionException {
 		return get(bucketName, objectKey, versionId) != null;
 	}
 
@@ -86,7 +86,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T, F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {	
+	public <T, F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {	
 		
 		if(resourceModifier != null) {
 			T result = null;		
@@ -122,7 +122,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {
+	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
 			if(resourceModifier != null) {

@@ -48,7 +48,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException;
+	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws TransactionException;
 	
 	/**
 	 * Get the entity record, not the content
@@ -95,7 +95,7 @@ public interface ObjectManager {
 	 * @throws S3Exception
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException;
+	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state
@@ -103,6 +103,6 @@ public interface ObjectManager {
 	 * @param object
 	 * @param versionIdSupplier
 	 */
-	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T,F> resourceModifier) throws S3Exception, TransactionException;
+	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws S3Exception, TransactionException;
 	
 }
