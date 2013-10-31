@@ -291,19 +291,21 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public void start() throws EucalyptusCloudException {
-		LOG.debug("Starting");		
+		LOG.debug("Starting");
 		LOG.debug("Start completed successfully");		
 	}
 
 	@Override
 	public void stop() throws EucalyptusCloudException {
 		LOG.debug("Stopping");
+		//Force a new load of this on startup.
+		this.s3Client = null;
 		LOG.debug("Stop completed successfully");		
 	}
 
 	@Override
 	public void enable() throws EucalyptusCloudException {
-		LOG.debug("Enabling");		
+		LOG.debug("Enabling");	
 		LOG.debug("Enable completed successfully");		
 	}
 

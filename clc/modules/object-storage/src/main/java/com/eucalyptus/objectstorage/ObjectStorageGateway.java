@@ -57,6 +57,7 @@ import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchKeyException;
+import com.eucalyptus.objectstorage.exceptions.s3.NoSuchVersionException;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
@@ -148,7 +149,10 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	
 	public ObjectStorageGateway() {}
 	
-	public static void checkPreconditions() throws EucalyptusCloudException, ExecutionException {}
+	public static void checkPreconditions() throws EucalyptusCloudException, ExecutionException {
+		LOG.debug("Checking ObjectStorageGateway preconditions");
+		LOG.debug("ObjectStorageGateway Precondition check complete");
+	}
 
 	/**
 	 * Configure 
@@ -193,21 +197,28 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	}
 
 	public static void enable() throws EucalyptusCloudException {
+		LOG.debug("Enabling ObjectStorageGateway");
 		ospClient.enable();
+		LOG.debug("Enabling ObjectStorageGateway complete");
 	}
 
-	public static void disable() throws EucalyptusCloudException {		
+	public static void disable() throws EucalyptusCloudException {
+		LOG.debug("Disabling ObjectStorageGateway");
 		ospClient.disable();
 
 		//flush the data stream buffer, disconnect clients.
 		streamDataMap.clear();
+		LOG.debug("Disabling ObjectStorageGateway complete");
 	}
 
 	public static void check() throws EucalyptusCloudException {
+		LOG.trace("Checking ObjectStorageGateway");
 		ospClient.check();
+		LOG.trace("Checking ObjectStorageGateway complete");
 	}
 
 	public static void stop() throws EucalyptusCloudException {
+		LOG.debug("Checking ObjectStorageGateway preconditions");
 		ospClient.stop();
 		synchronized(ObjectStorageGateway.class) {
 			ospClient = null;
@@ -218,6 +229,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 		//Be sure it's empty
 		streamDataMap.clear();
+		LOG.debug("Checking ObjectStorageGateway preconditions");
 	}
 	
 	/**
@@ -909,7 +921,37 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public CopyObjectResponseType copyObject(CopyObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.copyObject(request);
+		Bucket bucket = null;
+		try {
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//Ok, bucket not found.
+			bucket = null;
+		}
+		
+		ObjectEntity objectEntity = null;
+		try {
+			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), null);
+		} catch(TransactionException e) {
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//Ok, bucket not found.
+			objectEntity = null;
+		}
+		
+		if(bucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} if(objectEntity == null) {
+			throw new NoSuchKeyException(request.getKey());
+		} else {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
+				return ospClient.copyObject(request);
+			} else {		
+				throw new AccessDeniedException(request.getBucket());			
+			}
+		}		
 	}
 
 	/* (non-Javadoc)
@@ -1123,7 +1165,24 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public DeleteVersionResponseType deleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.deleteVersion(request);
+		ObjectEntity objectEntity = null;
+		try {
+			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionid());
+		} catch(TransactionException e) {
+			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//object version not found
+			objectEntity = null;
+			throw new NoSuchVersionException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionid());
+		}
+		
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+			//Get the listing from the back-end and copy results in.
+			return ospClient.deleteVersion(request);
+		} else {
+			throw new AccessDeniedException(request.getBucket());
+		}
 	}
 
 	public static InetAddress getBucketIp(String bucket) throws EucalyptusCloudException {
