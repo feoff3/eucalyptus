@@ -40,6 +40,12 @@ public class S3ProviderConfiguration{
 			displayName = "s3_secret_key", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
 	public static String S3SecretKey;
+	
+	@ConfigurableField( description = "Use HTTPS for communication to service backend.",
+			displayName = "use_https", 
+			type = ConfigurableFieldType.BOOLEAN )
+	public static Boolean S3UseHttps;
+
 
 	public static String getS3AccessKey() {
 		return S3AccessKey;
@@ -57,6 +63,14 @@ public class S3ProviderConfiguration{
 		S3SecretKey = s3SecretKey;
 	}
 	
+	public static Boolean getS3UseHttps() {
+		return S3UseHttps;
+	}
+
+	public static void setS3UseHttps(Boolean s3UseHttps) {
+		S3UseHttps = s3UseHttps;
+	}
+
 	public static String getS3Endpoint() {
 		return S3Endpoint;
 	}

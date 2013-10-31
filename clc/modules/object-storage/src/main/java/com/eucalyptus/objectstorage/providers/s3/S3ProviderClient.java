@@ -160,7 +160,6 @@ import com.google.common.base.Strings;
 public class S3ProviderClient extends ObjectStorageProviderClient {
 	private static final Logger LOG = Logger.getLogger(S3ProviderClient.class); 
 	private static final int CONNECTION_TIMEOUT_MS = 500;
-	private static final Boolean USE_HTTPS = false; //TODO: make configurable
 	
 	protected boolean usePathStyle = true;
 	protected AmazonS3Client s3Client = null; //Single shared client. May need to expand this to a pool
@@ -184,7 +183,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			synchronized(this) {
 				if(s3Client == null) {
 					ClientConfiguration config = new ClientConfiguration();
-					if(USE_HTTPS) {
+					if(S3ProviderConfiguration.getS3UseHttps()) {						
 						config.setProtocol(Protocol.HTTPS);
 					} else {
 						config.setProtocol(Protocol.HTTP);
