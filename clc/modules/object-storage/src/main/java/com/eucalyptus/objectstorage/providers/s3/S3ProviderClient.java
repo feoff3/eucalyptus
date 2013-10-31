@@ -45,6 +45,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.BucketVersioningConfiguration;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.EmailAddressGrantee;
@@ -52,6 +53,7 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GroupGrantee;
 import com.amazonaws.services.s3.model.ListBucketsRequest;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
+import com.amazonaws.services.s3.model.ListVersionsRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
@@ -59,7 +61,11 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.S3VersionSummary;
+import com.amazonaws.services.s3.model.SetBucketVersioningConfigurationRequest;
+import com.amazonaws.services.s3.model.VersionListing;
 import com.eucalyptus.auth.Accounts;
+import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
@@ -121,6 +127,7 @@ import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
+import com.eucalyptus.storage.msgs.s3.DeleteMarkerEntry;
 import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.Grantee;
 import com.eucalyptus.storage.msgs.s3.Group;
@@ -128,8 +135,10 @@ import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.storage.msgs.s3.PrefixEntry;
+import com.eucalyptus.storage.msgs.s3.VersionEntry;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.walrus.util.WalrusProperties;
+import com.eucalyptus.objectstorage.exceptions.s3.AccountProblemException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -608,28 +617,28 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(
 			SetBucketAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetBucketACP");
 	}
 
 	@Override
 	public SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(
 			SetRESTBucketAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetBucketACP");
 	}
 
 	@Override
 	public SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(
 			SetObjectAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetObjectACP");
 	}
 
 	@Override
 	public SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(
 			SetRESTObjectAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetObjectACP");
 	}
 	
 	@Override
@@ -772,8 +781,36 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public GetBucketLocationResponseType getBucketLocation(
-			GetBucketLocationType request) throws EucalyptusCloudException {		
-		throw new NotImplementedException("BucketLocation");
+			GetBucketLocationType request) throws EucalyptusCloudException {				
+		GetBucketLocationResponseType reply = (GetBucketLocationResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			String bucketLocation = s3Client.getBucketLocation(request.getBucket());
+			reply.setLocationConstraint(bucketLocation);			
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override
@@ -797,25 +834,179 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public GetBucketVersioningStatusResponseType getBucketVersioningStatus(GetBucketVersioningStatusType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("GetBucketVersioningStatus");
+		GetBucketVersioningStatusResponseType reply = (GetBucketVersioningStatusResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			BucketVersioningConfiguration versioning = s3Client.getBucketVersioningConfiguration(request.getBucket());
+			reply.setVersioningStatus(versioning.getStatus());
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override
 	public SetBucketVersioningStatusResponseType setBucketVersioningStatus(
 			SetBucketVersioningStatusType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("SetBucketVersioningStatus");
+		SetBucketVersioningStatusResponseType reply = (SetBucketVersioningStatusResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			BucketVersioningConfiguration config = new BucketVersioningConfiguration().withStatus(request.getVersioningStatus());
+			SetBucketVersioningConfigurationRequest configRequest = new SetBucketVersioningConfigurationRequest(request.getBucket(), config);			
+			s3Client.setBucketVersioningConfiguration(configRequest);
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 
 	@Override
 	public ListVersionsResponseType listVersions(ListVersionsType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		ListVersionsResponseType reply = (ListVersionsResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			ListVersionsRequest listVersionsRequest = new ListVersionsRequest(request.getBucket(), 
+					request.getPrefix(),
+					request.getKeyMarker(),
+					request.getVersionIdMarker(), 
+					request.getDelimiter(), Integer.parseInt(request.getMaxKeys()));
+			VersionListing result = s3Client.listVersions(listVersionsRequest);
+			
+			CanonicalUser owner = null;
+			try {
+				owner = ObjectStorageGateway.buildCanonicalUser(requestUser.getAccount());				
+			} catch(AuthException e) {
+				LOG.error("Error getting request user's account during bucket version listing",e);
+				owner = null;
+				throw new AccountProblemException("Account for user " + requestUser.getUserId());
+			}
+			
+			//Populate result to euca
+			reply.setBucket(request.getBucket());
+			reply.setMaxKeys(result.getMaxKeys());
+			reply.setDelimiter(result.getDelimiter());
+			reply.setNextKeyMarker(result.getNextKeyMarker());
+			reply.setNextVersionIdMarker(result.getNextVersionIdMarker());
+			reply.setIsTruncated(result.isTruncated());
+			reply.setVersionIdMarker(result.getVersionIdMarker());
+			reply.setKeyMarker(result.getKeyMarker());
+			
+			ArrayList<PrefixEntry> commonPrefixes = new ArrayList<PrefixEntry>();
+			for(String s : result.getCommonPrefixes()) {
+				commonPrefixes.add(new PrefixEntry(s));
+			}
+			reply.setCommonPrefixes(commonPrefixes);
+			
+			ArrayList<VersionEntry> versions = new ArrayList<VersionEntry>();
+			//TODO: this is wrong, deleteMarkers should be inline with Versions. This is just legacy
+			ArrayList<DeleteMarkerEntry> deleteMarkers = new ArrayList<DeleteMarkerEntry>();
+			VersionEntry v = null;
+			DeleteMarkerEntry d = null;
+			for(S3VersionSummary summary: result.getVersionSummaries()) {
+				if(!summary.isDeleteMarker()) {
+					v = new VersionEntry();
+					v.setKey(summary.getKey()); 
+					v.setVersionId(summary.getVersionId()); 
+					v.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified())); 
+					v.setEtag(summary.getETag());
+					v.setIsLatest(summary.isLatest());
+					v.setOwner(owner);
+					v.setSize(summary.getSize());
+					versions.add(v);
+				} else {
+					d = new DeleteMarkerEntry();
+					d.setIsLatest(summary.isLatest());
+					d.setKey(summary.getKey());
+					d.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified()));
+					d.setOwner(owner);
+					d.setVersionId(summary.getVersionId());
+					deleteMarkers.add(d);
+				}								
+			}
+			//Again, this is wrong, should be a single listing
+			reply.setDeleteMarkers(deleteMarkers);
+			reply.setVersions(versions);
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override
 	public DeleteVersionResponseType deleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		try {
+			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			s3Client.deleteVersion(request.getBucket(), request.getKey(), request.getVersionid());
+			DeleteVersionResponseType reply = (DeleteVersionResponseType) request.getReply();
+			reply.setCode("200");
+			reply.setDescription("OK");
+			return reply;
+		} catch(Exception e) {
+			LOG.error("Unable to delete object version", e);
+			throw new EucalyptusCloudException(e);
+		}
 	}
 
 

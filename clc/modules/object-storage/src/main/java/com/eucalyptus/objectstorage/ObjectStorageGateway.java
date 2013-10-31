@@ -777,7 +777,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		if(listBucket == null) {
 			throw new NoSuchBucketException(request.getBucket());
 		} else {				
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, listBucket, null, 0)) {
 				//Get the listing from the back-end and copy results in.
 				return ospClient.listBucket(request);
 			} else {
@@ -1094,7 +1094,27 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public ListVersionsResponseType listVersions(ListVersionsType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.listVersions(request);
+		Bucket listBucket = null;
+		try {
+			listBucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//bucket not found
+			listBucket = null;
+		}
+		
+		if(listBucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {				
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, listBucket, null, 0)) {
+				//Get the listing from the back-end and copy results in.
+				return ospClient.listVersions(request);
+			} else {
+				throw new AccessDeniedException(request.getBucket());
+			}
+		}
 	}
 
 	/* (non-Javadoc)
