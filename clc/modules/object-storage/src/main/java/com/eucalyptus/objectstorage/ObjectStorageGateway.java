@@ -57,6 +57,7 @@ import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchKeyException;
+import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.exceptions.s3.TooManyBucketsException;
 import com.eucalyptus.objectstorage.exceptions.s3.AccessDeniedException;
@@ -120,8 +121,10 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatu
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
+import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
+import com.eucalyptus.storage.msgs.s3.TargetGrants;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Exceptions;
 import com.google.common.base.Function;
@@ -915,7 +918,52 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public GetBucketLoggingStatusResponseType getBucketLoggingStatus(GetBucketLoggingStatusType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.getBucketLoggingStatus(request);
+		Bucket bucket = null;
+		try {
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//Ok, bucket not found.
+			bucket = null;
+		}
+		
+		if(bucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+				GetBucketLoggingStatusResponseType reply = (GetBucketLoggingStatusResponseType) request.getReply();
+				LoggingEnabled loggingConfig = new LoggingEnabled();
+				if(bucket.getLoggingEnabled()) {
+					Bucket targetBucket = null;
+					try {
+						targetBucket = BucketManagerFactory.getInstance().get(bucket.getTargetBucket(), false, null);
+					} catch(Exception e) {
+						LOG.error("Error locating target bucket info for bucket " + request.getBucket() + " on target bucket " + bucket.getTargetBucket(), e);
+					}
+					
+					TargetGrants grants = new TargetGrants();
+					try {
+						grants.setGrants(targetBucket.getAccessControlPolicy().getAccessControlList().getGrants());
+					} catch(Exception e) {
+						LOG.error("Error populating target grants for bucket " + request.getBucket() + " for target " + targetBucket.getBucketName(),e);
+						grants.setGrants(new ArrayList<Grant>());
+					}						
+					loggingConfig.setTargetBucket(bucket.getTargetBucket());
+					loggingConfig.setTargetPrefix(bucket.getTargetPrefix());
+					loggingConfig.setTargetGrants(grants);
+					reply.setLoggingEnabled(loggingConfig);
+				} else {
+					//Logging not enabled
+					reply.setLoggingEnabled(null);
+				}
+				
+				return reply;
+			} else {		
+				throw new AccessDeniedException(request.getBucket());			
+			}
+		}
+		
 	}
 
 	/* (non-Javadoc)
@@ -938,51 +986,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchBucketException(request.getBucket());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-				try {
-					Boolean loggingEnabled = (request.getLoggingEnabled() == null);
-					String logBucket = (loggingEnabled ? request.getLoggingEnabled().getTargetBucket() : null);
-					String logPrefix = (loggingEnabled ? request.getLoggingEnabled().getTargetBucket() : null);
-					final Boolean oldLoggingState = bucket.getLoggingEnabled();
-					final String oldPrefix = bucket.getTargetPrefix();
-					final String oldTarget = bucket.getTargetBucket();
-					
-					return BucketManagerFactory.getInstance().setLoggingStatus(bucket, loggingEnabled, logBucket, logPrefix, new CallableWithRollback<SetBucketLoggingStatusResponseType, Boolean>() {
-						
-						@Override
-						public SetBucketLoggingStatusResponseType call() throws Exception {
-							return ospClient.setBucketLoggingStatus(request);
-						}
-						
-						@Override
-						public Boolean rollback(SetBucketLoggingStatusResponseType arg) throws Exception {
-							SetBucketLoggingStatusType revertRequest = new SetBucketLoggingStatusType();
-							revertRequest.setBucket(request.getBucket());
-							LoggingEnabled revertSetting = null;
-							if(oldLoggingState) {
-								revertSetting = new LoggingEnabled();
-								revertSetting.setTargetBucket(oldTarget);
-								revertSetting.setTargetPrefix(oldPrefix);
-							} else {
-								revertSetting = null;
-							}							
-							
-							try {
-								SetBucketLoggingStatusResponseType response = ospClient.setBucketLoggingStatus(revertRequest);							
-								if(response != null && response.get_return()) {
-									return true;
-								}
-							} catch(Exception e) {
-								LOG.error("Error invoking bucket versioning state rollback from logging enabled=" + (request.getLoggingEnabled() == null) + " to " + oldLoggingState, e);
-								return false;
-							}
-							
-							return false;
-						}					
-					});
-				} catch(TransactionException e) {
-					LOG.error("Transaction error deleting bucket " + request.getBucket(),e);
-					throw new InternalErrorException(request.getBucket());
-				}
+				//TODO: zhill -- add support for this. Not implemented for the tech preview
+				throw new NotImplementedException("Bucket Logging");
 			} else {		
 				throw new AccessDeniedException(request.getBucket());			
 			}
@@ -1046,7 +1051,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					final String bucketName = request.getBucket();
 					final VersioningStatus newState = VersioningStatus.valueOf(request.getVersioningStatus());
 					
-					return BucketManagerFactory.getInstance().setVersioning(bucket, newState, new CallableWithRollback<SetBucketVersioningStatusResponseType, Boolean>() {
+					return BucketManagerFactory.getInstance().setVersioning(bucket, 
+							newState, 
+							new CallableWithRollback<SetBucketVersioningStatusResponseType, Boolean>() {
 						
 						@Override
 						public SetBucketVersioningStatusResponseType call() throws Exception {
@@ -1079,7 +1086,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				throw new AccessDeniedException(request.getBucket());			
 			}
 		}
-		
 	}
 
 	/* (non-Javadoc)

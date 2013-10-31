@@ -773,38 +773,38 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public GetBucketLocationResponseType getBucketLocation(
 			GetBucketLocationType request) throws EucalyptusCloudException {		
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("BucketLocation");
 	}
 
 	@Override
 	public CopyObjectResponseType copyObject(CopyObjectType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("Copy Object");
 	}
 
 	@Override
 	public SetBucketLoggingStatusResponseType setBucketLoggingStatus(
 			SetBucketLoggingStatusType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetLoggingSTatus");
 	}
 
 	@Override
 	public GetBucketLoggingStatusResponseType getBucketLoggingStatus(
 			GetBucketLoggingStatusType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("GetLoggingStatus");
 	}
 
 	@Override
 	public GetBucketVersioningStatusResponseType getBucketVersioningStatus(GetBucketVersioningStatusType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("GetBucketVersioningStatus");
 	}
 
 	@Override
 	public SetBucketVersioningStatusResponseType setBucketVersioningStatus(
 			SetBucketVersioningStatusType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("NO U CANNOT HAS");
+		throw new NotImplementedException("SetBucketVersioningStatus");
 	}
 
 
