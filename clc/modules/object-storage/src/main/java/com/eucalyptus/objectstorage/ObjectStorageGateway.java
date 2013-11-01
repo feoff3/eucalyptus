@@ -459,8 +459,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(bucket == null) {
 				throw new NoSuchBucketException(request.getBucket());				
 			}
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {				
-				return ospClient.headBucket(request);
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+				HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
+				reply.setBucket(bucket.getBucketName());
+				reply.setStatus(HttpResponseStatus.OK);
+				reply.setStatusMessage("OK");
+				return reply;
 			} else {
 				throw new AccessDeniedException(request.getBucket());			
 			}
