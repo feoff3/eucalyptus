@@ -22,6 +22,7 @@ package com.eucalyptus.objectstorage;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -464,6 +465,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				reply.setBucket(bucket.getBucketName());
 				reply.setStatus(HttpResponseStatus.OK);
 				reply.setStatusMessage("OK");
+				reply.setTimestamp(new Date());
 				return reply;
 			} else {
 				throw new AccessDeniedException(request.getBucket());			
