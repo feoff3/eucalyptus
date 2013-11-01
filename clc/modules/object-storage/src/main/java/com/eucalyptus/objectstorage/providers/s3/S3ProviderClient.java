@@ -183,7 +183,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			synchronized(this) {
 				if(s3Client == null) {
 					ClientConfiguration config = new ClientConfiguration();
-					if(S3ProviderConfiguration.getS3UseHttps()) {						
+					if(S3ProviderConfiguration.getS3UseHttps() != null && S3ProviderConfiguration.getS3UseHttps()) {						
 						config.setProtocol(Protocol.HTTPS);
 					} else {
 						config.setProtocol(Protocol.HTTP);

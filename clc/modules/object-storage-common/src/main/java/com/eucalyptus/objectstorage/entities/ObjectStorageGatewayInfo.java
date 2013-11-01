@@ -98,7 +98,7 @@ public class ObjectStorageGatewayInfo extends AbstractPersistent {
 	@Column( name = "storage_snapshot_size_gb" )
 	private Integer storageMaxTotalSnapshotSizeInGb;
 	@ConfigurableField( description = "Total ObjectStorage storage capacity for Objects", displayName = "ObjectStorage object capacity (GB)" )
-	@Column( name = "storage_walrus_total_capacity" )
+	@Column( name = "storage_total_capacity" )
 	private Integer storageMaxTotalCapacity;
 
 	public ObjectStorageGatewayInfo() {}

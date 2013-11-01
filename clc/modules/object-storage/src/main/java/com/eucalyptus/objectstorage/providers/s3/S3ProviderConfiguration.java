@@ -42,8 +42,8 @@ public class S3ProviderConfiguration{
 	public static String S3SecretKey;
 	
 	@ConfigurableField( description = "Use HTTPS for communication to service backend.",
-			displayName = "use_https", initial="false" ,
-			type = ConfigurableFieldType.BOOLEAN )
+			displayName = "use_https",
+			initial="false" )
 	public static Boolean S3UseHttps;
 
 
