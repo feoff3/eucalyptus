@@ -47,7 +47,10 @@ import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
+import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
+import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 
@@ -88,7 +91,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public Bucket get(@Nonnull String bucketName,
 			@Nonnull boolean includeHidden,
-			@Nullable ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
 		try {
 			Bucket searchExample = new Bucket(bucketName);
 			searchExample.setHidden(includeHidden);
@@ -101,7 +104,7 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public boolean exists(@Nonnull String bucketName,
-			@Nullable ReversibleOperation<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
 		try {
 			return (Transactions.find(new Bucket(bucketName)) != null);
 		} catch (TransactionException e) {
@@ -116,7 +119,7 @@ public class DbBucketManagerImpl implements BucketManager {
 			@Nonnull String ownerIamUserId,
 			@Nonnull String acl, 
 			@Nonnull String location,
-			@Nullable ReversibleOperation<T,R> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException {
 
 		Bucket newBucket = new Bucket(bucketName);
 		try {
@@ -178,7 +181,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	
 	@Override
 	public <T> T delete(String bucketName, 
-			ReversibleOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
+			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
 		
 		Bucket searchEntity = new Bucket(bucketName);
 		try {
@@ -196,7 +199,7 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public <T> T delete(Bucket bucketEntity, 
-			ReversibleOperation<T,?> resourceModifier) throws S3Exception, TransactionException {
+			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
 		try {			
 			Transactions.delete(bucketEntity);
 		} catch(TransactionException e) {
@@ -223,34 +226,9 @@ public class DbBucketManagerImpl implements BucketManager {
 	}
 
 	@Override
-	public void updateVersioningState(String bucketName,
-			VersioningStatus newState, 
-			ReversibleOperation<?,?> resourceModifier) throws InvalidBucketStateException, TransactionException {
-		
-		EntityTransaction db = Entities.get(Bucket.class);
-		try {
-			Bucket searchBucket = new Bucket(bucketName);
-			Bucket bucket = Entities.uniqueResult(searchBucket);
-			if(VersioningStatus.Disabled.equals(newState) && !bucket.isVersioningDisabled()) {
-				//Cannot set versioning disabled if not already disabled.
-				throw new InvalidBucketStateException(bucketName);
-			}
-			bucket.setVersioning(newState.toString());			
-			db.commit();
-		} catch (TransactionException e) {
-			LOG.error("Error updating versioning status for bucket " + bucketName + " due to DB transaction error", e);
-			throw e;
-		} finally {
-			if(db != null && db.isActive()) {
-				db.rollback();
-			}
-		}
-	}
-
-	@Override
 	public List<Bucket> list(String ownerCanonicalId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws TransactionException {
+			CallableWithRollback<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
 		searchBucket.setHidden(includeHidden);
@@ -267,7 +245,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public List<Bucket> listByUser(String userIamId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws TransactionException {
+			CallableWithRollback<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -284,7 +262,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public long countByUser(String userIamId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws ExecutionException {
+			CallableWithRollback<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerIamUserId(userIamId);
@@ -302,7 +280,7 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			ReversibleOperation<?,?> resourceModifier) throws ExecutionException {
+			CallableWithRollback<?,?> resourceModifier) throws ExecutionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setHidden(includeHidden);
 		searchBucket.setOwnerCanonicalId(canonicalId);
@@ -314,6 +292,139 @@ public class DbBucketManagerImpl implements BucketManager {
 			throw new ExecutionException(e);
 		} finally {
 			db.rollback();
+		}
+	}
+	
+	public <T> T setAcl(@Nonnull Bucket bucketEntity, 
+			@Nonnull String acl, 
+			@Nullable CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception {
+		EntityTransaction db = Entities.get(Bucket.class);
+		T result = null;
+		try {
+			Bucket bucket = Entities.uniqueResult(bucketEntity);
+			bucket.setAcl(acl);
+			
+			if(resourceModifier != null) {				
+				try {
+					result = resourceModifier.call();
+				} catch(Exception ex) {
+					LOG.error("Resource modifier call (backend) for setAcl failed. Rolling back", ex);
+					try {
+						resourceModifier.rollback(result);
+					} catch(Exception ex2) {
+						LOG.error("Resource rollback failed on setAcl rollback.", ex2);
+					}
+				}				
+			} else {
+				result = null;
+			}
+			
+			db.commit();
+			return result;
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(bucketEntity.getBucketName());
+		} catch(TransactionException e) {
+			LOG.error("Transaction error updating acl for bucket " + bucketEntity.getBucketName(),e);
+			try {
+				resourceModifier.rollback(result);
+			} catch(Exception e2) {
+				LOG.error("Rollback after transaction exception failed for resource modififer",e2);				
+			}
+			throw e;
+		} finally {
+			if(db != null && db.isActive()) {
+				db.rollback();
+			}
+		}
+	}
+	
+	public <T> T setLoggingStatus(@Nonnull Bucket bucketEntity, 
+			@Nonnull Boolean loggingEnabled, 
+			@Nullable String destBucket, 
+			@Nullable String destPrefix, 
+			@Nullable CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception {
+		EntityTransaction db = Entities.get(Bucket.class);
+		T result = null;
+		try {
+			Bucket bucket = Entities.uniqueResult(bucketEntity);
+			bucket.setLoggingEnabled(loggingEnabled);
+			bucket.setTargetBucket(destBucket);
+			bucket.setTargetPrefix(destPrefix);
+			
+			if(resourceModifier != null) {				
+				try {
+					result = resourceModifier.call();
+				} catch(Exception ex) {
+					LOG.error("Resource modifier call (backend) for setLogging failed. Rolling back", ex);
+					try {
+						resourceModifier.rollback(result);
+					} catch(Exception ex2) {
+						LOG.error("Resource rollback failed on setLogging rollback.", ex2);
+					}
+				}				
+			} else {
+				result = null;
+			}
+			
+			db.commit();
+			return result;
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(bucketEntity.getBucketName());
+		} catch(TransactionException e) {
+			LOG.error("Transaction error updating acl for bucket " + bucketEntity.getBucketName(),e);
+			try {
+				resourceModifier.rollback(result);
+			} catch(Exception e2) {
+				LOG.error("Rollback after transaction exception failed for resource modififer",e2);				
+			}
+			throw e;
+		} finally {
+			if(db != null && db.isActive()) {
+				db.rollback();
+			}
+		}
+	}
+	
+	public <T> T setVersioning(@Nonnull Bucket bucketEntity, 
+			@Nonnull VersioningStatus newState, 
+			@Nullable CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception {
+		EntityTransaction db = Entities.get(Bucket.class);
+		T result = null;
+		try {
+			Bucket bucket = Entities.uniqueResult(bucketEntity);
+			bucket.setVersioning(newState.toString());
+			
+			if(resourceModifier != null) {
+				try {
+					result = resourceModifier.call();
+				} catch(Exception ex) {
+					LOG.error("Resource modifier call (backend) for setVersioning failed. Rolling back", ex);
+					try {
+						resourceModifier.rollback(result);
+					} catch(Exception ex2) {
+						LOG.error("Resource rollback failed on setVersioning rollback.", ex2);
+					}
+				}				
+			} else {
+				result = null;
+			}
+			
+			db.commit();
+			return result;
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(bucketEntity.getBucketName());
+		} catch(TransactionException e) {
+			LOG.error("Transaction error updating versioning state for bucket " + bucketEntity.getBucketName(),e);
+			try {
+				resourceModifier.rollback(result);
+			} catch(Exception e2) {
+				LOG.error("Rollback after transaction exception failed for resource modififer",e2);				
+			}
+			throw e;
+		} finally {
+			if(db != null && db.isActive()) {
+				db.rollback();
+			}
 		}
 	}
 

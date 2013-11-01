@@ -21,6 +21,7 @@
 package com.eucalyptus.objectstorage.entities;
 
 import java.util.Date;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
@@ -35,7 +36,7 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 @PersistenceContext(name="eucalyptus_osg")
 @Table( name = "buckets" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-public class Bucket extends S3AccessControlledEntity {	
+public class Bucket extends S3AccessControlledEntity {
 	/**
 	 * 
 	 */
@@ -203,5 +204,5 @@ public class Bucket extends S3AccessControlledEntity {
 		} else if (!bucketName.equals(other.bucketName))
 			return false;
 		return true;
-	}	
+	}
 }

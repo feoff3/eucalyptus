@@ -1,3 +1,23 @@
+/*************************************************************************
+ * Copyright 2009-2013 Eucalyptus Systems, Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see http://www.gnu.org/licenses/.
+ *
+ * Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
+ * CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
+ * additional information or have any questions.
+ ************************************************************************/
+
 package com.eucalyptus.objectstorage;
 
 import java.util.Collections;
@@ -31,8 +51,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(DbObjectManagerImpl.class);
 	
 	@Override
-	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException {
-		return lookupAndClose(bucketName, objectKey, versionId) != null;
+	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws TransactionException {
+		return get(bucketName, objectKey, versionId) != null;
 	}
 
 	@Override
@@ -51,7 +71,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public ObjectEntity lookupAndClose(String bucketName, String objectKey, String versionId) throws TransactionException {
+	public ObjectEntity get(String bucketName, String objectKey, String versionId) throws TransactionException {
 		try {
 			ObjectEntity objectExample = new ObjectEntity(bucketName, objectKey, versionId);
 			ObjectEntity foundObject = Transactions.find(objectExample);		
@@ -66,7 +86,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T, F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {	
+	public <T, F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {	
 		
 		if(resourceModifier != null) {
 			T result = null;		
@@ -102,7 +122,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException {
+	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
 			if(resourceModifier != null) {

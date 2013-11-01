@@ -20,14 +20,30 @@
 
 package com.eucalyptus.objectstorage;
 
+import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+
 /**
- * Manager factory for bucket metadata handler. Returns an instance
- * for the configured manager.
+ * An wrapper for an operation with two phases:
+ * call()
+ * rollback()
+ * 
+ * To allow passing of operations (like Callable) with
+ * another rollback option if necessary.
+ * @author zhill
  *
  */
-public class BucketManagerFactory {
-	private static final BucketManager manager = new DbBucketManagerImpl(); 	
-	public static BucketManager getInstance() {
-		return manager;
-	}
+public interface CallableWithRollback<T,R> {
+	/**
+	 * Do the operation
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract T call() throws S3Exception, Exception;
+	
+	/**
+	 * Rollback the previous call.
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract R rollback(T arg) throws S3Exception, Exception;
 }

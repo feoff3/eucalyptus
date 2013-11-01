@@ -84,6 +84,8 @@ import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectType;
 import com.eucalyptus.objectstorage.msgs.ListBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.ListBucketType;
+import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.objectstorage.msgs.PutObjectInlineResponseType;
@@ -107,15 +109,15 @@ public class ObjectTest {
         createBucketRequest.setEffectiveUserId("eucalyptus");
 		AccessControlList acl = new AccessControlList();
 		createBucketRequest.setAccessControlList(acl);
-		CreateBucketResponseType reply = bukkit.CreateBucket(createBucketRequest);
+		CreateBucketResponseType reply = bukkit.createBucket(createBucketRequest);
 		System.out.println(reply);
 
-		PutObjectInlineType putObjectRequest = new PutObjectInlineType();
+		PutObjectType putObjectRequest = new PutObjectType();
 		putObjectRequest.setBucket(bucketName);
 		putObjectRequest.setKey(objectName);
         String data = "hi here is some data";
 		putObjectRequest.setContentLength(String.valueOf(data.length()));
-		putObjectRequest.setBase64Data(data);
+		putObjectRequest.setData(data.getBytes());
 		putObjectRequest.setUserId(userId);
         ArrayList<MetaDataEntry> metaData = new ArrayList<MetaDataEntry>();
         MetaDataEntry metaDataEntry = new MetaDataEntry();
@@ -123,20 +125,20 @@ public class ObjectTest {
         metaDataEntry.setValue("walrus");
         metaData.add(metaDataEntry);
         putObjectRequest.setMetaData(metaData);
-        PutObjectInlineResponseType putObjectReply = bukkit.PutObjectInline(putObjectRequest);
-		System.out.println(putObjectReply);
+        //PutObjectResponseType putObjectReply = bukkit.putObject(putObjectRequest);
+		//System.out.println(putObjectReply);
 
         ListBucketType listBucketRequest = new ListBucketType();
         listBucketRequest.setBucket(bucketName);
         listBucketRequest.setUserId(userId);
-        ListBucketResponseType listBucketReply = bukkit.ListBucket(listBucketRequest);
+        ListBucketResponseType listBucketReply = bukkit.listBucket(listBucketRequest);
         System.out.println(listBucketReply);        
 
         GetObjectAccessControlPolicyType acpRequest = new GetObjectAccessControlPolicyType();
 		acpRequest.setBucket(bucketName);
         acpRequest.setKey(objectName);
         acpRequest.setUserId(userId);
-		GetObjectAccessControlPolicyResponseType acpResponse = bukkit.GetObjectAccessControlPolicy(acpRequest);
+		GetObjectAccessControlPolicyResponseType acpResponse = bukkit.getObjectAccessControlPolicy(acpRequest);
 		System.out.println(acpResponse);
 
         GetObjectType getObjectRequest = new GetObjectType();
@@ -146,20 +148,20 @@ public class ObjectTest {
         getObjectRequest.setGetData(true);
         getObjectRequest.setGetMetaData(true);
         getObjectRequest.setInlineData(true);
-        GetObjectResponseType getObjectReply = bukkit.GetObject(getObjectRequest);
+        GetObjectResponseType getObjectReply = bukkit.getObject(getObjectRequest);
         System.out.println(getObjectReply);
 
         DeleteObjectType deleteObjectRequest = new DeleteObjectType();
 		deleteObjectRequest.setBucket(bucketName);
 		deleteObjectRequest.setKey(objectName);
 		deleteObjectRequest.setUserId(userId);
-		DeleteObjectResponseType deleteObjectReply = bukkit.DeleteObject(deleteObjectRequest);
+		DeleteObjectResponseType deleteObjectReply = bukkit.deleteObject(deleteObjectRequest);
 		System.out.println(deleteObjectReply);
 
 		DeleteBucketType deleteBucketRequest = new DeleteBucketType();
 		deleteBucketRequest.setUserId(userId);
 		deleteBucketRequest.setBucket(bucketName);
-		DeleteBucketResponseType deleteResponse = bukkit.DeleteBucket(deleteBucketRequest);
+		DeleteBucketResponseType deleteResponse = bukkit.deleteBucket(deleteBucketRequest);
 		System.out.println(deleteResponse);
 	}
 

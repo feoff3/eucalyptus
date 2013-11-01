@@ -1,10 +1,29 @@
+/*************************************************************************
+ * Copyright 2009-2013 Eucalyptus Systems, Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see http://www.gnu.org/licenses/.
+ *
+ * Please contact Eucalyptus Systems, Inc., 6755 Hollister Ave., Goleta
+ * CA 93117, USA or visit http://www.eucalyptus.com/licenses/ if you need
+ * additional information or have any questions.
+ ************************************************************************/
+
 package com.eucalyptus.objectstorage;
 
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
-import com.google.common.base.Supplier;
 
 /**
  * Interface for interacting with object metadata (not content directly)
@@ -29,15 +48,54 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws TransactionException;
+	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws TransactionException;
 	
-	public abstract ObjectEntity lookupAndClose(String bucketName, String objectKey, String versionId) throws TransactionException;
+	/**
+	 * Get the entity record, not the content
+	 * @param bucketName
+	 * @param objectKey
+	 * @param versionId
+	 * @return
+	 * @throws TransactionException
+	 */
+	public abstract ObjectEntity get(String bucketName, String objectKey, String versionId) throws TransactionException;
 	
+	/**
+	 * List the objects in the given bucket
+	 * @param bucketName
+	 * @param maxRecordCount
+	 * @param prefix
+	 * @param delimiter
+	 * @param startKey
+	 * @return
+	 * @throws TransactionException
+	 */
 	public abstract PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxRecordCount, String prefix, String delimiter, String startKey) throws TransactionException;
 
+	/**
+	 * List the object versions in the given bucket
+	 * @param bucketName
+	 * @param maxKeys
+	 * @param prefix
+	 * @param delimiter
+	 * @param startKey
+	 * @param startVersionId
+	 * @param includeDeleteMarkers
+	 * @return
+	 * @throws TransactionException
+	 */
 	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws TransactionException;
 	
-	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  ReversibleOperation<T, F> resourceModifier) throws S3Exception, TransactionException;
+	/**
+	 * Delete the object entity
+	 * @param bucketName
+	 * @param objectKey
+	 * @param versionId
+	 * @param resourceModifier
+	 * @throws S3Exception
+	 * @throws TransactionException
+	 */
+	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state
@@ -45,6 +103,6 @@ public interface ObjectManager {
 	 * @param object
 	 * @param versionIdSupplier
 	 */
-	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, ReversibleOperation<T,F> resourceModifier) throws S3Exception, TransactionException;
+	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws S3Exception, TransactionException;
 	
 }

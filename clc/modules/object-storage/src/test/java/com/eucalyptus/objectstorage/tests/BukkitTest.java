@@ -97,25 +97,25 @@ public class BukkitTest {
         createBucketRequest.setEffectiveUserId("eucalyptus");
 		AccessControlList acl = new AccessControlList();
 		createBucketRequest.setAccessControlList(acl);
-		CreateBucketResponseType reply = bukkit.CreateBucket(createBucketRequest);
+		CreateBucketResponseType reply = bukkit.createBucket(createBucketRequest);
 		System.out.println(reply);
 
 		ListAllMyBucketsType listBucketsRequest = new ListAllMyBucketsType();
 
 		listBucketsRequest.setUserId(userId);
-		ListAllMyBucketsResponseType response =  bukkit.ListAllMyBuckets(listBucketsRequest);
+		ListAllMyBucketsResponseType response =  bukkit.listAllMyBuckets(listBucketsRequest);
 		System.out.println(response);
 
 		GetBucketAccessControlPolicyType acpRequest = new GetBucketAccessControlPolicyType();
 		acpRequest.setBucket(bucketName);
 		acpRequest.setUserId(userId);
-		GetBucketAccessControlPolicyResponseType acpResponse = bukkit.GetBucketAccessControlPolicy(acpRequest);
+		GetBucketAccessControlPolicyResponseType acpResponse = bukkit.getBucketAccessControlPolicy(acpRequest);
 		System.out.println(acpResponse);
 
 		DeleteBucketType deleteRequest = new DeleteBucketType();
 		deleteRequest.setUserId(userId);
 		deleteRequest.setBucket(bucketName);
-		DeleteBucketResponseType deleteResponse = bukkit.DeleteBucket(deleteRequest);
+		DeleteBucketResponseType deleteResponse = bukkit.deleteBucket(deleteRequest);
 		System.out.println(deleteResponse);
 	}
 
