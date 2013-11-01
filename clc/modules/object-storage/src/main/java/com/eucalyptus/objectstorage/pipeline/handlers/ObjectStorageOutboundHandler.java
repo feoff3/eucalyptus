@@ -63,9 +63,11 @@
 package com.eucalyptus.objectstorage.pipeline.handlers;
 
 import org.apache.log4j.Logger;
+import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -86,6 +88,30 @@ import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
 @ChannelPipelineCoverage("one")
 public class ObjectStorageOutboundHandler extends MessageStackHandler {
+	@Override
+	public void handleUpstream(ChannelHandlerContext ctx,
+			ChannelEvent channelEvent) throws Exception {
+		if (channelEvent instanceof ExceptionEvent) {
+			exceptionCaught(ctx, (ExceptionEvent) channelEvent);
+		} else {
+			ctx.sendUpstream(channelEvent);
+		}
+	}
+
+	private void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) {
+		ctx.sendUpstream(e);
+	}
+
+	@Override
+	public void handleDownstream(ChannelHandlerContext ctx,
+			ChannelEvent channelEvent) throws Exception {
+		if ( channelEvent instanceof MessageEvent ) {
+			final MessageEvent msgEvent = ( MessageEvent ) channelEvent;
+			this.outgoingMessage(ctx, msgEvent);
+		}
+		ctx.sendDownstream(channelEvent);
+	}
+
 	private static Logger LOG = Logger.getLogger( ObjectStorageOutboundHandler.class );
 
 	@Override
@@ -98,7 +124,7 @@ public class ObjectStorageOutboundHandler extends MessageStackHandler {
 				PutObjectResponseType putObjectResponse = (PutObjectResponseType) msg;
 				httpResponse.addHeader(HttpHeaders.Names.ETAG, '\"' + putObjectResponse.getEtag() + '\"');
 				if(putObjectResponse.getLastModified() != null) {
-				    httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, putObjectResponse.getLastModified());
+					httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, putObjectResponse.getLastModified());
 				}
 				if(putObjectResponse.getVersionId() != null) {
 					httpResponse.addHeader(ObjectStorageProperties.X_AMZ_VERSION_ID, putObjectResponse.getVersionId());

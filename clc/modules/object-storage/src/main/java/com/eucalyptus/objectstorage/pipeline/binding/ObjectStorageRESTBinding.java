@@ -158,7 +158,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 	public static final int DATA_MESSAGE_SIZE = 102400;
 	protected String key;
 	protected String randomKey;
-	protected ObjectStorageDataQueue<ObjectStorageDataMessage> putQueue;
 	private String correlationId;
 
 	public ObjectStorageRESTBinding( ) {
@@ -177,12 +176,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				Channels.fireExceptionCaught( channelHandlerContext, e );
 				return;
 			} 
-		} else if (channelEvent.toString().contains("DISCONNECTED") || 
-				channelEvent.toString().contains("CLOSED")) {
-			if(key != null && randomKey != null) {
-				putMessenger.removeQueue(key, randomKey);
-				putQueue = null;
-			}
 		}
 		channelHandlerContext.sendUpstream( channelEvent );
 	}
@@ -233,14 +226,8 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 
 			if(!(msg instanceof EucalyptusErrorMessageType)&&!(msg instanceof ExceptionResponseType)) {
 				binding = BindingManager.getBinding( super.getNamespace( ) );
-				if(putQueue != null) {
-					putQueue = null;
-				}
 			} else {
 				binding = BindingManager.getDefaultBinding( );
-				if(putQueue != null) {
-					putQueue = null;
-				}
 			}
 			if(msg != null) {
 				ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
@@ -538,7 +525,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						operationParams.put("ContentLength", (new Long(contentLength).toString()));
 					operationParams.put(ObjectStorageProperties.Headers.RandomKey.toString(), randomKey);					
 					//TODO: This is PostObject.
-					putQueue = getWriteMessenger().interruptAllAndGetQueue(key, randomKey);
 					handleFirstChunk(httpRequest, (ChannelBuffer)formFields.get(ObjectStorageProperties.IGNORE_PREFIX + "FirstDataChunk"), contentLength);
 				} else if(ObjectStorageProperties.HTTPVerb.PUT.toString().equals(verb)) {  
 					if(params.containsKey(ObjectStorageProperties.BucketParameter.logging.toString())) {
@@ -1277,22 +1263,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 		return new String( read );
 	}
 
-	protected void handleHttpChunk(HttpChunk httpChunk) throws Exception {
-		ChannelBuffer buffer = httpChunk.getContent();
-		try {
-			buffer.markReaderIndex( );
-			byte[] read = new byte[buffer.readableBytes( )];
-			buffer.readBytes( read );
-			while((putQueue != null) && (!putQueue.offer(ObjectStorageDataMessage.DataMessage(read), 500, TimeUnit.MILLISECONDS)));
-			if(httpChunk.isLast()) {
-				while((putQueue != null) && (!putQueue.offer(ObjectStorageDataMessage.EOF(), 1000, TimeUnit.MILLISECONDS)));
-			}
-		} catch (Exception ex) {
-			LOG.error(ex, ex);
-		}
-
-	}
-
 	protected byte[] getFirstChunk(MappingHttpRequest httpRequest, long dataLength) throws Exception {
 		ChannelBuffer buffer = httpRequest.getContent();
 		try {
@@ -1308,33 +1278,9 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 	}
 
 	protected void handleFirstChunk(MappingHttpRequest httpRequest, long dataLength) {
-		ChannelBuffer buffer = httpRequest.getContent();
-		try {
-			putQueue.put(ObjectStorageDataMessage.StartOfData(dataLength));
-			buffer.markReaderIndex( );
-			byte[] read = new byte[buffer.readableBytes( )];
-			buffer.readBytes( read );
-			putQueue.put(ObjectStorageDataMessage.DataMessage(read));
-			if(!httpRequest.isChunked())
-				putQueue.put(ObjectStorageDataMessage.EOF());
-		} catch (Exception ex) {
-			LOG.error(ex, ex);
-		}
-
 	}
 
 	protected void handleFirstChunk(MappingHttpRequest httpRequest, ChannelBuffer firstChunk, long dataLength) {
-		try {
-			putQueue.put(ObjectStorageDataMessage.StartOfData(dataLength));
-			byte[] read = new byte[firstChunk.readableBytes( )];
-			firstChunk.readBytes( read );
-			putQueue.put(ObjectStorageDataMessage.DataMessage(read));
-			if(!httpRequest.isChunked())
-				putQueue.put(ObjectStorageDataMessage.EOF());
-		} catch (Exception ex) {
-			LOG.error(ex, ex);
-		}
-
 	}
 
 
@@ -1359,12 +1305,10 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 
 			try {
 				LOG.info("Starting upload");                
-				putQueue.put(ObjectStorageDataMessage.StartOfData(dataLength));
 
 				firstBuffer.markReaderIndex( );
 				byte[] read = new byte[firstBuffer.readableBytes( )];
 				firstBuffer.readBytes( read );
-				putQueue.put(ObjectStorageDataMessage.DataMessage(read));
 				//putQueue.put(ObjectStorageDataMessage.EOF());
 
 			} catch (Exception ex) {

@@ -65,8 +65,10 @@ package com.eucalyptus.component;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+
 import org.apache.log4j.Logger;
 import org.mule.util.queue.QueueConfiguration;
+
 import com.eucalyptus.bootstrap.Bootstrap;
 import com.eucalyptus.bootstrap.Bootstrapper;
 import com.eucalyptus.bootstrap.Provides;
@@ -106,6 +108,9 @@ public class ServiceOperations {
     return serviceOperations.containsKey( msg.getClass( ) ) ? Ats.from( serviceOperations.get( msg.getClass( ) ) ).get( ServiceOperation.class ).user( ) : false;
   }
 
+  public static boolean isAsyncOperation( final BaseMessage msg ) {
+	return serviceOperations.containsKey( msg.getClass( ) ) ? Ats.from( serviceOperations.get( msg.getClass( ) ) ).get( ServiceOperation.class ).async( ) : true;
+  }
   
   public static class ServiceOperationDiscovery extends ServiceJarDiscovery {
     
@@ -187,7 +192,7 @@ public class ServiceOperations {
   }
   
   @SuppressWarnings( "unchecked" )
-  public static <I extends BaseMessage, O extends BaseMessage> void dispatch( final I request ) {
+  public static <I extends BaseMessage, O extends BaseMessage> void dispatch( final I request ) throws Exception {
     if ( !serviceOperations.containsKey( request.getClass( ) ) || !StackConfiguration.OOB_INTERNAL_OPERATIONS ) {
       try {
         ServiceContext.dispatch( RequestQueue.ENDPOINT, request );
@@ -202,7 +207,7 @@ public class ServiceOperations {
           
           @Override
           public Object call( ) throws Exception {
-            if ( StackConfiguration.ASYNC_INTERNAL_OPERATIONS ) {
+            if ( StackConfiguration.ASYNC_INTERNAL_OPERATIONS && ServiceOperations.isAsyncOperation(request) ) {
               Threads.enqueue( Empyrean.class, ServiceOperations.class, new Callable<Boolean>( ) {
                 
                 @Override
@@ -225,7 +230,7 @@ public class ServiceOperations {
         } ).call( );
       } catch ( final Exception ex ) {
         Logs.extreme( ).error( ex, ex );
-        Contexts.responseError( request.getCorrelationId( ), ex );
+        throw ex;
       }
     }
   }
@@ -237,7 +242,7 @@ public class ServiceOperations {
       Contexts.response( reply );
     } catch ( final Exception ex ) {
       Logs.extreme( ).error( ex, ex );
-      Contexts.responseError( request.getCorrelationId( ), ex );
+      throw ex;
     } finally {
       Contexts.removeThreadLocal( );
     }

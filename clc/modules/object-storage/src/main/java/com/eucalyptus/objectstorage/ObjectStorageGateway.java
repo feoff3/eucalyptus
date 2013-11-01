@@ -285,7 +285,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	}
 
 	/* PUT object */
-	@ServiceOperation
+	@ServiceOperation (async = false)
 	public enum HandleFirstChunk implements Function<PutObjectType, Object> {
 		INSTANCE;
 			
@@ -357,7 +357,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 	}
 
-	@ServiceOperation
+	@ServiceOperation (async = false)
 	public enum HandleChunk implements Function<BaseDataChunk, Object> {
 		INSTANCE;
 		private static final int retryCount = 15;
