@@ -157,6 +157,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		synchronized(ObjectStorageGateway.class) {
 			if(ospClient == null) {		
 				//TODO: zhill - wtf? Is this just priming the config? why is it unused.
+				//lol yes. Lame, must be fixed.
 				ObjectStorageGatewayInfo osgInfo = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo();
 				try {
 					ospClient = ObjectStorageProviders.getInstance();
