@@ -98,7 +98,7 @@ public class ObjectStorageHEADOutboundHandler extends MessageStackHandler {
 				if(errMsg instanceof ObjectStorageErrorMessageType) {
 					ObjectStorageErrorMessageType objErrorMsg = (ObjectStorageErrorMessageType) errMsg;
 					httpResponse.setStatus(objErrorMsg.getStatus());
-				}				
+				}		
 			}
 			
 			//Since a HEAD response, never include a body

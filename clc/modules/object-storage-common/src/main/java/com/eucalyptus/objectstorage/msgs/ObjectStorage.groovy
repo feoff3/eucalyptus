@@ -166,10 +166,6 @@ public class ObjectStorageDataGetRequestType extends ObjectStorageDataRequestTyp
 	}
 }
 
-//TODO: zhill, remove these types, should be handled by the Verb-specific pipelines
-public class ObjectStorageDeleteType extends ObjectStorageRequestType {}
-public class ObjectStorageDeleteResponseType extends ObjectStorageResponseType {}
-
 public class ObjectStorageErrorMessageType extends BaseMessage {
 	protected String message;
 	protected String code;
@@ -268,17 +264,13 @@ public class ListAllMyBucketsResponseType extends ObjectStorageResponseType {
 	ListAllMyBucketsList bucketList;	
 }
 
-//TODO: zhill -- remove this type, pipeline should handle this
-public class ObjectStorageHeadRequestType extends ObjectStorageRequestType {}
-public class ObjectStorageHeadResponseType extends ObjectStorageResponseType {}
-
 /* HEAD /bucket */
 @AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_GETOBJECT])
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
-public class HeadBucketType extends ObjectStorageHeadRequestType {}
-public class HeadBucketResponseType extends ObjectStorageHeadResponseType{}
+public class HeadBucketType extends ObjectStorageRequestType {}
+public class HeadBucketResponseType extends ObjectStorageResponseType{}
 
 /* PUT /bucket */
 @AdminOverrideAllowed
@@ -306,8 +298,8 @@ public class CreateBucketResponseType extends ObjectStorageResponseType {
 @RequiresPermission([PolicySpec.S3_DELETEBUCKET])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 @RequiresACLPermission(object=[], bucket=[]) //No ACLs for deleting a bucket
-public class DeleteBucketType extends ObjectStorageDeleteType {}
-public class DeleteBucketResponseType extends ObjectStorageDeleteResponseType {}
+public class DeleteBucketType extends ObjectStorageRequestType {}
+public class DeleteBucketResponseType extends ObjectStorageResponseType {}
 
 
 public class ObjectStorageDataGetResponseType extends ObjectStorageDataResponseType {
@@ -457,8 +449,8 @@ public class PutObjectInlineResponseType extends ObjectStorageDataResponseType {
 @RequiresPermission([PolicySpec.S3_DELETEOBJECT])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 @RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
-public class DeleteObjectType extends ObjectStorageDeleteType {}
-public class DeleteObjectResponseType extends ObjectStorageDeleteResponseType {
+public class DeleteObjectType extends ObjectStorageRequestType {}
+public class DeleteObjectResponseType extends ObjectStorageResponseType {
 	String code;
 	String description;
 }
@@ -468,11 +460,11 @@ public class DeleteObjectResponseType extends ObjectStorageDeleteResponseType {
 @RequiresPermission([PolicySpec.S3_DELETEOBJECTVERSION])
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
 @RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
-public class DeleteVersionType extends ObjectStorageDeleteType {
+public class DeleteVersionType extends ObjectStorageRequestType {
 	String versionid;
 }
 
-public class DeleteVersionResponseType extends ObjectStorageDeleteResponseType {
+public class DeleteVersionResponseType extends ObjectStorageResponseType {
 	String code;
 	String description;
 }
