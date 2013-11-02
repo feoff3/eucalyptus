@@ -371,7 +371,38 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	 */
 	@Override
 	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("HeadBucket");
+		HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+
+		}	
+
+		// call the storage manager to save the bucket to disk
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			com.amazonaws.services.s3.model.AccessControlList responseList = s3Client.getBucketAcl(request.getBucket());
+			reply.setBucket(request.getBucket());			
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+
+		return reply;		
+
 	}
 
 	@Override
