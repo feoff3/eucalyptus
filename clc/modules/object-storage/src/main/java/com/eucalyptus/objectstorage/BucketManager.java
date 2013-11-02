@@ -25,11 +25,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
-import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 
 /**
@@ -126,7 +122,7 @@ public interface BucketManager {
 	public abstract <T> T delete(Bucket bucketEntity, 
 			CallableWithRollback<T,?> resourceModifier) throws TransactionException, S3Exception;
 		
-	public abstract <T> T setAcl(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
+	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
 	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;
 	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;	
 }

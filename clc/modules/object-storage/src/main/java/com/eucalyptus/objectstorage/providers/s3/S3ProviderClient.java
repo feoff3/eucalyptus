@@ -45,6 +45,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.BucketLoggingConfiguration;
 import com.amazonaws.services.s3.model.BucketVersioningConfiguration;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
@@ -62,6 +63,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.model.S3VersionSummary;
+import com.amazonaws.services.s3.model.SetBucketLoggingConfigurationRequest;
 import com.amazonaws.services.s3.model.SetBucketVersioningConfigurationRequest;
 import com.amazonaws.services.s3.model.VersionListing;
 import com.eucalyptus.auth.Accounts;
@@ -109,14 +111,10 @@ import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PutObjectType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
@@ -133,6 +131,7 @@ import com.eucalyptus.storage.msgs.s3.Grantee;
 import com.eucalyptus.storage.msgs.s3.Group;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
+import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
 import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.storage.msgs.s3.VersionEntry;
@@ -615,31 +614,27 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	}
 
 	@Override
-	public SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(
-			SetBucketAccessControlPolicyType request)
-					throws EucalyptusCloudException {
-		throw new NotImplementedException("SetBucketACP");
-	}
-
-	@Override
 	public SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(
 			SetRESTBucketAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("SetBucketACP");
-	}
-
-	@Override
-	public SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(
-			SetObjectAccessControlPolicyType request)
-					throws EucalyptusCloudException {
-		throw new NotImplementedException("SetObjectACP");
+		//This is a no-op in the current design because we track ACP at the OSG only. Backend uses all 'private'
+		SetRESTBucketAccessControlPolicyResponseType reply = (SetRESTBucketAccessControlPolicyResponseType)request.getReply();
+		reply.setBucket(request.getBucket());
+		reply.setStatus(HttpResponseStatus.OK);
+		reply.setStatusMessage("OK");
+		return reply;
 	}
 
 	@Override
 	public SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(
 			SetRESTObjectAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		throw new NotImplementedException("SetObjectACP");
+		//This is a no-op in the current design because we track ACP at the OSG only. Backend uses all 'private'
+		SetRESTObjectAccessControlPolicyResponseType reply = (SetRESTObjectAccessControlPolicyResponseType)request.getReply();
+		reply.setBucket(request.getBucket());
+		reply.setStatus(HttpResponseStatus.OK);
+		reply.setStatusMessage("OK");
+		return reply;
 	}
 	
 	@Override
@@ -820,16 +815,93 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		throw new NotImplementedException("Copy Object");
 	}
 
+	/* NOTE: bucket logging grants don't work because there is no way to specify them via the
+	 * S3 Java SDK. Need to add that functionality ourselves if we want it on the backend directly
+	 * 
+	 * (non-Javadoc)
+	 * @see com.eucalyptus.objectstorage.ObjectStorageProviderClient#setBucketLoggingStatus(com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusType)
+	 */
 	@Override
 	public SetBucketLoggingStatusResponseType setBucketLoggingStatus(
 			SetBucketLoggingStatusType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("SetLoggingSTatus");
+		SetBucketLoggingStatusResponseType reply = (SetBucketLoggingStatusResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			BucketLoggingConfiguration config = new BucketLoggingConfiguration();
+			LoggingEnabled requestConfig = request.getLoggingEnabled();
+			config.setDestinationBucketName(requestConfig == null ? null : requestConfig.getTargetBucket());
+			config.setLogFilePrefix(requestConfig == null ? null : requestConfig.getTargetPrefix());
+			
+			SetBucketLoggingConfigurationRequest loggingRequest = new SetBucketLoggingConfigurationRequest(request.getBucket(), config);			
+			s3Client.setBucketLoggingConfiguration(loggingRequest);
+			reply.setStatus(HttpResponseStatus.OK);
+			reply.setStatusMessage("OK");
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override
 	public GetBucketLoggingStatusResponseType getBucketLoggingStatus(
-			GetBucketLoggingStatusType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("GetLoggingStatus");
+			GetBucketLoggingStatusType request) throws EucalyptusCloudException {		
+		GetBucketLoggingStatusResponseType reply = (GetBucketLoggingStatusResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}
+		
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			BucketLoggingConfiguration loggingConfig = s3Client.getBucketLoggingConfiguration(request.getBucket());
+			LoggingEnabled loggingEnabled = new LoggingEnabled();
+			if(loggingConfig == null || !loggingConfig.isLoggingEnabled()) {
+				//Do nothing, logging is disabled
+			} else {
+				//S3 SDK does not provide a way to fetch the grants on the destination logging
+				loggingEnabled.setTargetBucket(loggingConfig.getDestinationBucketName());
+				loggingEnabled.setTargetPrefix(loggingConfig.getLogFilePrefix());
+			}
+			reply.setLoggingEnabled(loggingEnabled);
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		
+		return reply;
 	}
 
 	@Override

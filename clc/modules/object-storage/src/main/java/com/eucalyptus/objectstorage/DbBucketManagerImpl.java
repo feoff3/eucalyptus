@@ -23,7 +23,6 @@ package com.eucalyptus.objectstorage;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nonnull;
@@ -43,14 +42,9 @@ import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyExistsException;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketAlreadyOwnedByYouException;
-import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
-import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
-import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketStateException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
-import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
-import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 
@@ -295,7 +289,8 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 	
-	public <T> T setAcl(@Nonnull Bucket bucketEntity, 
+	@Override
+	public <T> T setAcp(@Nonnull Bucket bucketEntity, 
 			@Nonnull String acl, 
 			@Nullable CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception {
 		EntityTransaction db = Entities.get(Bucket.class);
@@ -338,6 +333,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 	
+	@Override
 	public <T> T setLoggingStatus(@Nonnull Bucket bucketEntity, 
 			@Nonnull Boolean loggingEnabled, 
 			@Nullable String destBucket, 

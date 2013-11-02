@@ -114,14 +114,10 @@ import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
@@ -329,17 +325,7 @@ public class WalrusProviderClient extends S3ProviderClient {
 			throw e;
 		}
 	}
-
-	@Override
-	public SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(SetBucketAccessControlPolicyType request) throws EucalyptusCloudException {
-		try {
-			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.SetBucketAccessControlPolicyType.class, com.eucalyptus.walrus.msgs.SetBucketAccessControlPolicyResponseType.class);			
-		} catch (EucalyptusCloudException e) {
-			LOG.error("Error response from Walrus", e);
-			throw e;
-		}
-	}
-
+	
 	@Override
 	public SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(SetRESTBucketAccessControlPolicyType request) throws EucalyptusCloudException {
 		try {
@@ -457,16 +443,6 @@ public class WalrusProviderClient extends S3ProviderClient {
 	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		try {
 			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.GetObjectAccessControlPolicyType.class, com.eucalyptus.walrus.msgs.GetObjectAccessControlPolicyResponseType.class);			
-		} catch (EucalyptusCloudException e) {
-			LOG.error("Error response from Walrus", e);
-			throw e;
-		}
-	}
-
-	@Override
-	public SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(SetObjectAccessControlPolicyType request) throws EucalyptusCloudException {	
-		try {
-			return proxyRequest(Contexts.lookup(), request, com.eucalyptus.walrus.msgs.SetObjectAccessControlPolicyType.class, com.eucalyptus.walrus.msgs.SetObjectAccessControlPolicyResponseType.class);			
 		} catch (EucalyptusCloudException e) {
 			LOG.error("Error response from Walrus", e);
 			throw e;

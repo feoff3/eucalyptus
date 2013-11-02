@@ -24,6 +24,8 @@ import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 
 /**
  * Interface for interacting with object metadata (not content directly)
@@ -104,5 +106,7 @@ public interface ObjectManager {
 	 * @param versionIdSupplier
 	 */
 	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws S3Exception, TransactionException;
+	
+	public abstract <T extends SetRESTObjectAccessControlPolicyResponseType, F> T setAcp(ObjectEntity object, AccessControlPolicy acp, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
 	
 }

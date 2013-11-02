@@ -41,6 +41,8 @@ import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.google.common.base.Strings;
 
 /**
@@ -175,6 +177,56 @@ public class DbObjectManagerImpl implements ObjectManager {
 			throw new InternalErrorException(object.getBucketName() + "/" + object.getObjectKey());
 		}
 	}
+	
+	@Override
+	public <T extends SetRESTObjectAccessControlPolicyResponseType, F> T setAcp(ObjectEntity object, AccessControlPolicy acp, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
+		T result = null;
+		try {			
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {
+				if(resourceModifier != null) {
+					result = resourceModifier.call();
+				}
+				
+				//Do record swap if existing record is found.
+				ObjectEntity extantEntity = null;
+				extantEntity = Entities.merge(object);
+				extantEntity.setAcl(acp);
+				db.commit();
+				return result;
+			} catch (Exception e) {
+				LOG.error("Error updating ACP on object " + object.getBucketName() + "/" + object.getObjectKey() + "?versionId=" + object.getVersionId());
+				throw e;
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
+		} catch(S3Exception e) {
+			LOG.error("Error setting ACP on backend for object: " + object.getBucketName() + "/" + object.getObjectKey());
+			try {
+				//Call the rollback. It is up to the provider to ensure the rollback is correct for that backend
+				if(resourceModifier != null) {
+					resourceModifier.rollback(result);
+				}
+			} catch(Exception ex) {
+				LOG.error("Error rolling back object ACP put",ex);
+			}
+			throw e;
+		} catch(Exception e) {
+			LOG.error("Error setting ACP on backend for object: " + object.getBucketName() + "/" + object.getObjectKey());
+			
+			try {
+				if(resourceModifier != null) {
+					resourceModifier.rollback(result);
+				}
+			} catch(Exception ex) {
+				LOG.error("Error rolling back object ACP put",ex);
+			}			
+			throw new InternalErrorException(object.getBucketName() + "/" + object.getObjectKey() + "?versionId=" + object.getVersionId());
+		}
+	}
+
 
 	@Override
 	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey)

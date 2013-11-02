@@ -535,34 +535,6 @@ public class ListVersionsResponseType extends ObjectStorageResponseType {
 	ArrayList<PrefixEntry> commonPrefixes;
 }
 
-/* Currently these are SOAP variants of acl calls */
-@AdminOverrideAllowed
-@RequiresPermission([PolicySpec.S3_PUTBUCKETACL])
-@ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
-@RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE_ACP])
-public class SetBucketAccessControlPolicyType extends ObjectStorageRequestType {
-	AccessControlList accessControlList;
-}
-
-public class SetBucketAccessControlPolicyResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
-
-@AdminOverrideAllowed
-@RequiresPermission([PolicySpec.S3_PUTOBJECTACL])
-@ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
-@RequiresACLPermission(object=[ObjectStorageProperties.Permission.WRITE_ACP], bucket=[])
-public class SetObjectAccessControlPolicyType extends ObjectStorageRequestType {
-	AccessControlList accessControlList;
-	String versionId;
-}
-
-public class SetObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
-
 /* PUT /bucket?acl */
 //TODO: zhill -- remove this and have a single setACL type now that SOAP is removed
 @AdminOverrideAllowed

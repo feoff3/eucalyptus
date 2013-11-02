@@ -56,14 +56,10 @@ import com.eucalyptus.objectstorage.msgs.ListVersionsResponseType;
 import com.eucalyptus.objectstorage.msgs.ListVersionsType;
 import com.eucalyptus.objectstorage.msgs.PostObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.PostObjectType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketLoggingStatusType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusResponseType;
 import com.eucalyptus.objectstorage.msgs.SetBucketVersioningStatusType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyResponseType;
-import com.eucalyptus.objectstorage.msgs.SetObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
@@ -98,10 +94,6 @@ public interface ObjectStorageService {
 	public abstract ListAllMyBucketsResponseType listAllMyBuckets(
 			ListAllMyBucketsType request) throws EucalyptusCloudException;
 
-	public abstract GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(
-			GetBucketAccessControlPolicyType request)
-			throws EucalyptusCloudException;
-
 	public abstract PostObjectResponseType postObject(PostObjectType request)
 			throws EucalyptusCloudException;
 
@@ -111,20 +103,17 @@ public interface ObjectStorageService {
 	public abstract ListBucketResponseType listBucket(ListBucketType request)
 			throws EucalyptusCloudException;
 
-	public abstract GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
-			GetObjectAccessControlPolicyType request)
-			throws EucalyptusCloudException;
-
-	public abstract SetBucketAccessControlPolicyResponseType setBucketAccessControlPolicy(
-			SetBucketAccessControlPolicyType request)
-			throws EucalyptusCloudException;
-
-	public abstract SetObjectAccessControlPolicyResponseType setObjectAccessControlPolicy(
-			SetObjectAccessControlPolicyType request)
+	public abstract GetBucketAccessControlPolicyResponseType getBucketAccessControlPolicy(
+			GetBucketAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
 	public abstract SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(
 			SetRESTBucketAccessControlPolicyType request)
+			throws EucalyptusCloudException;
+
+
+	public abstract GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
+			GetObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
 	public abstract SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(
