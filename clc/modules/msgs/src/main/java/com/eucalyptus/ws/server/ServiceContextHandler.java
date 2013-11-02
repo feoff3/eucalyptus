@@ -91,10 +91,12 @@ import com.eucalyptus.records.EventClass;
 import com.eucalyptus.records.EventRecord;
 import com.eucalyptus.records.EventType;
 import com.eucalyptus.records.Logs;
+import com.eucalyptus.util.RESTException;
 
 import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 import edu.ucsb.eucalyptus.msgs.BaseMessageSupplier;
+import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
 
 public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDownstreamHandler {
@@ -206,7 +208,7 @@ public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDow
       e.getFuture( ).addListener( ChannelFutureListener.CLOSE );
       ctx.sendUpstream( e );
     } else if ( request != null && msg != null ) {
-      this.messageReceived( ctx, msg );
+      this.messageReceived( ctx, msg, e );
       ctx.sendUpstream( e );
     } else if( chunk != null && (chunk.getCorrelationId() != null)) {
     	//Handle HTTP chunk types
@@ -226,11 +228,20 @@ public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDow
 	    ServiceOperations.dispatchChunk( chunk );
   }
   
-  private void messageReceived( final ChannelHandlerContext ctx, final BaseMessage msg ) throws ServiceDispatchException {
+  private void messageReceived( final ChannelHandlerContext ctx, final BaseMessage msg, ChannelEvent channelEvent) throws ServiceDispatchException {
     this.startTime.set( ctx.getChannel( ), System.currentTimeMillis( ) );
     this.messageType.set( ctx.getChannel( ), msg );
     EventRecord.here( ServiceContextHandler.class, EventType.MSG_RECEIVED, msg.getClass( ).getSimpleName( ) ).trace( );
-    ServiceOperations.dispatch( msg );
+    try {
+      ServiceOperations.dispatch( msg );
+    } catch (Exception e) {
+      if(e.getCause() != null) {
+    	  if(e.getCause() instanceof RESTException) {
+    		  RESTException exception = (RESTException) e.getCause();
+              Contexts.response( new ExceptionResponseType( msg.getReply(), exception.getMessage( ), exception.getStatus(), exception )  );
+    	  }
+      }
+    }
   }
   
   private void channelClosed( ChannelHandlerContext ctx, ChannelStateEvent evt ) {

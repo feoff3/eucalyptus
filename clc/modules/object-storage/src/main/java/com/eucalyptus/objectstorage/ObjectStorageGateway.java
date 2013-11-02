@@ -158,6 +158,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		synchronized(ObjectStorageGateway.class) {
 			if(ospClient == null) {		
 				//TODO: zhill - wtf? Is this just priming the config? why is it unused.
+				//lol yes. Lame, must be fixed.
 				ObjectStorageGatewayInfo osgInfo = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo();
 				try {
 					ospClient = ObjectStorageProviders.getInstance();
@@ -300,7 +301,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	}
 
 	/* PUT object */
-	@ServiceOperation
+	@ServiceOperation (async = false)
 	public enum HandleFirstChunk implements Function<PutObjectType, Object> {
 		INSTANCE;
 			
@@ -372,7 +373,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 	}
 
-	@ServiceOperation
+	@ServiceOperation (async = false)
 	public enum HandleChunk implements Function<BaseDataChunk, Object> {
 		INSTANCE;
 		private static final int retryCount = 15;

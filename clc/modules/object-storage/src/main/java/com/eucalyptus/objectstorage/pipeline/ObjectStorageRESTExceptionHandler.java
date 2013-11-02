@@ -50,7 +50,11 @@ public class ObjectStorageRESTExceptionHandler extends SimpleChannelUpstreamHand
 	@Override
 	public void exceptionCaught(final ChannelHandlerContext ctx, final ExceptionEvent e) throws Exception {
 		final Channel ch = e.getChannel();
-		final Throwable cause = e.getCause();
+		Throwable cause = e.getCause();
+		if (cause.getCause() != null) {
+			//wrapped exception
+			cause = cause.getCause();
+		}
 		HttpResponseStatus status = null;
 		String code = null;
 		String resource = null;
@@ -101,5 +105,6 @@ public class ObjectStorageRESTExceptionHandler extends SimpleChannelUpstreamHand
 		if (ctx.getChannel().isConnected()) {
 			Channels.write(ctx, writeFuture, response);
 		}
+		ctx.sendDownstream(e);
 	}
 }

@@ -60,21 +60,17 @@
  *   NEEDED TO COMPLY WITH ANY SUCH LICENSES OR RIGHTS.
  ************************************************************************/
 
-package com.eucalyptus.objectstorage.exceptions;
+package com.eucalyptus.util;
 
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
-import com.eucalyptus.storage.msgs.BucketLogData;
-import com.eucalyptus.util.RESTException;
+public class RESTException extends EucalyptusCloudException {
 
-@SuppressWarnings("serial")
-public class ObjectStorageException extends RESTException {	
 	String message;
 	String code;
 	HttpResponseStatus status;
 	String resourceType;
     String resource;
-    BucketLogData logData;
     
 	public void setStatus(HttpResponseStatus status) {
 		this.status = status;
@@ -96,12 +92,12 @@ public class ObjectStorageException extends RESTException {
 		this.resource = resource;
 	}
 
-	public ObjectStorageException()
+	public RESTException()
 	{
 		super();
 	}
 
-	public ObjectStorageException(String message)
+	public RESTException(String message)
 	{
 		super(message);
 		this.message = message;
@@ -109,7 +105,7 @@ public class ObjectStorageException extends RESTException {
 		this.status = HttpResponseStatus.INTERNAL_SERVER_ERROR;
 	}
 
-	public ObjectStorageException(String code, String message, String resourceType, String resource, HttpResponseStatus status)
+	public RESTException(String code, String message, String resourceType, String resource, HttpResponseStatus status)
 	{
 		super(message);
 		this.code = code;
@@ -117,12 +113,6 @@ public class ObjectStorageException extends RESTException {
 		this.resourceType = resourceType;
 		this.resource = resource;
 		this.status = status;
-	}
-
-	public ObjectStorageException(String code, String message, String resourceType, String resource, HttpResponseStatus status, BucketLogData logData)
-	{
-		this(code, message, resourceType, resource, status);
-		this.logData = logData;
 	}
 
 	public String getMessage() {
@@ -145,16 +135,9 @@ public class ObjectStorageException extends RESTException {
 		return resource;		
 	}
 	
-	public ObjectStorageException(String message, Throwable ex)
+	public RESTException(String message, Throwable ex)
 	{
 		super(message,ex);
 	}
 
-	public BucketLogData getLogData() {
-		return logData;
-	}
-
-	public void setLogData(BucketLogData logData) {
-		this.logData = logData;
-	}	
 }

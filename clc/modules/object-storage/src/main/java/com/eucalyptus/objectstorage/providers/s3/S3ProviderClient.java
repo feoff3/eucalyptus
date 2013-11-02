@@ -20,8 +20,13 @@
 
 package com.eucalyptus.objectstorage.providers.s3;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -159,10 +164,9 @@ import com.google.common.base.Strings;
 public class S3ProviderClient extends ObjectStorageProviderClient {
 	private static final Logger LOG = Logger.getLogger(S3ProviderClient.class); 
 	private static final int CONNECTION_TIMEOUT_MS = 500;
-	
 	protected boolean usePathStyle = true;
 	protected AmazonS3Client s3Client = null; //Single shared client. May need to expand this to a pool
-	
+
 	public boolean usePathStyle() {
 		return usePathStyle;
 	}
@@ -170,7 +174,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public void setUsePathStyle(boolean usePathStyle) {
 		this.usePathStyle = usePathStyle;
 	}
-	
+
 	/**
 	 * Returns a usable S3 Client configured to send requests to the currently configured
 	 * endpoint with the currently configured credentials.
@@ -210,14 +214,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	protected static AccessControlPolicy sdkAclToEucaAcl(com.amazonaws.services.s3.model.AccessControlList s3Acl) {
 		if(s3Acl == null) { return null; }		
 		AccessControlPolicy acp = new AccessControlPolicy();
-		
+
 		acp.setOwner(new CanonicalUser(acp.getOwner().getID(), acp.getOwner().getDisplayName()));
 		if(acp.getAccessControlList() == null) {
 			acp.setAccessControlList(new AccessControlList());
 		}
 		Grantee grantee = null;
 		for(com.amazonaws.services.s3.model.Grant g : s3Acl.getGrants()) {
-			
+
 			grantee = new Grantee();
 			if(g.getGrantee() instanceof CanonicalGrantee) {
 				grantee.setCanonicalUser(new CanonicalUser(g.getGrantee().getIdentifier(),((CanonicalGrantee)g.getGrantee()).getDisplayName()));
@@ -226,13 +230,13 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			} else if(g.getGrantee() instanceof EmailAddressGrantee) {
 				grantee.setEmailAddress(g.getGrantee().getIdentifier());
 			}
-			
+
 			acp.getAccessControlList().getGrants().add(new Grant(grantee, g.getPermission().toString()));
 		}
-		
+
 		return acp;
 	}
-	
+
 	/**
 	 * Maps the request credentials to another set of credentials. This implementation maps
 	 * all Eucalyptus credentials to a single s3/backend credential.
@@ -246,7 +250,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	protected BasicAWSCredentials mapCredentials(User requestUser, String requestAWSAccessKeyId) throws NoSuchElementException, IllegalArgumentException {
 		return new BasicAWSCredentials(S3ProviderConfiguration.getS3AccessKey(), S3ProviderConfiguration.getS3SecretKey());
 	}
-	
+
 	protected ObjectMetadata getS3ObjectMetadata(PutObjectType request) {
 		ObjectMetadata meta = new ObjectMetadata();
 		if(request.getMetaData() != null) {
@@ -254,22 +258,22 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				meta.addUserMetadata(m.getName(), m.getValue());
 			}
 		}
-		
+
 		if(!Strings.isNullOrEmpty(request.getContentLength())) {
 			meta.setContentLength(Long.parseLong(request.getContentLength()));
 		}
-		
+
 		if(!Strings.isNullOrEmpty(request.getContentMD5())) {		
 			meta.setContentMD5(request.getContentMD5());
 		}
-		
+
 		if(!Strings.isNullOrEmpty(request.getContentType())) {
 			meta.setContentType(request.getContentType());
 		}
 
 		return meta;
 	}
-	
+
 	@Override
 	public void initialize() throws EucalyptusCloudException {
 		LOG.debug("Initializing");		
@@ -278,10 +282,20 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public void check() throws EucalyptusCloudException {
-		LOG.debug("Checking");		
+		LOG.debug("Checking");
+		try {
+			new Socket(S3ProviderConfiguration.getS3EndpointHost(), S3ProviderConfiguration.getS3EndpointPort());
+		} catch (UnknownHostException e) {
+			//it is safe to do this because we won't try to execute an operation until enable returns successfully.
+			s3Client = null;
+			throw new EucalyptusCloudException("Host Exception. Unable to connect to S3 Endpoint: " + S3ProviderConfiguration.getS3Endpoint() + ". Please check configuration and network connection");
+		} catch (IOException e) {
+			s3Client = null;
+			throw new EucalyptusCloudException("Unable to connect to S3 Endpoint: " + S3ProviderConfiguration.getS3Endpoint() + ". Please check configuration and network connection");
+		}
 		LOG.debug("Check completed successfully");		
 	}
-	
+
 	@Override
 	public void checkPreconditions() throws EucalyptusCloudException {
 		LOG.debug("Checking preconditions");		
@@ -304,7 +318,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public void enable() throws EucalyptusCloudException {
-		LOG.debug("Enabling");	
+		LOG.debug("Enabling");
 		LOG.debug("Enable completed successfully");		
 	}
 
@@ -313,7 +327,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		LOG.debug("Disabling");		
 		LOG.debug("Disable completed successfully");
 	}
-		
+
 	/*
 	 * TODO: add multi-account support on backend and then this can be a pass-thru to backend for bucket listing.
 	 * Multiplexing a single eucalyptus account on the backend means we have to track all of the user buckets ourselves
@@ -328,17 +342,17 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			ListAllMyBucketsList myBucketList = new ListAllMyBucketsList();
 			myBucketList.setBuckets(new ArrayList<BucketListEntry>());
 			Context ctx = Contexts.lookup(request.getCorrelationId());
-			
+
 			//The s3 client types
 			AmazonS3Client s3Client = this.getS3Client(ctx.getUser(), request.getAccessKeyID());
 			ListBucketsRequest listRequest = new ListBucketsRequest();
-			
+
 			//Map s3 client result to euca response message
 			List<Bucket> result = s3Client.listBuckets(listRequest);
 			for(Bucket b : result) {
 				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToFormattedString(b.getCreationDate())));
 			}
-			
+
 			reply.setBucketList(myBucketList);
 			reply.setOwner(new CanonicalUser(ctx.getAccount().getCanonicalId(), ctx.getUser().getName()));
 		} catch (Exception e) {
@@ -369,16 +383,16 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
 				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
-			
+
 		}	
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -391,7 +405,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;		
 	}
 
@@ -404,16 +418,16 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			} catch(Exception ex) {
 				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
-			
+
 		}	
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -425,7 +439,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;		
 	}
 
@@ -440,7 +454,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -448,7 +462,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -461,10 +475,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
-	
+
 	@Override
 	public PutObjectResponseType putObject(PutObjectType request, InputStream inputData) throws EucalyptusCloudException {
 		try {
@@ -528,7 +542,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			listRequest.setMarker(Strings.isNullOrEmpty(request.getMarker()) ? null : request.getMarker());
 			listRequest.setMaxKeys((request.getMaxKeys() == null ? null : Integer.parseInt(request.getMaxKeys())));
 			listRequest.setPrefix(Strings.isNullOrEmpty(request.getPrefix()) ? null : request.getPrefix());
-			
+
 			ObjectListing response = s3Client.listObjects(listRequest);
 			/* Non-optional, must have non-null values */
 			reply.setName(request.getBucket());
@@ -540,14 +554,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			/* Optional */
 			reply.setNextMarker(response.getNextMarker());			
 			reply.setDelimiter(response.getDelimiter());
-			
+
 			if(reply.getContents() == null) {
 				reply.setContents(new ArrayList<ListEntry>());
 			}
 			if(reply.getCommonPrefixes() == null) {
 				reply.setCommonPrefixes(new ArrayList<PrefixEntry>());
 			}
-			
+
 			for(S3ObjectSummary obj : response.getObjectSummaries()) {
 				//Add entry, note that the canonical user is set based on requesting user, not returned user
 				reply.getContents().add(new ListEntry(
@@ -558,11 +572,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 						ObjectStorageGateway.buildCanonicalUser(Contexts.lookup(request.getCorrelationId()).getAccount()),
 						obj.getStorageClass()));
 			}
-			
+
 			for(String commonPrefix : response.getCommonPrefixes()) {
 				reply.getCommonPrefixes().add(new PrefixEntry(commonPrefix));
 			}
-			
+
 			return reply;
 		} catch(AmazonServiceException e) {
 			throw new S3Exception(e.getErrorCode(), e.getMessage(), HttpResponseStatus.valueOf(e.getStatusCode()));
@@ -588,7 +602,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -596,7 +610,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -609,7 +623,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
@@ -636,7 +650,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		reply.setStatusMessage("OK");
 		return reply;
 	}
-	
+
 	@Override
 	public GetObjectResponseType getObject(final GetObjectType request) throws EucalyptusCloudException {
 		AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
@@ -694,7 +708,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 	@Override
 	public GetObjectExtendedResponseType getObjectExtended(final GetObjectExtendedType request) throws EucalyptusCloudException {
-        //TODO: This is common. Stop repeating.
+		//TODO: This is common. Stop repeating.
 		User requestUser = null;
 		String canonicalId = null;
 		try {
@@ -703,7 +717,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 				canonicalId = requestUser.getAccount().getCanonicalId();
@@ -711,7 +725,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
-			
+
 		}	
 
 		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
@@ -785,7 +799,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -793,7 +807,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			String bucketLocation = s3Client.getBucketLocation(request.getBucket());
@@ -805,7 +819,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
@@ -914,7 +928,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -922,7 +936,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			BucketVersioningConfiguration versioning = s3Client.getBucketVersioningConfiguration(request.getBucket());
@@ -934,7 +948,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
@@ -949,7 +963,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -957,7 +971,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			BucketVersioningConfiguration config = new BucketVersioningConfiguration().withStatus(request.getVersioningStatus());
@@ -970,7 +984,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
@@ -984,7 +998,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -992,7 +1006,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}	
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			ListVersionsRequest listVersionsRequest = new ListVersionsRequest(request.getBucket(), 
@@ -1001,7 +1015,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 					request.getVersionIdMarker(), 
 					request.getDelimiter(), Integer.parseInt(request.getMaxKeys()));
 			VersionListing result = s3Client.listVersions(listVersionsRequest);
-			
+
 			CanonicalUser owner = null;
 			try {
 				owner = ObjectStorageGateway.buildCanonicalUser(requestUser.getAccount());				
@@ -1010,7 +1024,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				owner = null;
 				throw new AccountProblemException("Account for user " + requestUser.getUserId());
 			}
-			
+
 			//Populate result to euca
 			reply.setBucket(request.getBucket());
 			reply.setMaxKeys(result.getMaxKeys());
@@ -1020,13 +1034,13 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			reply.setIsTruncated(result.isTruncated());
 			reply.setVersionIdMarker(result.getVersionIdMarker());
 			reply.setKeyMarker(result.getKeyMarker());
-			
+
 			ArrayList<PrefixEntry> commonPrefixes = new ArrayList<PrefixEntry>();
 			for(String s : result.getCommonPrefixes()) {
 				commonPrefixes.add(new PrefixEntry(s));
 			}
 			reply.setCommonPrefixes(commonPrefixes);
-			
+
 			ArrayList<VersionEntry> versions = new ArrayList<VersionEntry>();
 			//TODO: this is wrong, deleteMarkers should be inline with Versions. This is just legacy
 			ArrayList<DeleteMarkerEntry> deleteMarkers = new ArrayList<DeleteMarkerEntry>();
@@ -1063,7 +1077,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 

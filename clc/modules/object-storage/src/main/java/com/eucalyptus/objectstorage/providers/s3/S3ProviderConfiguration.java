@@ -20,22 +20,24 @@
 
 package com.eucalyptus.objectstorage.providers.s3;
 
+import org.apache.http.protocol.HTTP;
+
 import com.eucalyptus.configurable.ConfigurableClass;
 import com.eucalyptus.configurable.ConfigurableField;
 import com.eucalyptus.configurable.ConfigurableFieldType;
 
 @ConfigurableClass( root = "objectstorage.s3provider", description = "Configuration for S3-compatible backend")
 public class S3ProviderConfiguration{
-	
+
 	@ConfigurableField( description = "External S3 endpoint.",
 			displayName = "s3_endpoint" )
 	public static String S3Endpoint  = "s3.amazonaws.com";
-	
+
 	@ConfigurableField( description = "External S3 Access Key.",
 			displayName = "s3_access_key", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
 	public static String S3AccessKey;
-	
+
 	@ConfigurableField( description = "External S3 Secret Key.",
 			displayName = "s3_secret_key", 
 			type = ConfigurableFieldType.KEYVALUEHIDDEN )
@@ -79,5 +81,25 @@ public class S3ProviderConfiguration{
 		S3Endpoint = endPoint;
 	}
 
+	public static String getS3EndpointHost() {
+		String[] s3EndpointParts = S3Endpoint.split(":");
+		if (s3EndpointParts.length > 0) {
+			return s3EndpointParts[0];
+		} else {
+			return null;
+		}
+	}
 
+	public static int getS3EndpointPort() {
+		String[] s3EndpointParts = S3Endpoint.split(":");
+		if (s3EndpointParts.length > 0) {
+			try {
+				return Integer.parseInt(s3EndpointParts[1]);
+			} catch (NumberFormatException e) {
+				return 80;
+			}
+		} else {
+			return 80; //default http port
+		}
+	}
 }

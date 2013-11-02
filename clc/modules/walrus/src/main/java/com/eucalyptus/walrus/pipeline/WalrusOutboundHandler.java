@@ -63,8 +63,10 @@
 package com.eucalyptus.walrus.pipeline;
 
 import org.apache.log4j.Logger;
+import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -83,7 +85,6 @@ import com.eucalyptus.walrus.util.WalrusUtil;
 import com.eucalyptus.ws.handlers.MessageStackHandler;
 
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
-
 import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
 import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 
