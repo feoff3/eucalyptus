@@ -952,7 +952,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			} catch (TransactionException e) {
 				LOG.error(e);
 			} catch(NoSuchElementException e) {
-				throw new NoSuchBucketException(request.getBucket());
+				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
 			}
 			
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {				
@@ -1022,8 +1022,29 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 */
 	@Override
 	public GetBucketLocationResponseType getBucketLocation(GetBucketLocationType request) throws EucalyptusCloudException {
-		logRequest(request);
-		return ospClient.getBucketLocation(request);
+		logRequest(request);		
+		Bucket bucket = null;
+		try {
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+		} catch(TransactionException e) {
+			throw new InternalErrorException(request.getBucket());
+		} catch(NoSuchElementException e) {
+			//Ok, bucket not found.
+			bucket = null;
+		}
+		
+		if(bucket == null) {
+			throw new NoSuchBucketException(request.getBucket());
+		} else {
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+				GetBucketLocationResponseType reply = (GetBucketLocationResponseType) request.getReply();
+				reply.setLocationConstraint(bucket.getLocation());
+				reply.setBucket(request.getBucket());
+				return reply;
+			} else {		
+				throw new AccessDeniedException(request.getBucket());			
+			}
+		}		
 	}
 
 	/* (non-Javadoc)

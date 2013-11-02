@@ -536,7 +536,6 @@ public class ListVersionsResponseType extends ObjectStorageResponseType {
 }
 
 /* PUT /bucket?acl */
-//TODO: zhill -- remove this and have a single setACL type now that SOAP is removed
 @AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_PUTBUCKETACL])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
@@ -560,7 +559,6 @@ public class SetRESTObjectAccessControlPolicyType extends ObjectStorageRequestTy
 	String versionId;
 }
 
-//TODO: zhill -- remove this and have a single setACL type now that SOAP is removed
 public class SetRESTObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
 	String code;
 	String description;
