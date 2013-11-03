@@ -20,7 +20,6 @@
 
 package com.eucalyptus.objectstorage.entities;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;

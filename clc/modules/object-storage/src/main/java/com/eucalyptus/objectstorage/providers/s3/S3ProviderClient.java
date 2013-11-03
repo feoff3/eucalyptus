@@ -429,6 +429,9 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			Bucket responseBucket = s3Client.createBucket(request.getBucket());
 			//Save the owner info in response?
+			reply.setBucket(request.getBucket());
+			reply.setStatus(HttpResponseStatus.OK);
+			reply.setStatusMessage("OK");
 		} catch(AmazonServiceException ex) {
 			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);

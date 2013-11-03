@@ -143,7 +143,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		newBucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
 		newBucket.setCreationDate(new Date());
 		
-		T result = null;		
+		T result = null;
 		try {
 			if(resourceModifier != null) {
 				result = resourceModifier.call();

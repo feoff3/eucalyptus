@@ -49,6 +49,7 @@ import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
+import com.eucalyptus.objectstorage.auth.AclUtils;
 import com.eucalyptus.objectstorage.auth.OSGAuthorizationHandler;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
@@ -337,7 +338,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					//Construct and set the ACP properly
 					AccessControlPolicy acp = new AccessControlPolicy();
 					acp.setOwner(buildCanonicalUser(requestUser.getAccount()));
-					acp.setAccessControlList(request.getAccessControlList());
+					acp.setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlList(), bucket.getOwnerCanonicalId(), requestUser.getAccount().getCanonicalId()));
 					objectEntity.setAcl(acp);
 					
 					return ObjectManagerFactory.getInstance().create(request.getBucket(),
@@ -524,9 +525,10 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
 
-				final AccessControlPolicy acPolicy = new AccessControlPolicy();
-				acPolicy.setAccessControlList(request.getAccessControlList());
+				final AccessControlPolicy acPolicy = new AccessControlPolicy();				
 				acPolicy.setOwner(new CanonicalUser(canonicalId,""));
+				acPolicy.setAccessControlList(
+						AclUtils.expandCannedAcl(request.getAccessControlList(), canonicalId, null));
 				
 				return BucketManagerFactory.getInstance().create(request.getBucket(),
 						canonicalId,
@@ -859,6 +861,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchKeyException(request.getBucket());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+				final String bucketOwnerCanonicalId = bucket.getOwnerCanonicalId();
+				
 				try {
 				return BucketManagerFactory.getInstance().setAcp(bucket, 
 						S3AccessControlledEntity.marshallACPToString(request.getAccessControlPolicy()), 
@@ -866,6 +870,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 					@Override
 					public SetRESTBucketAccessControlPolicyResponseType call() throws S3Exception, Exception {
+						request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerCanonicalId, null));
 						return ospClient.setRESTBucketAccessControlPolicy(request);
 					}
 
@@ -894,8 +899,10 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(final SetRESTObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
+		Bucket bucket = null;
 		try {
 			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), true, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
@@ -909,7 +916,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
 				SetRESTObjectAccessControlPolicyResponseType reply = (SetRESTObjectAccessControlPolicyResponseType)request.getReply();
-				
+				final String bucketOwnerId = bucket.getOwnerCanonicalId();
+				final String objectOwnerId = objectEntity.getOwnerCanonicalId();
 				try {
 					//Get the listing from the back-end and copy results in.
 					return ObjectManagerFactory.getInstance().setAcp(objectEntity, 
@@ -919,6 +927,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 								@Override
 								public SetRESTObjectAccessControlPolicyResponseType call()
 										throws S3Exception, Exception {
+									request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerId, objectOwnerId));
 									return ospClient.setRESTObjectAccessControlPolicy(request);
 									}
 
