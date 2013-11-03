@@ -348,32 +348,47 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 				//Nothing to do
 				return aclMap;
 			}
-			
+			Grantee grantee = null;
+			CanonicalUser canonicalUser = null;
+			Group group = null;
+			String email;
 			for(Grant g: srcList.getGrants()) {
-				if(g.getGrantee() == null || Strings.isNullOrEmpty(g.getPermission())) {
-					//Invalid message.
+				grantee = g.getGrantee();
+				if(grantee == null || Strings.isNullOrEmpty(g.getPermission())) {
+					//Invalid message. grant. No grantee.
 					return null;
+				} else {
+					canonicalUser = grantee.getCanonicalUser();
+					group = grantee.getGroup();
+					email = grantee.getEmailAddress();
 				}
 				
-				if(!Strings.isNullOrEmpty(g.getGrantee().getCanonicalUser().getID())) {
+				if(canonicalUser != null && !Strings.isNullOrEmpty(canonicalUser.getID())) {
 					//CanonicalId
 					try {
-						canonicalId = Accounts.lookupAccountByCanonicalId(g.getGrantee().getCanonicalUser().getID()).getCanonicalId();
+						//Check validity of the canonicalId
+						canonicalId = Accounts.lookupAccountByCanonicalId(canonicalUser.getID()).getCanonicalId();
 					} catch (AuthException e) {
-						//Invalid canonical Id.
-						return null;
-					}					
-				} else if(!Strings.isNullOrEmpty(g.getGrantee().getEmailAddress())) {
+						//For legacy support, also check the account Id. Euca used to use AccountId instead of canoncialId.
+						try {
+							canonicalId = Accounts.lookupAccountById(canonicalUser.getID()).getCanonicalId();
+						} catch(AuthException ex) {
+							//Neither canonical Id nor account id worked
+							return null;							
+						}
+					}										
+				} else if(!Strings.isNullOrEmpty(email)) {
 					//Email
 					try {
-						canonicalId = Accounts.lookupUserByEmailAddress(g.getGrantee().getEmailAddress()).getAccount().getCanonicalId();
+						canonicalId = Accounts.lookupUserByEmailAddress(email).getAccount().getCanonicalId();
 					} catch (AuthException e) {
 						//Invalid canonical Id.
 						return null;
 					}
-				} else if(g.getGrantee().getGroup() != null) {
+				} else if(group != null) {
 					try {
-						ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(g.getGrantee().getGroup().getUri());
+						//Check that the group is valid
+						ObjectStorageProperties.S3_GROUP groupUri = ObjectStorageProperties.S3_GROUP.valueOf(group.getUri());
 					} catch(IllegalArgumentException e) {
 						//Invalid group name
 						LOG.warn("Invalid group name when trying to map ACL grantee: " + g.getGrantee().getGroup().getUri());
@@ -381,7 +396,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					}
 					
 					//Group URI, use as canonicalId for now.
-					canonicalId = g.getGrantee().getGroup().getUri();					
+					canonicalId = group.getUri();					
 				}
 				
 				if(canonicalId == null) {
