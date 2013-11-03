@@ -385,7 +385,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 						//Invalid canonical Id.
 						return null;
 					}
-				} else if(group != null) {
+				} else if(group != null && !Strings.isNullOrEmpty(group.getUri())) {
 					try {
 						//Check that the group is valid
 						ObjectStorageProperties.S3_GROUP groupUri = ObjectStorageProperties.S3_GROUP.valueOf(group.getUri());
@@ -396,7 +396,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					}
 					
 					//Group URI, use as canonicalId for now.
-					canonicalId = group.getUri();					
+					canonicalId = group.getUri();
 				}
 				
 				if(canonicalId == null) {
@@ -411,7 +411,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 						//skip no-op grants
 					}
 				}
-			}			
+			}
 			return aclMap;
 		}
 	}

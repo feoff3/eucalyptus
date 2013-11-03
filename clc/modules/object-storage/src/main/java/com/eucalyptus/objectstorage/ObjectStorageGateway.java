@@ -530,10 +530,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				acPolicy.setAccessControlList(
 						AclUtils.expandCannedAcl(request.getAccessControlList(), canonicalId, null));
 				
+				String aclString = S3AccessControlledEntity.marshallACPToString(acPolicy);
+				if(aclString == null) {
+					LOG.error("Unexpectedly got null for acl string. Cannot complete bucket creation with null acl");
+					throw new InternalErrorException(request.getBucket());
+				}
+						
 				return BucketManagerFactory.getInstance().create(request.getBucket(),
 						canonicalId,
 						userId,
-						S3AccessControlledEntity.marshallACPToString(acPolicy), 
+						aclString,
 						request.getLocationConstraint(),
 						new CallableWithRollback<CreateBucketResponseType, Boolean>() {
 					public CreateBucketResponseType call() throws Exception {
