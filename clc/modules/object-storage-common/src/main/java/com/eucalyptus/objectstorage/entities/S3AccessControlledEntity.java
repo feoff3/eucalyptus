@@ -266,7 +266,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 				//Check if a group uri
 				ObjectStorageProperties.S3_GROUP groupId = null;
 				try {
-					groupId = ObjectStorageProperties.S3_GROUP.valueOf(entry.getKey());							
+					groupId = AclUtils.getGroupFromUri(entry.getKey());					
 				} catch(Exception e) {}				
 				if(groupId != null) {
 					grantee.setGroup(new Group(groupId.toString()));						
