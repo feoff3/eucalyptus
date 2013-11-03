@@ -49,7 +49,6 @@ import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
-import com.eucalyptus.objectstorage.auth.AclUtils;
 import com.eucalyptus.objectstorage.auth.OSGAuthorizationHandler;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
@@ -115,6 +114,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
+import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;

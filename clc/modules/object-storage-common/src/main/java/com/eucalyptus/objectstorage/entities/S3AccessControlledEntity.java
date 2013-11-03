@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import javax.persistence.Column;
 import javax.persistence.Lob;
@@ -41,6 +42,7 @@ import org.hibernate.annotations.Type;
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.entities.AbstractPersistent;
+import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
@@ -387,9 +389,11 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					}
 				} else if(group != null && !Strings.isNullOrEmpty(group.getUri())) {
 					try {
-						//Check that the group is valid
-						ObjectStorageProperties.S3_GROUP groupUri = ObjectStorageProperties.S3_GROUP.valueOf(group.getUri());
-					} catch(IllegalArgumentException e) {
+						ObjectStorageProperties.S3_GROUP foundGroup = AclUtils.getGroupFromUri(group.getUri());
+						if(foundGroup == null) {
+							throw new NoSuchElementException("URI: " + group.getUri() + " not found in group map");
+						}					
+					} catch(NoSuchElementException e) {
 						//Invalid group name
 						LOG.warn("Invalid group name when trying to map ACL grantee: " + g.getGrantee().getGroup().getUri());
 						return null;

@@ -1,8 +1,9 @@
-package com.eucalyptus.objectstorage.auth;
+package com.eucalyptus.objectstorage.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -11,7 +12,6 @@ import org.apache.log4j.Logger;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
@@ -32,6 +32,9 @@ public class AclUtils {
 	/* Use string as key since enum doesn't allow '-' which is in the ACL types. Allows a direct lookup from the msg */
 	private static final HashMap<String, Function<OwnerIdPair, List<Grant>>> cannedAclMap = new HashMap<String, Function<OwnerIdPair, List<Grant>>>();
 
+	//A lookup map for quick verification of group uris
+	private static final HashMap<String, ObjectStorageProperties.S3_GROUP> groupUriMap = new HashMap<String, ObjectStorageProperties.S3_GROUP>();
+	
 	static {		
 		//Populate the map
 		cannedAclMap.put(ObjectStorageProperties.CannedACL.private_only.toString(), PrivateOnlyGrantBuilder.INSTANCE);
@@ -42,6 +45,10 @@ public class AclUtils {
 		cannedAclMap.put(ObjectStorageProperties.CannedACL.bucket_owner_full_control.toString(), BucketOwnerFullControlGrantBuilder.INSTANCE);
 		cannedAclMap.put(ObjectStorageProperties.CannedACL.bucket_owner_read.toString(), BucketOwnerReadGrantBuilder.INSTANCE);
 		cannedAclMap.put(ObjectStorageProperties.CannedACL.log_delivery_write.toString(), LogDeliveryWriteGrantBuilder.INSTANCE);
+		
+		for(ObjectStorageProperties.S3_GROUP g : ObjectStorageProperties.S3_GROUP.values()) {
+			groupUriMap.put(g.toString(), g);
+		}
 	}
 	
 	/**
@@ -227,6 +234,13 @@ public class AclUtils {
 		}
 	};
 
+	public static ObjectStorageProperties.S3_GROUP getGroupFromUri(String uri) throws NoSuchElementException {
+		ObjectStorageProperties.S3_GROUP foundGroup = groupUriMap.get(uri);
+		if(foundGroup == null) {
+			throw new NoSuchElementException(uri);
+		}
+		return foundGroup;
+	}
 	
 	/**
 	 * Processes a list by finding all canned-acls and expanding those.
