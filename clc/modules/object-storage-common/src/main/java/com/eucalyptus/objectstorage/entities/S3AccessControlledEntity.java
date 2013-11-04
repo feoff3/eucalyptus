@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage.entities;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -274,9 +275,8 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),""));
 				}
 				
-				for(Grant g : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
-					g.setGrantee(grantee);
-					grants.add(g);
+				for(ObjectStorageProperties.Permission p : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
+					grants.add(new Grant(grantee, p.toString()));
 				}
 			}
 			acList.setGrants(grants);
@@ -426,40 +426,38 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * 
 	 * Represents the grant(s) for a single canonicalId/group
 	 */
-	protected enum AccountGrantsFromBitmap implements Function<Integer, Grant[]> {
+	protected enum AccountGrantsFromBitmap implements Function<Integer, List<ObjectStorageProperties.Permission>> {
 		INSTANCE;
 		
 		@Override
-		public Grant[] apply(Integer srcBitmap) {
+		public List<ObjectStorageProperties.Permission> apply(Integer srcBitmap) {
+			ArrayList<ObjectStorageProperties.Permission> permissions = new ArrayList<ObjectStorageProperties.Permission>();
 			if(srcBitmap == null) {
-				return null;
-			}
-			
-			Grant[] grants = new Grant[3];
+				return permissions;
+			}				
 			
 			if(BitmapGrant.allows(ObjectStorageProperties.Permission.FULL_CONTROL, srcBitmap)) {
-				grants = new Grant[] { new Grant() };				
-				grants[0].setPermission(ObjectStorageProperties.Permission.FULL_CONTROL.toString());
+				permissions.add(ObjectStorageProperties.Permission.FULL_CONTROL);
 			} else {
 				
 				int i = 0;
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.READ, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.READ.toString());
+					permissions.add(ObjectStorageProperties.Permission.READ);
 				}
 				
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.WRITE, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.WRITE.toString());
+					permissions.add(ObjectStorageProperties.Permission.WRITE);
 				}
 
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.READ_ACP, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.READ_ACP.toString());
+					permissions.add(ObjectStorageProperties.Permission.READ_ACP);
 				}
 				
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.WRITE_ACP, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.WRITE_ACP.toString());
+					permissions.add(ObjectStorageProperties.Permission.WRITE_ACP);
 				}
 			}
-			return grants;
+			return permissions;
 		}
 	}
 	

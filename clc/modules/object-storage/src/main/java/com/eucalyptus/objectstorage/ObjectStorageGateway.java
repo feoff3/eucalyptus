@@ -713,7 +713,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				try {
 					reply.setAccessControlPolicy(bucket.getAccessControlPolicy());
 				} catch(Exception e) {
-					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+					throw new InternalErrorException(request.getBucket() + "/?acl");
 				}
 				return reply;
 			} else {
