@@ -23,8 +23,6 @@ package com.eucalyptus.objectstorage.providers.s3;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -556,8 +554,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
 			s3Client.deleteObject(request.getBucket(), request.getKey());
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
-			reply.setCode("200");
-			reply.setDescription("OK");
+			reply.setStatus(HttpResponseStatus.NO_CONTENT);
+			reply.setStatusMessage("NO CONTENT");
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object", e);
@@ -1121,8 +1119,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
 			s3Client.deleteVersion(request.getBucket(), request.getKey(), request.getVersionid());
 			DeleteVersionResponseType reply = (DeleteVersionResponseType) request.getReply();
-			reply.setCode("200");
-			reply.setDescription("OK");
+			reply.setStatus(HttpResponseStatus.NO_CONTENT);
+			reply.setStatusMessage("NO CONTENT");
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object version", e);

@@ -49,7 +49,6 @@ import com.eucalyptus.storage.msgs.s3.S3ErrorMessage
 import com.eucalyptus.storage.msgs.s3.S3GetDataResponse
 import com.eucalyptus.storage.msgs.s3.S3Request
 import com.eucalyptus.storage.msgs.s3.S3Response
-import com.eucalyptus.storage.msgs.s3.Status
 import com.eucalyptus.storage.msgs.s3.VersionEntry
 
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
@@ -372,7 +371,6 @@ public class GetObjectType extends ObjectStorageDataGetRequestType {
 }
 
 public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
-	Status status;
 	String base64Data;
 }
 
@@ -396,9 +394,7 @@ public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
 	Boolean returnCompleteObjectOnConditionFailure;
 }
 
-public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {
-	Status status;
-}
+public class GetObjectExtendedResponseType extends ObjectStorageDataResponseType {}
 
 /* PUT /bucket/object with x-amz-copy-src header */
 @AdminOverrideAllowed
@@ -450,10 +446,7 @@ public class PutObjectInlineResponseType extends ObjectStorageDataResponseType {
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
 @RequiresACLPermission(object=[], bucket=[ObjectStorageProperties.Permission.WRITE])
 public class DeleteObjectType extends ObjectStorageRequestType {}
-public class DeleteObjectResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
+public class DeleteObjectResponseType extends ObjectStorageResponseType {}
 
 /* DELETE /bucket/object?versionid=x */
 @AdminOverrideAllowed
@@ -464,10 +457,7 @@ public class DeleteVersionType extends ObjectStorageRequestType {
 	String versionid;
 }
 
-public class DeleteVersionResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
+public class DeleteVersionResponseType extends ObjectStorageResponseType {}
 
 /* GET /bucket */
 @AdminOverrideAllowed
@@ -544,10 +534,7 @@ public class SetRESTBucketAccessControlPolicyType extends ObjectStorageRequestTy
 	AccessControlPolicy accessControlPolicy;
 }
 
-public class SetRESTBucketAccessControlPolicyResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
+public class SetRESTBucketAccessControlPolicyResponseType extends ObjectStorageResponseType {}
 
 /* PUT /bucket/object?acl */
 @AdminOverrideAllowed
@@ -559,10 +546,7 @@ public class SetRESTObjectAccessControlPolicyType extends ObjectStorageRequestTy
 	String versionId;
 }
 
-public class SetRESTObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {
-	String code;
-	String description;
-}
+public class SetRESTObjectAccessControlPolicyResponseType extends ObjectStorageResponseType {}
 
 /* GET /bucket?location */
 @AdminOverrideAllowed

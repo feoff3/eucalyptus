@@ -204,8 +204,6 @@
 
 	<mapping name="SetRESTBucketAccessControlPolicyResponse"
 		class="com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyResponseType">
-		<value name="Code" field="code" />
-		<value name="Description" field="description" />
 	</mapping>
 
 
@@ -238,8 +236,6 @@
 
 	<mapping name="SetRESTObjectAccessControlPolicyResponse"
 		class="com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType">
-		<value name="Code" field="code" />
-		<value name="Description" field="description" />
 	</mapping>
 
 	<mapping name="CreateBucket"
@@ -417,7 +413,6 @@
 	<mapping name="GetObjectResponse"
 		class="com.eucalyptus.objectstorage.msgs.GetObjectResponseType">
 		<structure name="GetObjectResponse">
-			<structure field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />
 			<value name="Data" field="base64Data" usage="optional" />
 			<structure
 				map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataResponseType" />
@@ -446,7 +441,6 @@
 	<mapping name="GetObjectExtendedResponse"
 		class="com.eucalyptus.objectstorage.msgs.GetObjectExtendedResponseType">
 		<structure name="GetObjectResponse">
-			<structure field="status" map-as="com.eucalyptus.storage.msgs.s3.Status" />
 			<structure
 				map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataResponseType" />
 		</structure>
