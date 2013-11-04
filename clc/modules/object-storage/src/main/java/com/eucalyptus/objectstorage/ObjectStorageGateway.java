@@ -58,6 +58,7 @@ import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.MalformedACLErrorException;
+import com.eucalyptus.objectstorage.exceptions.s3.MissingContentLengthException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchKeyException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchVersionException;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
@@ -334,8 +335,25 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new NoSuchBucketException(request.getBucket());
 				}
 				
-				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-					ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
+				ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
+				objectEntity.setOwnerCanonicalId(requestUser.getAccount().getCanonicalId());
+				objectEntity.setOwnerIamUserId(requestUser.getUserId());				
+				long newBucketSize = bucket.getBucketSize() == null ? 0 : bucket.getBucketSize();
+				
+				if(Strings.isNullOrEmpty(request.getContentLength())) {
+					//Not known. Content-Lenght is required by S3-spec.
+					//TODO: this should be done in binding.
+					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
+				}
+				try {
+					long objectSize = Long.parseLong(request.getContentLength());
+					newBucketSize = bucket.getBucketSize() + objectSize;
+				} catch(Exception e) {
+					LOG.error("Could not parse content length into a long: " + request.getContentLength(), e);
+					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
+				}
+				
+				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, newBucketSize)) {
 					//Construct and set the ACP properly
 					AccessControlPolicy acp = new AccessControlPolicy();
 					acp.setOwner(buildCanonicalUser(requestUser.getAccount()));
@@ -348,6 +366,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 								@Override
 								public PutObjectResponseType call() throws S3Exception, Exception {
+									//TODO: add the bucket size increment here. Or, make this a function of the BucketManager
 									return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
 								}
 
