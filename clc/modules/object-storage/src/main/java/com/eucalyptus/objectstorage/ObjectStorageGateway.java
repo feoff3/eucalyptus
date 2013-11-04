@@ -967,10 +967,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						throw new MalformedACLErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
 					} else {
 						//Expand the acl first
-						request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerId, objectOwnerId));
+						request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerId, objectOwnerId));						
 						if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
 							//Something happened in acl expansion.
+							LOG.error("Cannot put ACL that does not exist in request");
 							throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
+						} else {
+							//Add in the owner entry if not present
+							if(request.getAccessControlPolicy().getOwner() == null ) {
+								request.getAccessControlPolicy().setOwner(new CanonicalUser(objectOwnerId,""));
+							}
 						}
 							
 						//Marshal into a string
@@ -998,6 +1004,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 								}							
 					});
 				} catch(Exception e) {
+					LOG.error("Internal error during PUT object?acl for object " + request.getBucket() + "/" + request.getKey(), e);
 					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
 				}
 			} else {
