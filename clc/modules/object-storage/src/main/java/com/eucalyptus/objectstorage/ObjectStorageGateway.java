@@ -57,6 +57,7 @@ import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
+import com.eucalyptus.objectstorage.exceptions.s3.MalformedACLErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchKeyException;
 import com.eucalyptus.objectstorage.exceptions.s3.NoSuchVersionException;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
@@ -697,14 +698,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
-			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/?acl");
 		} catch(NoSuchElementException e) {
 			//bucket not found
 			bucket = null;
 		}
 		
 		if(bucket == null) {
-			throw new NoSuchKeyException(request.getBucket());
+			throw new NoSuchBucketException(request.getBucket());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 				//Get the listing from the back-end and copy results in.
@@ -857,37 +858,52 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
-			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/?acl");
 		} catch(NoSuchElementException e) {
 			//bucket not found
 			bucket = null;
 		}
 		
 		if(bucket == null) {
-			throw new NoSuchKeyException(request.getBucket());
+			throw new NoSuchBucketException(request.getBucket());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 				final String bucketOwnerCanonicalId = bucket.getOwnerCanonicalId();
-				
+				String aclString = null;
+				if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
+					//Can't set to null
+					throw new MalformedACLErrorException(request.getBucket() + "?acl");
+				} else {
+					//Expand the acl first
+					request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerCanonicalId, null));
+					if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
+						//Something happened in acl expansion.
+						throw new InternalErrorException(request.getBucket() + "?acl");
+					}
+						
+					//Marshal into a string
+					aclString = S3AccessControlledEntity.marshallACPToString(request.getAccessControlPolicy());
+					if(Strings.isNullOrEmpty(aclString)) {
+						throw new MalformedACLErrorException(request.getBucket() + "?acl");
+					}
+				}
 				try {
-				return BucketManagerFactory.getInstance().setAcp(bucket, 
-						S3AccessControlledEntity.marshallACPToString(request.getAccessControlPolicy()), 
-						new CallableWithRollback<SetRESTBucketAccessControlPolicyResponseType, Boolean>() {
-
-					@Override
-					public SetRESTBucketAccessControlPolicyResponseType call() throws S3Exception, Exception {
-						request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerCanonicalId, null));
-						return ospClient.setRESTBucketAccessControlPolicy(request);
-					}
-
-					@Override
-					public Boolean rollback(
-							SetRESTBucketAccessControlPolicyResponseType arg)
-							throws S3Exception, Exception {
-						//TODO: could preserve the old ACP and restore it here for the backend
-						return true;
-					}
-				});
+					return BucketManagerFactory.getInstance().setAcp(bucket, aclString,
+							new CallableWithRollback<SetRESTBucketAccessControlPolicyResponseType, Boolean>() {
+						
+						@Override
+						public SetRESTBucketAccessControlPolicyResponseType call() throws S3Exception, Exception {
+							return ospClient.setRESTBucketAccessControlPolicy(request);
+						}
+						
+						@Override
+						public Boolean rollback(
+								SetRESTBucketAccessControlPolicyResponseType arg)
+										throws S3Exception, Exception {
+							//TODO: could preserve the old ACP and restore it here for the backend
+							return true;
+						}
+					});
 				} catch(TransactionException e) {
 					LOG.error("Transaction error updating bucket ACL for bucket " + request.getBucket(),e);
 					throw new InternalErrorException(request.getBucket() + "?acl");
@@ -921,19 +937,37 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchKeyException(request.getBucket());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+								
 				SetRESTObjectAccessControlPolicyResponseType reply = (SetRESTObjectAccessControlPolicyResponseType)request.getReply();
 				final String bucketOwnerId = bucket.getOwnerCanonicalId();
 				final String objectOwnerId = objectEntity.getOwnerCanonicalId();
 				try {
+					String aclString = null;
+					if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
+						//Can't set to null
+						throw new MalformedACLErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
+					} else {
+						//Expand the acl first
+						request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerId, objectOwnerId));
+						if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
+							//Something happened in acl expansion.
+							throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
+						}
+							
+						//Marshal into a string
+						aclString = S3AccessControlledEntity.marshallACPToString(request.getAccessControlPolicy());
+						if(Strings.isNullOrEmpty(aclString)) {
+							throw new MalformedACLErrorException(request.getBucket() + "?acl");
+						}
+					}
+					
 					//Get the listing from the back-end and copy results in.
-					return ObjectManagerFactory.getInstance().setAcp(objectEntity, 
-							request.getAccessControlPolicy(), 
+					return ObjectManagerFactory.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), 
 							new CallableWithRollback<SetRESTObjectAccessControlPolicyResponseType, Boolean>() {
 
 								@Override
 								public SetRESTObjectAccessControlPolicyResponseType call()
 										throws S3Exception, Exception {
-									request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerId, objectOwnerId));
 									return ospClient.setRESTObjectAccessControlPolicy(request);
 									}
 
