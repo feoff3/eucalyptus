@@ -924,7 +924,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		Bucket bucket = null;
 		try {
 			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), true, null);
+			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
