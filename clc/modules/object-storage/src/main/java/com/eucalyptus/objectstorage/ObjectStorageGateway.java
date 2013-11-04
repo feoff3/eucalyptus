@@ -888,16 +888,22 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 				final String bucketOwnerCanonicalId = bucket.getOwnerCanonicalId();
-				String aclString = null;
+				String aclString = null;						
 				if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
 					//Can't set to null
-					throw new MalformedACLErrorException(request.getBucket() + "?acl");
+					throw new MalformedACLErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
 				} else {
 					//Expand the acl first
-					request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerCanonicalId, null));
+					request.getAccessControlPolicy().setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlPolicy().getAccessControlList(), bucketOwnerCanonicalId, null));						
 					if(request.getAccessControlPolicy() == null || request.getAccessControlPolicy().getAccessControlList() == null) {
 						//Something happened in acl expansion.
+						LOG.error("Cannot put ACL that does not exist in request");
 						throw new InternalErrorException(request.getBucket() + "?acl");
+					} else {
+						//Add in the owner entry if not present
+						if(request.getAccessControlPolicy().getOwner() == null ) {
+							request.getAccessControlPolicy().setOwner(new CanonicalUser(bucketOwnerCanonicalId,""));
+						}
 					}
 						
 					//Marshal into a string
@@ -905,7 +911,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					if(Strings.isNullOrEmpty(aclString)) {
 						throw new MalformedACLErrorException(request.getBucket() + "?acl");
 					}
-				}
+				}			
 				try {
 					return BucketManagerFactory.getInstance().setAcp(bucket, aclString,
 							new CallableWithRollback<SetRESTBucketAccessControlPolicyResponseType, Boolean>() {
@@ -982,7 +988,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						//Marshal into a string
 						aclString = S3AccessControlledEntity.marshallACPToString(request.getAccessControlPolicy());
 						if(Strings.isNullOrEmpty(aclString)) {
-							throw new MalformedACLErrorException(request.getBucket() + "?acl");
+							throw new MalformedACLErrorException(request.getBucket() + "/" + request.getKey() + "?acl");
 						}
 					}
 					
