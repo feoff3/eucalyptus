@@ -261,6 +261,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			AccessControlPolicy policy = new AccessControlPolicy();
 			AccessControlList acList = new AccessControlList();
 			ArrayList<Grant> grants = new ArrayList<Grant>();
+			String displayName = null;
 			for(Map.Entry<String,Integer> entry : srcMap.entrySet()) {
 				Grantee grantee = new Grantee();				
 
@@ -272,7 +273,13 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 				if(groupId != null) {
 					grantee.setGroup(new Group(groupId.toString()));						
 				} else {
-					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),""));
+					try {
+						displayName = Accounts.lookupAccountByCanonicalId(entry.getKey()).getName();
+					} catch(AuthException e) {
+						//Not found
+						displayName = "";
+					}
+					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),displayName));
 				}
 				
 				for(ObjectStorageProperties.Permission p : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
