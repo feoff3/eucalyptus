@@ -129,7 +129,7 @@
 			<value name="IsTruncated" field="isTruncated" />
 			<collection field="contents"
 				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-				<structure map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
+				<structure name="Contents" map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
 			</collection>
 			<collection name="CommonPrefixes" field="commonPrefixes"
 				factory="org.jibx.runtime.Utility.arrayListFactory" test-method="isCommonPrefixesPresent" usage="optional">
