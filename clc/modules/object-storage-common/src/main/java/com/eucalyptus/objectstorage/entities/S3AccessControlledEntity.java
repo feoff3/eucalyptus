@@ -20,11 +20,12 @@
 
 package com.eucalyptus.objectstorage.entities;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import javax.persistence.Column;
 import javax.persistence.Lob;
@@ -42,6 +43,7 @@ import org.hibernate.annotations.Type;
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.entities.AbstractPersistent;
+import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
@@ -259,23 +261,29 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			AccessControlPolicy policy = new AccessControlPolicy();
 			AccessControlList acList = new AccessControlList();
 			ArrayList<Grant> grants = new ArrayList<Grant>();
+			String displayName = null;
 			for(Map.Entry<String,Integer> entry : srcMap.entrySet()) {
 				Grantee grantee = new Grantee();				
 
 				//Check if a group uri
 				ObjectStorageProperties.S3_GROUP groupId = null;
 				try {
-					groupId = ObjectStorageProperties.S3_GROUP.valueOf(entry.getKey());							
+					groupId = AclUtils.getGroupFromUri(entry.getKey());					
 				} catch(Exception e) {}				
 				if(groupId != null) {
 					grantee.setGroup(new Group(groupId.toString()));						
 				} else {
-					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),""));
+					try {
+						displayName = Accounts.lookupAccountByCanonicalId(entry.getKey()).getName();
+					} catch(AuthException e) {
+						//Not found
+						displayName = "";
+					}
+					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),displayName));
 				}
 				
-				for(Grant g : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
-					g.setGrantee(grantee);
-					grants.add(g);
+				for(ObjectStorageProperties.Permission p : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {
+					grants.add(new Grant(grantee, p.toString()));
 				}
 			}
 			acList.setGrants(grants);
@@ -349,40 +357,57 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 				//Nothing to do
 				return aclMap;
 			}
-			
+			Grantee grantee = null;
+			CanonicalUser canonicalUser = null;
+			Group group = null;
+			String email;
 			for(Grant g: srcList.getGrants()) {
-				if(g.getGrantee() == null || Strings.isNullOrEmpty(g.getPermission())) {
-					//Invalid message.
+				grantee = g.getGrantee();
+				if(grantee == null || Strings.isNullOrEmpty(g.getPermission())) {
+					//Invalid message. grant. No grantee.
 					return null;
+				} else {
+					canonicalUser = grantee.getCanonicalUser();
+					group = grantee.getGroup();
+					email = grantee.getEmailAddress();
 				}
 				
-				if(!Strings.isNullOrEmpty(g.getGrantee().getCanonicalUser().getID())) {
+				if(canonicalUser != null && !Strings.isNullOrEmpty(canonicalUser.getID())) {
 					//CanonicalId
 					try {
-						canonicalId = Accounts.lookupAccountByCanonicalId(g.getGrantee().getCanonicalUser().getID()).getCanonicalId();
+						//Check validity of the canonicalId
+						canonicalId = Accounts.lookupAccountByCanonicalId(canonicalUser.getID()).getCanonicalId();
 					} catch (AuthException e) {
-						//Invalid canonical Id.
-						return null;
-					}					
-				} else if(!Strings.isNullOrEmpty(g.getGrantee().getEmailAddress())) {
+						//For legacy support, also check the account Id. Euca used to use AccountId instead of canoncialId.
+						try {
+							canonicalId = Accounts.lookupAccountById(canonicalUser.getID()).getCanonicalId();
+						} catch(AuthException ex) {
+							//Neither canonical Id nor account id worked
+							return null;							
+						}
+					}										
+				} else if(!Strings.isNullOrEmpty(email)) {
 					//Email
 					try {
-						canonicalId = Accounts.lookupUserByEmailAddress(g.getGrantee().getEmailAddress()).getAccount().getCanonicalId();
+						canonicalId = Accounts.lookupUserByEmailAddress(email).getAccount().getCanonicalId();
 					} catch (AuthException e) {
 						//Invalid canonical Id.
 						return null;
 					}
-				} else if(g.getGrantee().getGroup() != null) {
+				} else if(group != null && !Strings.isNullOrEmpty(group.getUri())) {
 					try {
-						ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(g.getGrantee().getGroup().getUri());
-					} catch(IllegalArgumentException e) {
+						ObjectStorageProperties.S3_GROUP foundGroup = AclUtils.getGroupFromUri(group.getUri());
+						if(foundGroup == null) {
+							throw new NoSuchElementException("URI: " + group.getUri() + " not found in group map");
+						}					
+					} catch(NoSuchElementException e) {
 						//Invalid group name
 						LOG.warn("Invalid group name when trying to map ACL grantee: " + g.getGrantee().getGroup().getUri());
 						return null;
 					}
 					
 					//Group URI, use as canonicalId for now.
-					canonicalId = g.getGrantee().getGroup().getUri();					
+					canonicalId = group.getUri();
 				}
 				
 				if(canonicalId == null) {
@@ -397,7 +422,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 						//skip no-op grants
 					}
 				}
-			}			
+			}
 			return aclMap;
 		}
 	}
@@ -408,40 +433,38 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * 
 	 * Represents the grant(s) for a single canonicalId/group
 	 */
-	protected enum AccountGrantsFromBitmap implements Function<Integer, Grant[]> {
+	protected enum AccountGrantsFromBitmap implements Function<Integer, List<ObjectStorageProperties.Permission>> {
 		INSTANCE;
 		
 		@Override
-		public Grant[] apply(Integer srcBitmap) {
+		public List<ObjectStorageProperties.Permission> apply(Integer srcBitmap) {
+			ArrayList<ObjectStorageProperties.Permission> permissions = new ArrayList<ObjectStorageProperties.Permission>();
 			if(srcBitmap == null) {
-				return null;
-			}
-			
-			Grant[] grants = new Grant[3];
+				return permissions;
+			}				
 			
 			if(BitmapGrant.allows(ObjectStorageProperties.Permission.FULL_CONTROL, srcBitmap)) {
-				grants = new Grant[] { new Grant() };				
-				grants[0].setPermission(ObjectStorageProperties.Permission.FULL_CONTROL.toString());
+				permissions.add(ObjectStorageProperties.Permission.FULL_CONTROL);
 			} else {
 				
 				int i = 0;
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.READ, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.READ.toString());
+					permissions.add(ObjectStorageProperties.Permission.READ);
 				}
 				
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.WRITE, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.WRITE.toString());
+					permissions.add(ObjectStorageProperties.Permission.WRITE);
 				}
 
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.READ_ACP, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.READ_ACP.toString());
+					permissions.add(ObjectStorageProperties.Permission.READ_ACP);
 				}
 				
 				if(BitmapGrant.allows(ObjectStorageProperties.Permission.WRITE_ACP, srcBitmap)) {
-					grants[i++].setPermission(ObjectStorageProperties.Permission.WRITE_ACP.toString());
+					permissions.add(ObjectStorageProperties.Permission.WRITE_ACP);
 				}
 			}
-			return grants;
+			return permissions;
 		}
 	}
 	

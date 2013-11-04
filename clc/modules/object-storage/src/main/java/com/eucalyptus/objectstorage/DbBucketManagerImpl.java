@@ -88,7 +88,9 @@ public class DbBucketManagerImpl implements BucketManager {
 			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
 		try {
 			Bucket searchExample = new Bucket(bucketName);
-			searchExample.setHidden(includeHidden);
+			if(!includeHidden) {				
+				searchExample.setHidden(false);
+			}
 			return Transactions.find(searchExample);
 		} catch (TransactionException e) {
 			LOG.error("Error querying bucket existence in db",e);
@@ -143,7 +145,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		newBucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
 		newBucket.setCreationDate(new Date());
 		
-		T result = null;		
+		T result = null;
 		try {
 			if(resourceModifier != null) {
 				result = resourceModifier.call();

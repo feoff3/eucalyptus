@@ -23,8 +23,6 @@ package com.eucalyptus.objectstorage.providers.s3;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -371,7 +369,38 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	 */
 	@Override
 	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
-		throw new NotImplementedException("HeadBucket");
+		HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+
+		}	
+
+		// call the storage manager to save the bucket to disk
+		try {
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			com.amazonaws.services.s3.model.AccessControlList responseList = s3Client.getBucketAcl(request.getBucket());
+			reply.setBucket(request.getBucket());			
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+
+		return reply;		
+
 	}
 
 	@Override
@@ -398,6 +427,9 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			Bucket responseBucket = s3Client.createBucket(request.getBucket());
 			//Save the owner info in response?
+			reply.setBucket(request.getBucket());
+			reply.setStatus(HttpResponseStatus.OK);
+			reply.setStatusMessage("OK");
 		} catch(AmazonServiceException ex) {
 			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
@@ -522,8 +554,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
 			s3Client.deleteObject(request.getBucket(), request.getKey());
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
-			reply.setCode("200");
-			reply.setDescription("OK");
+			reply.setStatus(HttpResponseStatus.NO_CONTENT);
+			reply.setStatusMessage("NO CONTENT");
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object", e);
@@ -1087,8 +1119,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
 			s3Client.deleteVersion(request.getBucket(), request.getKey(), request.getVersionid());
 			DeleteVersionResponseType reply = (DeleteVersionResponseType) request.getReply();
-			reply.setCode("200");
-			reply.setDescription("OK");
+			reply.setStatus(HttpResponseStatus.NO_CONTENT);
+			reply.setStatusMessage("NO CONTENT");
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object version", e);

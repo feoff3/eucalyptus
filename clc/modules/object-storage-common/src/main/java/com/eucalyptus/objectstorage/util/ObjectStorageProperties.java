@@ -133,7 +133,8 @@ public class ObjectStorageProperties {
 	public static enum S3_GROUP {
 		ALL_USERS_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/global/AllUsers"; }}, 
 		AUTHENTICATED_USERS_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"; }},
-		LOGGING_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/s3/LogDelivery"; }}
+		LOGGING_GROUP { public String toString() { return "http://acs.amazonaws.com/groups/s3/LogDelivery"; }},
+		AWS_EXEC_READ { public String toString() { return "http://acs.amazonaws.com/groups/s3/zateam"; }} //Used for the system for vm images
 	}
 	
 	public static final String IGNORE_PREFIX = "x-ignore-";
