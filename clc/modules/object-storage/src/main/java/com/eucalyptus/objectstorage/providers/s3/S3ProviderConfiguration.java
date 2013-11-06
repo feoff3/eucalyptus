@@ -92,7 +92,7 @@ public class S3ProviderConfiguration{
 
 	public static int getS3EndpointPort() {
 		String[] s3EndpointParts = S3Endpoint.split(":");
-		if (s3EndpointParts.length > 0) {
+		if (s3EndpointParts.length > 1) {
 			try {
 				return Integer.parseInt(s3EndpointParts[1]);
 			} catch (NumberFormatException e) {

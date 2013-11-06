@@ -688,18 +688,28 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
 		GetObjectRequest getRequest = new GetObjectRequest(request.getBucket(), request.getKey());
 		try {
-			S3Object response = s3Client.getObject(getRequest);
-			S3ObjectInputStream input = response.getObjectContent();
-			DefaultHttpResponse httpResponse = createHttpResponse(response.getObjectMetadata());
+			ObjectMetadata metadata = null;
+			S3Object response = null;
+			if (!request.getGetData()) {
+				//TODO: This sucks. HEAD must be a separate operation.
+				metadata = s3Client.getObjectMetadata(request.getBucket(), request.getKey());
+			} else {
+				response = s3Client.getObject(getRequest);
+				metadata = response.getObjectMetadata();
+			}
+			DefaultHttpResponse httpResponse = createHttpResponse(metadata);
 			Channel channel = request.getChannel();
 			channel.write(httpResponse);
-			final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
-			channel.write(dataStream).addListener(new ChannelFutureListener( ) {
-				@Override public void operationComplete( ChannelFuture future ) throws Exception {			
-					Contexts.clear(request.getCorrelationId());
-					dataStream.close();
-				}
-			});
+			if (request.getGetData()) {
+				S3ObjectInputStream input = response.getObjectContent();
+				final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
+				channel.write(dataStream).addListener(new ChannelFutureListener( ) {
+					@Override public void operationComplete( ChannelFuture future ) throws Exception {			
+						Contexts.clear(request.getCorrelationId());
+						dataStream.close();
+					}
+				});
+			}
 			return null;
 		} catch(Exception ex) {
 			LOG.error(ex, ex);
@@ -877,7 +887,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -885,14 +895,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			BucketLoggingConfiguration config = new BucketLoggingConfiguration();
 			LoggingEnabled requestConfig = request.getLoggingEnabled();
 			config.setDestinationBucketName(requestConfig == null ? null : requestConfig.getTargetBucket());
 			config.setLogFilePrefix(requestConfig == null ? null : requestConfig.getTargetPrefix());
-			
+
 			SetBucketLoggingConfigurationRequest loggingRequest = new SetBucketLoggingConfigurationRequest(request.getBucket(), config);			
 			s3Client.setBucketLoggingConfiguration(loggingRequest);
 			reply.setStatus(HttpResponseStatus.OK);
@@ -904,7 +914,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
@@ -918,7 +928,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			requestUser = ctx.getUser();
 		} catch(NoSuchContextException e) {
 			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			
+
 			try {
 				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
 			} catch(Exception ex) {
@@ -926,7 +936,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}			
 		}
-		
+
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			BucketLoggingConfiguration loggingConfig = s3Client.getBucketLoggingConfiguration(request.getBucket());
@@ -946,7 +956,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
 		}
-		
+
 		return reply;
 	}
 
