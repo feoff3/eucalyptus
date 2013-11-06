@@ -226,18 +226,18 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	}
 	
 	public static Criterion getNotSnapshotRestriction() {
-		return Restrictions.ne("is_snapshot", true);
+		return Restrictions.ne("isSnapshot", true);
 	}
 	
 	public static Criterion getNotPendingRestriction() {
-		return Restrictions.isNotNull("object_modified_date");
+		return Restrictions.isNotNull("objectModifiedTimestamp");
 	}
 	
 	/* versionId == null && is_deleted == true
 	 * if versionId != null, then is_deleted indicates a deleteMarker
 	 */
 	public static Criterion getNotDeletingRestriction() {
-		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("is_deleted", true));
+		return Restrictions.and(Restrictions.isNotNull("versionIdd"), Restrictions.eq("deleted", true));
 	}
 	
 	public ListEntry toListEntry() {
