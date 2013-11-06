@@ -21,6 +21,7 @@
 package com.eucalyptus.objectstorage;
 
 import java.net.InetAddress;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -56,6 +57,7 @@ import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
+import com.eucalyptus.objectstorage.exceptions.s3.InvalidArgumentException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
 import com.eucalyptus.objectstorage.exceptions.s3.MalformedACLErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.MissingContentLengthException;
@@ -901,10 +903,19 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				//Get the listing from the back-end and copy results in.				
 				//return ospClient.listBucket(request);
 				ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
+				int maxKeys = 1000;
+				try {
+					if(!Strings.isNullOrEmpty(request.getMaxKeys())) {
+						maxKeys = Integer.parseInt(request.getMaxKeys());
+					}
+				} catch(NumberFormatException e) {
+					LOG.error("Failed to parse maxKeys from request properly: " + request.getMaxKeys(), e);
+					throw new InvalidArgumentException("MaxKeys");
+				}
 				
 				PaginatedResult<ObjectEntity> result = null;
 				try {
-					result = ObjectManagerFactory.getInstance().listPaginated(request.getBucket(), Integer.parseInt(request.getMaxKeys()), request.getPrefix(), request.getDelimiter(), request.getMarker());									
+					result = ObjectManagerFactory.getInstance().listPaginated(request.getBucket(), maxKeys, request.getPrefix(), request.getDelimiter(), request.getMarker());									
 				} catch(Exception e) {
 					LOG.error("Error getting object listing for bucket: " + request.getBucket(), e);
 					throw new InternalErrorException(request.getBucket());
@@ -926,6 +937,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					}
 				}
 				
+				reply.setMaxKeys(maxKeys);
 				reply.setName(request.getBucket());				
 				reply.setDelimiter(request.getDelimiter());
 				reply.setMarker(request.getMarker());
