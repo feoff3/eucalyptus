@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
+import org.apache.tools.ant.util.DateUtils;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
@@ -52,6 +53,8 @@ import com.amazonaws.services.s3.model.BucketLoggingConfiguration;
 import com.amazonaws.services.s3.model.BucketVersioningConfiguration;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
+import com.amazonaws.services.s3.model.CopyObjectRequest;
+import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.EmailAddressGrantee;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GroupGrantee;
@@ -868,7 +871,64 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public CopyObjectResponseType copyObject(CopyObjectType request)
 			throws EucalyptusCloudException {
-		throw new NotImplementedException("Copy Object");
+		CopyObjectResponseType reply = (CopyObjectResponseType) request.getReply();
+		User requestUser = null;
+		try {
+			Context ctx = Contexts.lookup(request.getCorrelationId());
+			requestUser = ctx.getUser();
+		} catch(NoSuchContextException e) {
+			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+			} catch(Exception ex) {
+				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}			
+		}	
+		String sourceBucket = request.getSourceBucket();
+		String sourceKey = request.getSourceObject();
+		String sourceVersionId = request.getSourceVersionId();
+		String destinationBucket = request.getDestinationBucket();
+		String destinationKey = request.getDestinationObject();
+		String copyIfMatch = request.getCopySourceIfMatch();
+		String copyIfNoneMatch = request.getCopySourceIfNoneMatch();
+		Date copyIfUnmodifiedSince = request.getCopySourceIfUnmodifiedSince();
+		Date copyIfModifiedSince = request.getCopySourceIfModifiedSince();
+		try {
+			CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucket, sourceKey, sourceVersionId, destinationBucket, destinationKey);
+			copyRequest.setModifiedSinceConstraint(copyIfModifiedSince);
+			copyRequest.setUnmodifiedSinceConstraint(copyIfUnmodifiedSince);
+			if (copyIfMatch != null) {
+				List<String> copyIfMatchConstraint = new ArrayList<String>();
+				copyIfMatchConstraint.add(copyIfMatch);
+				copyRequest.setMatchingETagConstraints(copyIfMatchConstraint);
+			}
+			if (copyIfNoneMatch != null) {
+				List<String> copyIfNoneMatchConstraint = new ArrayList<String>();
+				copyIfNoneMatchConstraint.add(copyIfNoneMatch);
+				copyRequest.setNonmatchingETagConstraints(copyIfNoneMatchConstraint);
+			}
+			//TODO: Need to set canned ACL if specified
+			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
+			CopyObjectResult result = s3Client.copyObject(copyRequest);
+			reply.setEtag(result.getETag());
+			reply.setLastModified(DateUtils.format(
+					result.getLastModifiedDate().getTime(),
+					DateUtils.RFC822_DATETIME_PATTERN));
+			String destinationVersionId = result.getVersionId();
+			if (destinationVersionId != null) {
+				reply.setCopySourceVersionId(sourceVersionId);
+				reply.setVersionId(destinationVersionId);
+			}
+		} catch(AmazonServiceException ex) {
+			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		} catch(AmazonClientException ex) {
+			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
+			throw new EucalyptusCloudException(ex);
+		}
+		return reply;
+
 	}
 
 	/* NOTE: bucket logging grants don't work because there is no way to specify them via the
