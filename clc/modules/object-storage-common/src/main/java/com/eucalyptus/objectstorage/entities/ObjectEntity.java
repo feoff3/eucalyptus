@@ -35,6 +35,12 @@ import org.hibernate.annotations.OptimisticLocking;
 import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Restrictions;
 
+import com.eucalyptus.auth.Accounts;
+import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.storage.msgs.s3.CanonicalUser;
+import com.eucalyptus.storage.msgs.s3.ListEntry;
+import com.eucalyptus.storage.msgs.s3.VersionEntry;
+
 @Entity
 @OptimisticLocking(type = OptimisticLockType.NONE)
 @PersistenceContext(name="eucalyptus_osg")
@@ -233,4 +239,44 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	public static Criterion getNotDeletingRestriction() {
 		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("is_deleted", true));
 	}
+	
+	public ListEntry toListEntry() {
+		ListEntry e = new ListEntry();
+		e.setEtag(this.geteTag());
+		e.setKey(this.getObjectKey());
+		e.setLastModified(OSGUtil.dateToFormattedString(this.getObjectModifiedTimestamp()));
+		e.setSize(this.getSize());
+		String displayName = "";
+		try {
+			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
+		} catch(Exception ex) {
+			LOG.error("Failed to get display name/account name for canonical Id: " + this.getOwnerCanonicalId(),ex);
+			displayName = "";
+		}
+		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), displayName));		
+		return e;
+	}
+	
+	public VersionEntry toVersionEntry() {
+		VersionEntry e = new VersionEntry();
+		e.setEtag(this.geteTag());
+		e.setKey(this.getObjectKey());
+		e.setVersionId(this.getVersionId());
+		e.setLastModified(OSGUtil.dateToFormattedString(this.getObjectModifiedTimestamp()));
+		e.setSize(this.getSize());
+
+		//TODO: fix this, need to add entry to record? avoid query lookup
+		e.setIsLatest(false);
+		String displayName = "";
+		try {
+			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
+		} catch(Exception ex) {
+			LOG.error("Failed to get display name/account name for canonical Id: " + this.getOwnerCanonicalId(),ex);
+			displayName = "";
+		}
+		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), displayName));
+		return e;
+	}
+	
+	//TODO: add delete marker support. Fix is to use super-type for versioning entry and sub-types for version vs deleteMarker
 }

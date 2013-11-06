@@ -125,6 +125,7 @@ import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
+import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.storage.msgs.s3.TargetGrants;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Exceptions;
@@ -901,14 +902,34 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				//return ospClient.listBucket(request);
 				ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
 				
-				PaginatedResult result = null;
+				PaginatedResult<ObjectEntity> result = null;
 				try {
 					result = ObjectManagerFactory.getInstance().listPaginated(request.getBucket(), Integer.parseInt(request.getMaxKeys()), request.getPrefix(), request.getDelimiter(), request.getMarker());									
 				} catch(Exception e) {
-					LOG.error("Error getting object listing for bucket: " + request.getBucket());
+					LOG.error("Error getting object listing for bucket: " + request.getBucket(), e);
 					throw new InternalErrorException(request.getBucket());
 				}
 				
+				if(result != null) {
+					for(ObjectEntity obj : result.getEntityList()){
+						reply.getContents().add(obj.toListEntry());
+					}
+					
+					for(String s : result.getCommonPrefixes()) {
+						reply.getCommonPrefixes().add(new PrefixEntry(s));
+					}
+					reply.setIsTruncated(result.isTruncated);
+					if(result.getLastEntry() instanceof ObjectEntity) {
+						reply.setNextMarker(((ObjectEntity)result.getLastEntry()).getObjectKey());
+					} else if(result.getLastEntry() instanceof String) {
+						reply.setNextMarker((String)result.getLastEntry());
+					}
+				}
+				
+				reply.setName(request.getBucket());				
+				reply.setDelimiter(request.getDelimiter());
+				reply.setMarker(request.getMarker());
+				reply.setPrefix(request.getPrefix());								
 				return reply;
 			} else {
 				throw new AccessDeniedException(request.getBucket());

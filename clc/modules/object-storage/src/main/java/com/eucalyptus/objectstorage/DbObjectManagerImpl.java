@@ -350,7 +350,6 @@ public class DbObjectManagerImpl implements ObjectManager {
 			boolean latestOnly)
 			throws TransactionException {
 		
-		
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		try {
 			PaginatedResult<ObjectEntity> result = new PaginatedResult<ObjectEntity>();
@@ -442,6 +441,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 									} else {
 										//Add it to the common prefix set
 										commonPrefixes.add(prefixString);
+										result.lastEntry = prefixString;
 										// count the unique commonprefix as a single return entry
 										resultKeyCount++;
 									}
@@ -461,6 +461,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 						}
 						
 						result.entityList.add(objectRecord);
+						result.lastEntry = objectRecord;
 						resultKeyCount++;
 					}
 					
