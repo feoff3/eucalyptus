@@ -5,11 +5,9 @@ import java.util.Date;
 
 import org.apache.log4j.Logger;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mule.util.UUID;
 
-import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.CallableWithRollback;
 import com.eucalyptus.objectstorage.ObjectManager;
 import com.eucalyptus.objectstorage.ObjectManagerFactory;
@@ -25,7 +23,6 @@ import com.eucalyptus.objectstorage.util.OSGUtil;
  *
  */
 //Manual testing only, for now
-@Ignore
 public class ObjectManagerTest {
 	private static final Logger LOG = Logger.getLogger(ObjectManagerTest.class);
 	static ObjectManager objectManager = ObjectManagerFactory.getInstance();

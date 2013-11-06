@@ -405,7 +405,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					objectEntity.setInternalKey(versionId);					
 				}
 				objectEntity.setVersionId(versionId);
-								
+				objectEntity.setDeleted(false);				
 				objectEntity.setOwnerCanonicalId(requestUser.getAccount().getCanonicalId());
 				objectEntity.setOwnerIamUserId(requestUser.getUserId());				
 				long newBucketSize = bucket.getBucketSize() == null ? 0 : bucket.getBucketSize();
