@@ -966,8 +966,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			} catch(Exception ex) {
 				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
+			}
+		}
 
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -1127,6 +1127,4 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			throw new EucalyptusCloudException(e);
 		}
 	}
-
-
 }

@@ -72,6 +72,8 @@ import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
+import com.eucalyptus.objectstorage.BucketManagerFactory;
+import com.eucalyptus.objectstorage.ObjectManagerFactory;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.google.common.base.Objects;
@@ -79,120 +81,71 @@ import com.google.common.base.Objects;
 public class ObjectStorageQuotaUtil {
 
   public static long countBucketByAccount( String accountId ) throws AuthException {
-    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-    Bucket searchBucket = new Bucket();
-    searchBucket.setOwnerIamUserId(accountId);
-    try {
-      List<Bucket> bucketInfoList = db.query(searchBucket);
-      db.commit();
-      return bucketInfoList.size();
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search bucket", e);
-    }
+	  try {
+		  return BucketManagerFactory.getInstance().countByAccount(Accounts.lookupAccountById(accountId).getCanonicalId(), true, null);
+	  } catch (Exception e) {
+		  throw new AuthException("Failed to search bucket", e);
+	  }
   }
   
   public static long countBucketByUser( String userId ) throws AuthException {
-    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-    Bucket searchBucket = new Bucket();
-    searchBucket.setOwnerIamUserId(userId);
-    try {
-      List<Bucket> bucketInfoList = db.query(searchBucket);
-      db.commit();
-      return bucketInfoList.size();
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search bucket", e);
-    }
+	  try {
+		  return BucketManagerFactory.getInstance().countByUser(userId, true, null);
+	  } catch (Exception e) {
+		  throw new AuthException("Failed to search bucket", e);
+	  }
   }
   
-  public static long countBucketObjectNumber(String bucketName) throws AuthException {
-    EntityWrapper<ObjectEntity> db = EntityWrapper.get(ObjectEntity.class);
-    ObjectEntity searchObjectInfo = new ObjectEntity();
-    searchObjectInfo.setBucketName(bucketName);
-    searchObjectInfo.setDeleted(false);
-    searchObjectInfo.setLast(true);
-    try {
-      List<ObjectEntity> objectInfos = db.query(searchObjectInfo);
-      db.commit();
-      return objectInfos.size();
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search object", e);
-    }
+  public static long countBucketObjectNumber(String bucketName) throws AuthException {    
+	  try {
+		  return ObjectManagerFactory.getInstance().count(bucketName);
+	  } catch(Exception e) {
+		  throw new AuthException("Failed to search object", e);
+	  }
   }
   
   public static long countBucketSize(String bucketName) throws AuthException {
-    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-    Bucket searchBucket = new Bucket(bucketName);
-    try {
-      long size = 0;
-      List<Bucket> bucketInfoList = db.query(searchBucket);
-      if (bucketInfoList.size() > 0) {
-        size = bucketInfoList.get(0).getBucketSize();
-      }
-      db.commit();
-      return size;
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search bucket", e);
-    }
+	  try {
+		  Bucket b = BucketManagerFactory.getInstance().get(bucketName, true, null);
+		  return b.getBucketSize();
+	  } catch (Exception e) {      
+		  throw new AuthException("Failed to search bucket", e);
+	  }
   }
   
   public static long countTotalObjectSizeByAccount(String accountId) throws AuthException {
 	  String canonicalId = Accounts.lookupAccountById(accountId).getCanonicalId();
-    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-    Bucket searchBucket = new Bucket();
-    searchBucket.setOwnerCanonicalId(accountId);
-    try {
-      List<Bucket> bucketInfoList = db.query(searchBucket);
-      long size = 0;
-      for (Bucket b : bucketInfoList) {
-        size += b.getBucketSize();
-      }
-      db.commit();
-      return size;
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search bucket", e);
-    }
+	  try {
+		  List<Bucket> bucketList = BucketManagerFactory.getInstance().list(canonicalId, true, null);
+		  long size = 0;
+		  for (Bucket b : bucketList) {
+			  size += b.getBucketSize();
+		  }
+		  return size;
+	  } catch (Exception e) {
+		  throw new AuthException("Failed to search bucket", e);
+	  }
   }
   
   public static long countTotalObjectSizeByUser(String userId) throws AuthException {
-    EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-    Bucket searchBucket = new Bucket();
-    searchBucket.setOwnerIamUserId(userId);
-    try {
-      List<Bucket> bucketInfoList = db.query(searchBucket);
-      long size = 0;
-      for (Bucket b : bucketInfoList) {
-        size += b.getBucketSize();
-      }
-      db.commit();
-      return size;
-    } catch (Exception e) {
-      db.rollback();
-      throw new AuthException("Failed to search bucket", e);
-    }
+	  try {
+		  List<Bucket> bucketList = BucketManagerFactory.getInstance().listByUser(userId, true, null);
+		  long size = 0;
+		  for (Bucket b : bucketList) {
+			  size += b.getBucketSize();
+		  }
+		  return size;
+	  } catch (Exception e) {
+		  throw new AuthException("Failed to search bucket", e);
+	  }
   }
-
+  
   /**
    * Return the total size in bytes of objects in the ObjectStorage.
    *
    * @return The size or -1 if the size could not be determined.
    */
   public static long countTotalObjectSize() {
-    long size = -1;
-    final EntityTransaction db = Entities.get( Bucket.class );
-    try {
-      size = Objects.firstNonNull( (Number) Entities.createCriteria( Bucket.class )
-          .setProjection( Projections.sum( "bucketSize" ) )
-          .setReadOnly( true )
-          .uniqueResult(), 0 ).longValue();
-      db.commit();
-    } catch (Exception e) {
-      db.rollback();
-    }
-    return size;
+	  return BucketManagerFactory.getInstance().totalSizeOfAllBuckets();
   }
 }

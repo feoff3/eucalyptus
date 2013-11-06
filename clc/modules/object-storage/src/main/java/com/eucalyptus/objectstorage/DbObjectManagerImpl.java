@@ -20,7 +20,9 @@
 
 package com.eucalyptus.objectstorage;
 
+import java.text.ParseException;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -28,11 +30,13 @@ import java.util.NoSuchElementException;
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
+import org.apache.tools.ant.util.DateUtils;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
+import org.mule.util.UUID;
 
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
@@ -62,7 +66,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		ObjectEntity exampleObject = new ObjectEntity(bucketName, null, null);
 		exampleObject.setDeleted(false);
-		try {		
+		try {
 			return Entities.count(exampleObject);
 		} catch(Throwable e) {
 			LOG.error("Error getting object count for bucket " + bucketName, e);
@@ -71,27 +75,93 @@ public class DbObjectManagerImpl implements ObjectManager {
 			db.rollback();
 		}		
 	}
+	
+	/**
+	 * Returns the list of entities currently pending writes. List returned is in no
+	 * particular order. Caller must order if required.
+	 * @param bucketName
+	 * @param objectKey
+	 * @param versionId
+	 * @return
+	 * @throws TransactionException
+	 */
+	public List<ObjectEntity> getPendingWrites(String bucketName, String objectKey, String versionId) throws TransactionException {
+		try {
+			//Return the latest version based on the created date.
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {
+				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
+				Criteria search = Entities.createCriteria(ObjectEntity.class);			
+				List results = search.add(Example.create(searchExample))
+							.addOrder(Order.desc("object_create_date"))
+							.add(Restrictions.isNull("object_create_date"))
+							.list();
+				db.commit();
+				return (List<ObjectEntity>)results;
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
+		} catch(NoSuchElementException e) {
+			//Swallow this exception, return null;
+		} catch(Exception e) {
+			LOG.error("Error fetching pending write records for object " + bucketName + "/" + objectKey + "?versionId=" + versionId);
+			throw e;
+		}
+		
+		return null;
+	}
 
 	@Override
 	public ObjectEntity get(String bucketName, String objectKey, String versionId) throws TransactionException {
 		try {
-			ObjectEntity objectExample = new ObjectEntity(bucketName, objectKey, versionId);
-			ObjectEntity foundObject = Transactions.find(objectExample);		
-			return foundObject;
-		} catch (TransactionException e) {
-			if(e.getCause() instanceof NoSuchElementException) {
-				return null;
-			} else 
-				LOG.error("Error looking up object:" + bucketName + "/" + objectKey + " version " + versionId);
+			//Return the latest version based on the created date.
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {
+				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
+				Criteria search = Entities.createCriteria(ObjectEntity.class);			
+				List results = search.add(Example.create(searchExample))
+							.addOrder(Order.desc("object_last_modified"))
+							.add(ObjectEntity.getNotPendingRestriction())
+							.add(ObjectEntity.getNotDeletingRestriction())
+							.setMaxResults(1).list();
+				db.commit();
+				if(results == null || results.size() < 1) {
+					return null;
+				} else if(results.size() >= 1) {
+					return (ObjectEntity)results.get(0);
+				}
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
+		} catch(NoSuchElementException e) {
+			//Swallow this exception, return null;
+		} catch(Exception e) {
+			LOG.error("Error getting object entity for " + bucketName + "/" + objectKey + "?version=" + versionId);
 			throw e;
-		} 
+		}
+		
+		return null;
 	}
 
 	@Override
-	public <T, F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {	
-		
+	public <T, F> void delete(ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
+		T result = null;
+						
 		if(resourceModifier != null) {
-			T result = null;		
+			//Set to 'deleting'			
+			if(!object.getDeleted()) {
+				try {
+					object.setDeleted(true);
+					Transactions.save(object);
+				} catch(TransactionException e) {
+					throw new InternalErrorException(object.getResourceFullName());
+				}
+			}
+			
 			try {
 				result = resourceModifier.call();
 			} catch(S3Exception e) {
@@ -104,55 +174,85 @@ public class DbObjectManagerImpl implements ObjectManager {
 				throw e;
 			} catch(Exception e) {
 				LOG.error("Error calling modify resource in object delete", e);
-				InternalErrorException intEx = new InternalErrorException(bucketName + "/" + objectKey + (versionId == null ? "" : "?versionId=" + versionId));
+				InternalErrorException intEx = new InternalErrorException(object.getBucketName() + "/" + object.getObjectKey() + (object.getVersionId() == null ? "" : "?versionId=" + object.getVersionId()));
 				intEx.initCause(e);
 				throw intEx;
 			}
 		}
 		
 		try {
-			ObjectEntity objectExample = new ObjectEntity(bucketName, objectKey, versionId);			
-			Transactions.delete(objectExample);
+			Transactions.delete(object);
 		} catch (TransactionException e) {
 			if(e.getCause() instanceof NoSuchElementException) {
 				//Nothing to do, not found is okay
 			} else {
-				LOG.error("Error looking up object:" + bucketName + "/" + objectKey + " version " + versionId);
+				LOG.error("Error looking up object:" + object.getBucketName() + "/" + object.getObjectKey() + (object.getVersionId() == null ? "" : "?versionId=" + object.getVersionId()));
 				throw e;
 			}
-		}
+		} catch(NoSuchElementException e) {
+			//Ok, not found.
+		}		
 	}
 
 	@Override
 	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
-			if(resourceModifier != null) {
-				result = resourceModifier.call();
-			} else {
-				//nothing to call, so just save
+			if(object.getInternalKey() == null && object.getVersionId() == null) {
+				object.setInternalKey(object.getObjectKey() + UUID.getUUID());
 			}
-			
-			EntityTransaction db = Entities.get(ObjectEntity.class);
+
+			//Persist the new record in the 'pending' state.
 			try {
-				//Do record swap if existing record is found.
-				ObjectEntity extantEntity = null;
-				extantEntity = Entities.merge(object);
-				
-				if(result != null) {
-					extantEntity.setVersionId(result.getVersionId());
-					extantEntity.setSize(result.getSize());
-				}
-				db.commit();
-				return result;
-			} catch (Exception e) {
-				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
-				throw e;
-			} finally {
-				if(db != null && db.isActive()) {
-					db.rollback();
-				}
+				object = Transactions.saveDirect(object);
+			} catch(TransactionException e) {
+				//Fail. Could not persist.
+				LOG.error("Transaction error creating initial object metadata for " + object.getResourceFullName(), e);
+			} catch(Exception e) {
+				//Fail. Unknown.
+				LOG.error("Error creating initial object metadata for " + object.getResourceFullName(), e);
 			}
+						
+			//Send the data through to the backend
+			if(resourceModifier != null) {		
+				//This could be a long-lived operation...minutes
+				result = resourceModifier.call();
+		
+				Date updatedDate = null;
+				//Update the record and cleanup
+				if(result != null) {
+					object.setVersionId(result.getVersionId());
+					object.setSize(result.getSize());
+					object.seteTag(result.getEtag());
+					
+					try {
+						updatedDate = DateUtils.parseRfc822DateTime(result.getLastModified());
+					} catch(ParseException e) {
+						LOG.warn("Error parsing returned date from osg backend as RFC822: " + result.getLastModified() + " trying ISO8601", e);
+						try {
+							updatedDate = DateUtils.parseIso8601DateTimeOrDate(result.getLastModified());
+						} catch(ParseException ex) {
+							LOG.warn("Error parsing returned date from osg backend: " + result.getLastModified() + " using current time instead", e);
+							updatedDate = new Date();
+						}
+					}
+				} else {
+					updatedDate = new Date();					
+				}				
+				object.setObjectModifiedTimestamp(updatedDate);
+
+				//Update metadata post-call
+				try {
+					Transactions.save(object);
+					return result;
+				} catch (Exception e) {
+					LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
+					throw e;
+				}
+			} else {
+				//No Callable, so no result, just save the entity as given.
+			}
+			return result;
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
 			try {
@@ -237,7 +337,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 	@Override
 	public PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName,
-			int maxVersions,
+			int maxEntries,
 			String prefix,
 			String delimiter,
 			String fromKeyMarker,
@@ -250,23 +350,29 @@ public class DbObjectManagerImpl implements ObjectManager {
 		try {
 			PaginatedResult<ObjectEntity> result = new PaginatedResult<ObjectEntity>();
 			HashSet<String> commonPrefixes = new HashSet<String>(); //set of common prefixes found
+			
 			//Include zero since 'istruncated' is still valid
-			if (maxVersions >= 0) {
-				final int queryStrideSize = maxVersions+ 1;
+			if (maxEntries >= 0) {
+				final int queryStrideSize = maxEntries+ 1;
 				ObjectEntity searchObj = new ObjectEntity();
 				searchObj.setBucketName(bucketName);
-				searchObj.setLast(latestOnly);				
+
 				//Return latest version, so exclude delete markers as well.
 				//This makes listVersion act like listObjects
-				if(latestOnly) {			
+				if(latestOnly) {
 					searchObj.setDeleted(false);
 				} else {
 				}
 				
 				Criteria objCriteria = Entities.createCriteria(ObjectEntity.class);
+				objCriteria.setReadOnly(true);
+				objCriteria.setFetchSize(queryStrideSize);
 				objCriteria.add(Example.create(searchObj));
 				objCriteria.addOrder(Order.asc("objectKey"));
 				objCriteria.setMaxResults(queryStrideSize);
+				objCriteria.add(ObjectEntity.getNotPendingRestriction());
+				objCriteria.add(ObjectEntity.getNotDeletingRestriction());
+				objCriteria.add(ObjectEntity.getNotSnapshotRestriction());
 				
 				if (!Strings.isNullOrEmpty(fromKeyMarker)) {
 					objCriteria.add(Restrictions.gt("objectKey", fromKeyMarker));
@@ -298,6 +404,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				String[] parts = null;
 				String prefixString = null;
 				boolean useDelimiter = Strings.isNullOrEmpty(delimiter);
+				int pages = 0;
 				
 				// Iterate over result sets of size maxkeys + 1 since
 				// commonPrefixes collapse the list, we may examine many more records than maxkeys + 1
@@ -305,10 +412,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 					objectKey = null;
 					parts = null;
 					prefixString = null;
-					if (resultKeyCount > 0) { 
-						// Start from end of last round-trip if necessary
-						objCriteria.setFirstResult(queryStrideSize);
-					}
+					
+					//Skip ahead the next page of 'queryStrideSize' results.
+					objCriteria.setFirstResult(pages++*queryStrideSize);
 					
 					objectInfos = (List<ObjectEntity>) objCriteria.list();
 					if(objectInfos == null) {
@@ -323,7 +429,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 							if (parts.length > 1) {
 								prefixString = prefix + delimiter + parts[0] + delimiter;
 								if (!commonPrefixes.contains(prefixString)) {
-									if (resultKeyCount == maxVersions) {
+									if (resultKeyCount == maxEntries) {
 										// This is a new record, so we know we're truncating if this is true
 										result.setIsTruncated(true);
 										resultKeyCount++;
@@ -341,7 +447,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 							}
 						}
 						
-						if (resultKeyCount == maxVersions) {
+						if (resultKeyCount == maxEntries) {
 							// This is a new (non-commonprefix) record, so
 							// we know we're truncating							
 							result.setIsTruncated(true);
@@ -353,10 +459,10 @@ public class DbObjectManagerImpl implements ObjectManager {
 						resultKeyCount++;
 					}
 					
-					if (resultKeyCount <= maxVersions && objectInfos.size() <= maxVersions) {
+					if (resultKeyCount <= maxEntries && objectInfos.size() <= maxEntries) {
 						break;
-					}
-				} while (resultKeyCount <= maxVersions);
+					}					
+				} while (resultKeyCount <= maxEntries);
 				
 				// Sort the prefixes from the hashtable and add to the reply
 				if (commonPrefixes != null) {	

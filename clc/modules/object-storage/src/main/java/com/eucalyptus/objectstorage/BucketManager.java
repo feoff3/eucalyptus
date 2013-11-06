@@ -125,4 +125,21 @@ public interface BucketManager {
 	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
 	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;
 	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;	
+	
+	/**
+	 * Get a versionId for an object, since this is based on the bucket config
+	 * @param bucketEntity
+	 * @return
+	 * @throws TransactionException
+	 * @throws S3Exception
+	 */
+	public abstract String getVersionId(Bucket bucketEntity) throws TransactionException, S3Exception;
+	
+	/**
+	 * Returns the approximate total size of all objects in all buckets
+	 * in the system. This is not guaranteed to be consistent. An approximation
+	 * at best.
+	 * @return
+	 */
+	public long totalSizeOfAllBuckets();
 }

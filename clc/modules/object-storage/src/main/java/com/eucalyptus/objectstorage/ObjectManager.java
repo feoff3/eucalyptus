@@ -97,7 +97,7 @@ public interface ObjectManager {
 	 * @throws S3Exception
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> void delete(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
+	public abstract <T,F> void delete(ObjectEntity object,  CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state

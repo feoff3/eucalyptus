@@ -20,6 +20,8 @@
 
 package com.eucalyptus.objectstorage.entities;
 
+import java.util.Date;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
@@ -30,7 +32,8 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 import org.hibernate.annotations.OptimisticLocking;
-import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Restrictions;
 
 @Entity
 @OptimisticLocking(type = OptimisticLockType.NONE)
@@ -47,19 +50,42 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="version_id")
     private String versionId; //VersionId is required to uniquely identify ACLs and auth
 
-    @Column(name="size")
+    @Column(name="internal_key")
+    private String internalKey; //The a uuid for this specific object content & request
+
+	@Column(name="size")
     private Long size;
 
     @Column(name="storage_class")
     private String storageClass;
 
+    //If set in conjunction with the versionId == null, indicates the object is pending delete, if set with versionId != null, indicates DeleteMarker
     @Column(name="is_deleted")
-    private Boolean deleted;
-    
-    @Column(name="is_last")
-    private Boolean last;
+    private Boolean deleted; 
             
-    /**
+    @Column(name="object_last_modified") //Distinct from the record modification date, tracks the backend response
+    private Date objectModifiedTimestamp;
+    
+    @Column(name="etag")
+    private String eTag;        
+
+	public String geteTag() {
+		return eTag;
+	}
+
+	public void seteTag(String eTag) {
+		this.eTag = eTag;
+	}
+
+	public Date getObjectModifiedTimestamp() {
+		return objectModifiedTimestamp;
+	}
+
+	public void setObjectModifiedTimestamp(Date objectModifiedTimestamp) {
+		this.objectModifiedTimestamp = objectModifiedTimestamp;
+	}
+
+	/**
      * Used to denote the object as a snapshot, for special access-control considerations.
      */
     @Column(name="is_snapshot")
@@ -77,7 +103,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     }
     
 	@Override
-	protected String getResourceFullName() {
+	public String getResourceFullName() {
 		return getBucketName() + "/" + getObjectKey();
 	}
 
@@ -113,13 +139,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.storageClass = storageClass;
     }
     
-    /*
-    public Map<String, String> getUserMetadataMap() throws Exception {    	    	
-    	JSONObject jsonMap = (JSONObject)JSONSerializer.toJSON(this.getUserMetadata());
-    	return (Map<String,String>)jsonMap;
-    }
-    */
-    
     public Boolean getDeleted() {
 		return deleted;
 	}
@@ -140,15 +159,18 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         return this.objectKey.compareTo(((ObjectEntity)o).getObjectKey());
     }
 
+	public boolean isPending() {
+		return (getObjectModifiedTimestamp() == null);
+	}
 	
-	public Boolean getLast() {
-		return last;
+	public String getInternalKey() {
+		return internalKey;
 	}
-
-	public void setLast(Boolean last) {
-		this.last = last;
+	
+	public void setInternalKey(String internalKey) {
+		this.internalKey = internalKey;
 	}
-
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -196,8 +218,19 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	public void setIsSnapshot(Boolean isSnapshot) {
 		this.isSnapshot = isSnapshot;
 	}
-
-	public void setResourceAcl(AccessControlPolicy policy) {
-		
+	
+	public static Criterion getNotSnapshotRestriction() {
+		return Restrictions.ne("is_snapshot", true);
+	}
+	
+	public static Criterion getNotPendingRestriction() {
+		return Restrictions.isNotNull("object_modified_date");
+	}
+	
+	/* versionId == null && is_deleted == true
+	 * if versionId != null, then is_deleted indicates a deleteMarker
+	 */
+	public static Criterion getNotDeletingRestriction() {
+		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("is_deleted", true));
 	}
 }

@@ -32,6 +32,7 @@ public class PaginatedResult<T> {
 	protected List<T> entityList;
 	protected List<String> commonPrefixes;
 	protected boolean isTruncated;
+	protected Object lastEntry;
 	
 	public PaginatedResult() {
 		this.entityList = new ArrayList<T>();
@@ -64,5 +65,18 @@ public class PaginatedResult<T> {
 	
 	public void setIsTruncated(boolean t) {
 		this.isTruncated = t;
+	}
+	
+	/**
+	 * Returns the last object in the listing, Can be either String or type T.
+	 * Used to populate the "next" reference
+	 * @return
+	 */
+	public Object getLastEntry() {
+		return this.lastEntry;		
+	}
+	
+	public void setLastEntry(Object last) {
+		this.lastEntry = last;
 	}
 }

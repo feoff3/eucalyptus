@@ -73,9 +73,8 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	@Column( name = "owner_iam_user_id" )
 	protected String ownerIamUserId;
 
-	@Column( name = "acl")
-	@Type(type="org.hibernate.type.StringClobType")
-	@Lob
+	//8k size should cover 100 80-byte entries which allows for json chars etc 
+	@Column( name = "acl", length=8192)
 	private String acl; //A JSON encoded string that is the acl list.
 	
 	/**
@@ -97,7 +96,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * Returns the full name of the resource. e.g. bucket/object for objects or bucket for bucket
 	 * @return
 	 */
-	protected abstract String getResourceFullName();
+	public abstract String getResourceFullName();
 	
 	public String getOwnerCanonicalId() {
 		return ownerCanonicalId;

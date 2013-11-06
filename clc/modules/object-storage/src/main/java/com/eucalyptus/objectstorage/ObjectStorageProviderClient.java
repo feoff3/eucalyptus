@@ -170,7 +170,6 @@ public abstract class ObjectStorageProviderClient {
 	public abstract DeleteObjectResponseType deleteObject(
 			DeleteObjectType request) throws EucalyptusCloudException;
 
-
 	public abstract GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
 			GetObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
@@ -184,10 +183,11 @@ public abstract class ObjectStorageProviderClient {
 
 	public abstract GetObjectExtendedResponseType getObjectExtended(
 			GetObjectExtendedType request) throws EucalyptusCloudException;
-
-		public abstract CopyObjectResponseType copyObject(CopyObjectType request)
+	
+	public abstract CopyObjectResponseType copyObject(CopyObjectType request)
 			throws EucalyptusCloudException;
-
-		public abstract DeleteVersionResponseType deleteVersion(
-			DeleteVersionType request) throws EucalyptusCloudException;	
+	
+	public abstract DeleteVersionResponseType deleteVersion(
+			DeleteVersionType request) throws EucalyptusCloudException;
+	
 }

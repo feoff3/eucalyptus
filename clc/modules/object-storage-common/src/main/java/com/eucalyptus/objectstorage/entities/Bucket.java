@@ -79,7 +79,7 @@ public class Bucket extends S3AccessControlledEntity {
 	}
 	
 	@Override
-	protected String getResourceFullName() {
+	public String getResourceFullName() {
 		return getBucketName();
 	}
 

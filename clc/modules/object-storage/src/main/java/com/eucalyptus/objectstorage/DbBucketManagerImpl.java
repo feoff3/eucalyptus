@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nonnull;
@@ -47,6 +48,7 @@ import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
+import com.google.common.base.Objects;
 
 public class DbBucketManagerImpl implements BucketManager {
 	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
@@ -426,4 +428,30 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 
+	@Override
+	public String getVersionId(Bucket bucketEntity) throws TransactionException,
+			S3Exception {
+		Bucket b = Transactions.find(bucketEntity);
+		if(b.isVersioningEnabled()) {
+			return UUID.randomUUID().toString().replaceAll("-", "");
+		} else {
+			return null;
+		}
+	}
+	
+	@Override
+	public long totalSizeOfAllBuckets() {
+		long size = -1;
+		final EntityTransaction db = Entities.get( Bucket.class );
+	    try {
+	    	size = Objects.firstNonNull( (Number) Entities.createCriteria( Bucket.class )
+	    			.setProjection( Projections.sum( "bucketSize" ) )
+	    			.setReadOnly( true )
+	    			.uniqueResult(), 0 ).longValue();
+	    	db.commit();
+	    } catch (Exception e) {
+	    	db.rollback();
+	    }
+	    return size;
+	}
 }
