@@ -111,7 +111,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxRecordCount, String prefix, String delimiter, String startKey) throws TransactionException;
+	public abstract PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxRecordCount, String prefix, String delimiter, String startKey) throws TransactionException, Exception;
 
 	/**
 	 * List the object versions in the given bucket
@@ -125,7 +125,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws TransactionException;
+	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws TransactionException, Exception;
 	
 	/**
 	 * Delete the object entity

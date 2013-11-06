@@ -335,7 +335,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 	@Override
 	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey)
-			throws TransactionException {
+			throws TransactionException, Exception {
 		return listVersionsPaginated(bucketName, maxKeys, prefix, delimiter, startKey, null, true);
 		
 	}
@@ -348,7 +348,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			String fromKeyMarker,
 			String fromVersionId,
 			boolean latestOnly)
-			throws TransactionException {
+			throws TransactionException, Exception {
 		
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		try {
@@ -482,7 +482,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			return result;
 		} catch(Exception e) {
 			LOG.error("Error generating paginated object list of bucket " + bucketName, e);
-			throw new InternalError(bucketName);
+			throw e;
 		} finally {
 			db.rollback();
 		}
