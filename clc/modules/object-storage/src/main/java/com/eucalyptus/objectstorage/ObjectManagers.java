@@ -21,13 +21,13 @@
 package com.eucalyptus.objectstorage;
 
 /**
- * Manager factory for bucket metadata handler. Returns an instance
- * for the configured manager.
+ * Factory for object metadata manager. Returns instance
+ * for configured manager.
  *
  */
-public class BucketManagerFactory {
-	private static final BucketManager manager = new DbBucketManagerImpl(); 	
-	public static BucketManager getInstance() {
+public class ObjectManagers {
+	private static final ObjectManager manager = new DbObjectManagerImpl(); 	
+	public static ObjectManager getInstance() {
 		return manager;
 	}
 }

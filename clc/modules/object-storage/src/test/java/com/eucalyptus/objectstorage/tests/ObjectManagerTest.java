@@ -10,7 +10,7 @@ import org.mule.util.UUID;
 
 import com.eucalyptus.objectstorage.CallableWithRollback;
 import com.eucalyptus.objectstorage.ObjectManager;
-import com.eucalyptus.objectstorage.ObjectManagerFactory;
+import com.eucalyptus.objectstorage.ObjectManagers;
 import com.eucalyptus.objectstorage.PaginatedResult;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -25,7 +25,7 @@ import com.eucalyptus.objectstorage.util.OSGUtil;
 //Manual testing only, for now
 public class ObjectManagerTest {
 	private static final Logger LOG = Logger.getLogger(ObjectManagerTest.class);
-	static ObjectManager objectManager = ObjectManagerFactory.getInstance();
+	static ObjectManager objectManager = ObjectManagers.getInstance();
 	
 	protected static String generateVersion() {
 		return UUID.getUUID().replace("-", "");
@@ -70,7 +70,7 @@ public class ObjectManagerTest {
 			@Override
 			public PutObjectResponseType call() throws S3Exception, Exception {
 				PutObjectResponseType resp = new PutObjectResponseType();
-				resp.setLastModified(OSGUtil.dateToFormattedString(new Date()));				
+				resp.setLastModified(OSGUtil.dateToHeaderFormattedString(new Date()));				
 				resp.setVersionId(null); //no versioning
 				resp.setEtag(UUID.getUUID().replace("-",""));
 				resp.setSize(100L);
@@ -89,10 +89,10 @@ public class ObjectManagerTest {
 			for(int i = 0 ; i < entityCount ; i++) {
 				testEntity = generateFakeValidEntity(bucketName, key + String.valueOf(i), false);
 				testEntities.add(testEntity);
-				ObjectManagerFactory.getInstance().create(bucketName, testEntity, fakeModifier);
+				ObjectManagers.getInstance().create(bucketName, testEntity, fakeModifier);
 			}
 						
-			PaginatedResult<ObjectEntity> r = ObjectManagerFactory.getInstance().listPaginated(bucketName, 100, null, null, null);
+			PaginatedResult<ObjectEntity> r = ObjectManagers.getInstance().listPaginated(bucketName, 100, null, null, null);
 			
 			for(ObjectEntity e : r.getEntityList()) {
 				System.out.println(e.toString());
@@ -107,7 +107,7 @@ public class ObjectManagerTest {
 		} finally {
 			for(ObjectEntity obj : testEntities) {
 				try {
-					ObjectManagerFactory.getInstance().delete(obj, null);
+					ObjectManagers.getInstance().delete(obj, null);
 				} catch(Exception e) {
 					LOG.error("Error deleteing entity: " + obj.toString(), e);
 				}

@@ -348,7 +348,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			//Map s3 client result to euca response message
 			List<Bucket> result = s3Client.listBuckets(listRequest);
 			for(Bucket b : result) {
-				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToFormattedString(b.getCreationDate())));
+				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToHeaderFormattedString(b.getCreationDate())));
 			}
 
 			reply.setBucketList(myBucketList);
@@ -534,7 +534,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Null result. Internal error");
 			} else {
 				reply.setEtag(result.getETag());
-				reply.setVersionId(result.getVersionId());				
+				reply.setVersionId(result.getVersionId());
+				reply.setLastModified(OSGUtil.dateToHeaderFormattedString(new Date()));
 			}
 			return reply;
 		} catch(Exception e) {
@@ -598,7 +599,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				//Add entry, note that the canonical user is set based on requesting user, not returned user
 				reply.getContents().add(new ListEntry(
 						obj.getKey(),
-						OSGUtil.dateToFormattedString(obj.getLastModified()),
+						OSGUtil.dateToHeaderFormattedString(obj.getLastModified()),
 						obj.getETag(),
 						obj.getSize(),
 						ObjectStorageGateway.buildCanonicalUser(Contexts.lookup(request.getCorrelationId()).getAccount()),
@@ -1083,7 +1084,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 					v = new VersionEntry();
 					v.setKey(summary.getKey()); 
 					v.setVersionId(summary.getVersionId()); 
-					v.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified())); 
+					v.setLastModified(OSGUtil.dateToHeaderFormattedString(summary.getLastModified())); 
 					v.setEtag(summary.getETag());
 					v.setIsLatest(summary.isLatest());
 					v.setOwner(owner);
@@ -1093,7 +1094,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 					d = new DeleteMarkerEntry();
 					d.setIsLatest(summary.isLatest());
 					d.setKey(summary.getKey());
-					d.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified()));
+					d.setLastModified(OSGUtil.dateToHeaderFormattedString(summary.getLastModified()));
 					d.setOwner(owner);
 					d.setVersionId(summary.getVersionId());
 					deleteMarkers.add(d);

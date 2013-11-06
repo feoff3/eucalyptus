@@ -21,7 +21,6 @@
 package com.eucalyptus.objectstorage;
 
 import java.net.InetAddress;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.log4j.Logger;
-import org.apache.tools.ant.util.DateUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -119,6 +117,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
 import com.eucalyptus.objectstorage.util.AclUtils;
+import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
@@ -307,7 +306,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	}
 	
 	private static String generateInternalKey(String correlationId, String requestKey) {
-		return requestKey + correlationId;
+		return requestKey + "-" + correlationId;
 	}
 
 	/* PUT object */
@@ -386,7 +385,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				User requestUser = Contexts.lookup().getUser();
 				try {
 					//Get the bucket metadata
-					bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+					bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 				} catch (TransactionException e) {
 					LOG.error(e);
 				} catch(NoSuchElementException e) {
@@ -395,15 +394,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 				ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
 				
-				//Generate a versionId if necessary
-				String versionId = BucketManagerFactory.getInstance().getVersionId(bucket);
-				if(versionId == null) {
-					//Uniquely identifies this upload for this object
-					objectEntity.setInternalKey(generateInternalKey(request.getCorrelationId(), request.getKey()));					
-				} else {
-					//The versionId is sufficient and enabled on the bucket
-					objectEntity.setInternalKey(versionId);					
-				}
+				//Uniquely identifies this upload for this object
+				objectEntity.setInternalKey(generateInternalKey(request.getCorrelationId(), request.getKey()));
+
+				//Generate a versionId if necessary based on versioning status of bucket
+				String versionId = BucketManagers.getInstance().getVersionId(bucket);
 				objectEntity.setVersionId(versionId);
 				objectEntity.setDeleted(false);				
 				objectEntity.setOwnerCanonicalId(requestUser.getAccount().getCanonicalId());
@@ -418,6 +413,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				
 				try {
 					long objectSize = Long.parseLong(request.getContentLength());
+					objectEntity.setSize(objectSize);
 					newBucketSize = bucket.getBucketSize() + objectSize;
 				} catch(Exception e) {
 					LOG.error("Could not parse content length into a long: " + request.getContentLength(), e);
@@ -434,14 +430,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					//Initialize the new row
 					objectEntity.setCreationTimestamp(null);
 					final String fullObjectKey = objectEntity.getInternalKey();
+					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
 					
-					return ObjectManagerFactory.getInstance().create(request.getBucket(),
+					return ObjectManagers.getInstance().create(request.getBucket(),
 							objectEntity,
 							new CallableWithRollback<PutObjectResponseType,Boolean>() {
 
 								@Override
 								public PutObjectResponseType call() throws S3Exception, Exception {
-									//TODO: add the bucket size increment here. Or, make this a function of the BucketManager
 									return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
 								}
 
@@ -552,7 +548,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		try {	
-			Bucket bucket = BucketManagerFactory.getInstance().get(request.getBucket(), Contexts.lookup().hasAdministrativePrivileges(), null);
+			Bucket bucket = BucketManagers.getInstance().get(request.getBucket(), Contexts.lookup().hasAdministrativePrivileges(), null);
 
 			if(bucket == null) {
 				throw new NoSuchBucketException(request.getBucket());				
@@ -586,7 +582,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		try {
 			canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
 			userId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getUserId();
-			bucketCount = BucketManagerFactory.getInstance().countByUser(userId, false, null);
+			bucketCount = BucketManagers.getInstance().countByUser(userId, false, null);
 		} catch( AuthException e) {
 			LOG.error("Failed userID lookup for accesskeyID " + request.getAccessKeyID());
 			throw new AccessDeniedException(request.getBucket());
@@ -620,7 +616,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				 */
 				if (ObjectStorageProperties.shouldEnforceUsageLimits
 						&& !Contexts.lookup().hasAdministrativePrivileges() &&					
-						BucketManagerFactory.getInstance().countByAccount(canonicalId, true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
+						BucketManagers.getInstance().countByAccount(canonicalId, true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
 
@@ -635,7 +631,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new InternalErrorException(request.getBucket());
 				}
 						
-				return BucketManagerFactory.getInstance().create(request.getBucket(),
+				return BucketManagers.getInstance().create(request.getBucket(),
 						canonicalId,
 						userId,
 						aclString,
@@ -681,7 +677,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -699,7 +695,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 				long objectCount = 0;
 				try {
-					objectCount = ObjectManagerFactory.getInstance().count(bucket.getBucketName());
+					objectCount = ObjectManagers.getInstance().count(bucket.getBucketName());
 				} catch(Exception e) {
 					//Bail if we can't confirm bucket is empty.
 					LOG.error("Error fetching object count for bucket " + bucket.getBucketName());
@@ -710,7 +706,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new BucketNotEmptyException(bucket.getBucketName());
 				} else {
 					try {
-						return BucketManagerFactory.getInstance().delete(bucket, new CallableWithRollback<DeleteBucketResponseType, Boolean>() {
+						return BucketManagers.getInstance().delete(bucket, new CallableWithRollback<DeleteBucketResponseType, Boolean>() {
 							
 							@Override
 							public DeleteBucketResponseType call() throws Exception {
@@ -740,7 +736,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		bucketList.setBuckets(new ArrayList<BucketListEntry>());
 		for(Bucket b : buckets ) {
 			bucketList.getBuckets().add(new BucketListEntry(b.getBucketName(),
-					DateUtils.format(b.getCreationDate().getTime(),DateUtils.ALT_ISO8601_DATE_PATTERN)));
+					OSGUtil.dateToRFC822FormattedString(b.getCreationDate())));
 		}
 		return bucketList;
 	}
@@ -772,7 +768,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 			}
 			try {
-				List<Bucket> listing = BucketManagerFactory.getInstance().list(accnt.getCanonicalId(), false, null);
+				List<Bucket> listing = BucketManagers.getInstance().list(accnt.getCanonicalId(), false, null);
 				response.setBucketList(generateBucketListing(listing));
 				response.setOwner(buildCanonicalUser(accnt));
 				return response;
@@ -793,7 +789,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/?acl");
@@ -839,8 +835,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		Bucket bucket = null;
 		ObjectEntity objectEntity = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
-			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
 			throw new InternalErrorException(request.getBucket());
@@ -856,7 +852,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
 				//Get the listing from the back-end and copy results in.
 				try {
-					ObjectManagerFactory.getInstance().delete(objectEntity,
+					ObjectManagers.getInstance().delete(objectEntity,
 							new CallableWithRollback<DeleteObjectResponseType,Boolean>() {
 								public DeleteObjectResponseType call() throws S3Exception, Exception {
 									return ospClient.deleteObject(request);
@@ -887,7 +883,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket listBucket = null;
 		try {
-			listBucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			listBucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
 			throw new InternalErrorException(request.getBucket());
@@ -915,7 +911,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				
 				PaginatedResult<ObjectEntity> result = null;
 				try {
-					result = ObjectManagerFactory.getInstance().listPaginated(request.getBucket(), maxKeys, request.getPrefix(), request.getDelimiter(), request.getMarker());									
+					result = ObjectManagers.getInstance().listPaginated(request.getBucket(), maxKeys, request.getPrefix(), request.getDelimiter(), request.getMarker());									
 				} catch(Exception e) {
 					LOG.error("Error getting object listing for bucket: " + request.getBucket(), e);
 					throw new InternalErrorException(request.getBucket());
@@ -957,7 +953,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
 		try {
-			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
@@ -994,7 +990,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/?acl");
@@ -1033,7 +1029,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					}
 				}			
 				try {
-					return BucketManagerFactory.getInstance().setAcp(bucket, aclString,
+					return BucketManagers.getInstance().setAcp(bucket, aclString,
 							new CallableWithRollback<SetRESTBucketAccessControlPolicyResponseType, Boolean>() {
 						
 						@Override
@@ -1068,8 +1064,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectEntity objectEntity = null;
 		Bucket bucket = null;
 		try {
-			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
@@ -1113,7 +1109,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					}
 					
 					//Get the listing from the back-end and copy results in.
-					return ObjectManagerFactory.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), 
+					return ObjectManagers.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), 
 							new CallableWithRollback<SetRESTObjectAccessControlPolicyResponseType, Boolean>() {
 
 								@Override
@@ -1150,7 +1146,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			User requestUser = Contexts.lookup().getUser();			
 			try {
 				//Handle the pass-through
-				objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+				objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
 			} catch (TransactionException e) {
 				LOG.error(e);
 			} catch(NoSuchElementException e) {
@@ -1198,7 +1194,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			User requestUser = Contexts.lookup().getUser();			
 			try {
 				//Handle the pass-through
-				objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), null);
+				objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);
 			} catch (TransactionException e) {
 				LOG.error(e);
 			} catch(NoSuchElementException e) {
@@ -1227,7 +1223,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);		
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1257,7 +1253,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1267,7 +1263,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		ObjectEntity objectEntity = null;
 		try {
-			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), null);
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1296,7 +1292,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1313,7 +1309,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				if(bucket.getLoggingEnabled()) {
 					Bucket targetBucket = null;
 					try {
-						targetBucket = BucketManagerFactory.getInstance().get(bucket.getTargetBucket(), false, null);
+						targetBucket = BucketManagers.getInstance().get(bucket.getTargetBucket(), false, null);
 					} catch(Exception e) {
 						LOG.error("Error locating target bucket info for bucket " + request.getBucket() + " on target bucket " + bucket.getTargetBucket(), e);
 					}
@@ -1350,7 +1346,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1379,7 +1375,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1410,7 +1406,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket bucket = null;
 		try {
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			throw new InternalErrorException(request.getBucket());
 		} catch(NoSuchElementException e) {
@@ -1427,7 +1423,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					final String bucketName = request.getBucket();
 					final VersioningStatus newState = VersioningStatus.valueOf(request.getVersioningStatus());
 					
-					return BucketManagerFactory.getInstance().setVersioning(bucket, 
+					return BucketManagers.getInstance().setVersioning(bucket, 
 							newState, 
 							new CallableWithRollback<SetBucketVersioningStatusResponseType, Boolean>() {
 						
@@ -1472,7 +1468,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		Bucket listBucket = null;
 		try {
-			listBucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			listBucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
 			throw new InternalErrorException(request.getBucket());
@@ -1502,8 +1498,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectEntity objectEntity = null;
 		Bucket bucket = null;
 		try {
-			objectEntity = ObjectManagerFactory.getInstance().get(request.getBucket(), request.getKey(), request.getVersionid());
-			bucket = BucketManagerFactory.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionid());
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(TransactionException e) {
 			LOG.error("Error getting metadata for delete version operation on " + request.getBucket() + "/" + request.getKey() + "?version=" + request.getVersionid());
 			throw new InternalErrorException(request.getBucket());
@@ -1521,7 +1517,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				backendRequest.setKey(objectEntity.getInternalKey());
 				backendRequest.setVersionid(request.getVersionid());
 				
-				ObjectManagerFactory.getInstance().delete(objectEntity, new CallableWithRollback<DeleteVersionResponseType, Boolean>() {
+				ObjectManagers.getInstance().delete(objectEntity, new CallableWithRollback<DeleteVersionResponseType, Boolean>() {
 					@Override
 					public DeleteVersionResponseType call() throws S3Exception,
 					Exception {

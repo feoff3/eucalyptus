@@ -20,7 +20,6 @@
 
 package com.eucalyptus.objectstorage;
 
-import java.text.ParseException;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -30,13 +29,11 @@ import java.util.NoSuchElementException;
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
-import org.apache.tools.ant.util.DateUtils;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
-import org.mule.util.UUID;
 
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
@@ -46,6 +43,7 @@ import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
+import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.google.common.base.Strings;
 
@@ -185,7 +183,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			Transactions.delete(object);
 
 			//Update bucket size
-			BucketManagerFactory.getInstance().updateBucketSize(object.getBucketName(), -object.getSize());
+			BucketManagers.getInstance().updateBucketSize(object.getBucketName(), -object.getSize());
 		} catch (TransactionException e) {
 			if(e.getCause() instanceof NoSuchElementException) {
 				//Nothing to do, not found is okay
@@ -223,24 +221,21 @@ public class DbObjectManagerImpl implements ObjectManager {
 				//Update the record and cleanup
 				if(result != null) {
 					object.setVersionId(result.getVersionId());
-					object.setSize(result.getSize());
 					object.seteTag(result.getEtag());
 					
-					try {
-						updatedDate = DateUtils.parseRfc822DateTime(result.getLastModified());
-					} catch(ParseException e) {
-						LOG.warn("Error parsing returned date from osg backend as RFC822: " + result.getLastModified() + " trying ISO8601", e);
-						try {
-							updatedDate = DateUtils.parseIso8601DateTimeOrDate(result.getLastModified());
-						} catch(ParseException ex) {
-							LOG.warn("Error parsing returned date from osg backend: " + result.getLastModified() + " using current time instead", e);
-							updatedDate = new Date();
+					if(result.getLastModified() != null) {
+						updatedDate = OSGUtil.dateFromHeaderFormattedString(result.getLastModified());
+						if(updatedDate == null) {							
+							updatedDate = OSGUtil.dateFromRFC822FormattedString(result.getLastModified());
 						}
+					} else {
+						updatedDate = new Date();					
 					}
 				} else {
-					updatedDate = new Date();					
-				}				
-				object.setObjectModifiedTimestamp(updatedDate);
+					throw new Exception("Backend returned null result");
+				}
+				
+				object.setObjectModifiedTimestamp(updatedDate);				
 
 				//Update metadata post-call
 				try {
@@ -252,10 +247,15 @@ public class DbObjectManagerImpl implements ObjectManager {
 				}
 			} else {
 				//No Callable, so no result, just save the entity as given.
+				object.setLastUpdateTimestamp(new Date());
 			}
 			
 			//Update bucket size
-			BucketManagerFactory.getInstance().updateBucketSize(bucketName, object.getSize());
+			try {
+				BucketManagers.getInstance().updateBucketSize(bucketName, object.getSize());
+			} catch(Exception e) {
+				LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", e);
+			}
 			
 			return result;
 		} catch(S3Exception e) {

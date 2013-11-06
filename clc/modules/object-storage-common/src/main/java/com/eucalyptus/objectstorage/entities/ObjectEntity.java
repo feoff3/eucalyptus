@@ -73,7 +73,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     private Date objectModifiedTimestamp;
     
     @Column(name="etag")
-    private String eTag;        
+    private String eTag;
 
 	public String geteTag() {
 		return eTag;
@@ -244,7 +244,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		ListEntry e = new ListEntry();
 		e.setEtag(this.geteTag());
 		e.setKey(this.getObjectKey());
-		e.setLastModified(OSGUtil.dateToFormattedString(this.getObjectModifiedTimestamp()));
+		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
 		String displayName = "";
 		try {
@@ -262,7 +262,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setEtag(this.geteTag());
 		e.setKey(this.getObjectKey());
 		e.setVersionId(this.getVersionId());
-		e.setLastModified(OSGUtil.dateToFormattedString(this.getObjectModifiedTimestamp()));
+		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
 
 		//TODO: fix this, need to add entry to record? avoid query lookup
