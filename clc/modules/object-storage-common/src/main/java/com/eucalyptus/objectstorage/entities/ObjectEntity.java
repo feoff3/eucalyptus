@@ -237,7 +237,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	 * if versionId != null, then is_deleted indicates a deleteMarker
 	 */
 	public static Criterion getNotDeletingRestriction() {
-		return Restrictions.and(Restrictions.isNotNull("versionIdd"), Restrictions.eq("deleted", true));
+		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("deleted", true));
 	}
 	
 	public ListEntry toListEntry() {
