@@ -156,6 +156,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			if(!object.getDeleted()) {
 				try {
 					object.setDeleted(true);
+					object.setVersionId(null); //remove version Id.
 					Transactions.save(object);
 				} catch(TransactionException e) {
 					throw new InternalErrorException(object.getResourceFullName());
@@ -182,6 +183,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 		
 		try {
 			Transactions.delete(object);
+
+			//Update bucket size
+			BucketManagerFactory.getInstance().updateBucketSize(object.getBucketName(), -object.getSize());
 		} catch (TransactionException e) {
 			if(e.getCause() instanceof NoSuchElementException) {
 				//Nothing to do, not found is okay
@@ -198,10 +202,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
-			if(object.getInternalKey() == null && object.getVersionId() == null) {
-				object.setInternalKey(object.getObjectKey() + UUID.getUUID());
-			}
-
+			
 			//Persist the new record in the 'pending' state.
 			try {
 				object = Transactions.saveDirect(object);
@@ -252,6 +253,10 @@ public class DbObjectManagerImpl implements ObjectManager {
 			} else {
 				//No Callable, so no result, just save the entity as given.
 			}
+			
+			//Update bucket size
+			BucketManagerFactory.getInstance().updateBucketSize(bucketName, object.getSize());
+			
 			return result;
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());

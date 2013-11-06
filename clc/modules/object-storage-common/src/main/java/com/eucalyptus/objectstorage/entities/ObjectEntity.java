@@ -50,8 +50,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="version_id")
     private String versionId; //VersionId is required to uniquely identify ACLs and auth
 
-    @Column(name="internal_key")
-    private String internalKey; //The a uuid for this specific object content & request
+    @Column(name="objectUuid")
+    private String objectUuid; //The a uuid for this specific object content & request
 
 	@Column(name="size")
     private Long size;
@@ -164,11 +164,11 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	}
 	
 	public String getInternalKey() {
-		return internalKey;
+		return objectUuid;
 	}
 	
 	public void setInternalKey(String internalKey) {
-		this.internalKey = internalKey;
+		this.objectUuid = internalKey;
 	}
 	
 	@Override

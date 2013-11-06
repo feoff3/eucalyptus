@@ -39,6 +39,16 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatu
  */
 public interface BucketManager {
 
+	
+	/**
+	 * Change bucket size estimate. sizeToChange can be any value. Negatives decrement, positives
+	 * increment the size
+	 * @param bucketName
+	 * @param sizeToChange
+	 * @throws TransactionException
+	 */
+	public abstract void updateBucketSize(String bucketName, long sizeToChange) throws TransactionException;
+	
 	/**
 	 * Create the bucket
 	 * @param bucketName

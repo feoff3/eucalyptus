@@ -32,6 +32,45 @@ import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
  * @author zhill
  *
  */
+
+/*
+ * State of an object:
+ * (key, uuid, lastModified, versionId, isDeleted)
+ * 
+ * Possible permutations:
+ * 
+ * A: (key=null, ...)
+ * invalid. Key must always be set.
+ * 
+ * B: (key=non-null, uuid=null, lastModified=null, versionId=null, isDeleted=false)
+ * Initialized but not persisted, not-deleted, not confirmed to exist in back-end. This is
+ * an error state for an Object if found in the DB in this state. uuid must be set on any
+ * persisted object metadata
+ * 
+ * C: (key=non-null, uuid=non-null, lastModified=null, versionId=null, isDeleted=false)
+ * Valid for an in-progress upload to the back-end
+ *
+ * D: (key=non-null, uuid=non-null, lastModified=non-null, versionId=null, isDeleted=false)
+ * A valid persisted object that was confirmed to be stored in back-end.
+ * Versioning is not enabled on the bucket (or versionId would be set)
+ *
+ * E: (key=non-null, uuid=non-null, lastModified=non-null, versionId=non-null, isDeleted=false)
+ * A valid persisted object that was confirmed to be stored in back-end.
+ * Versioning enabled bucket (at time of PUT). versionId may = uuid, but not necessarily
+ *
+ * F: (key=non-null, uuid=non-null, lastModified=non-null, versionId=null, isDeleted=true)
+ * A valid non-versioned object persisted on the backend. This may be the
+ * "latest" object depending on the lastModified date and other records.
+ * 
+ * G: (key=non-null, uuid=non-null, lastModified=non-null, versionId=non-null, isDeleted=true)
+ * A "delete marker" entry with the given versionId. No corresponding backend resource guaranteed,
+ * but may exist (e.g. another delete marker for backend)
+ *  
+ *   
+ * For deletion of an object with versionid set, null the versionId and set isDeleted=true. At
+ * that point it is no-longer a delete-marker and can/will be cleaned from backend
+ * 
+ */
 public interface ObjectManager {
 	
 	/**

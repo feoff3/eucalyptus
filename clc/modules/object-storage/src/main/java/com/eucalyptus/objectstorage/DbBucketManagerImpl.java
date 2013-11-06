@@ -48,6 +48,7 @@ import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
+import com.google.common.base.Function;
 import com.google.common.base.Objects;
 
 public class DbBucketManagerImpl implements BucketManager {
@@ -453,5 +454,27 @@ public class DbBucketManagerImpl implements BucketManager {
 	    	db.rollback();
 	    }
 	    return size;
+	}
+
+	@Override
+	public void updateBucketSize(String bucketName, final long sizeToChange) throws TransactionException {
+		Function<String, Bucket> incrementSize = new Function<String, Bucket>() {
+			@Override
+			public Bucket apply(String bucketName) {
+				Bucket b;
+				try {
+					b = Entities.uniqueResult(new Bucket(bucketName));
+					b.setBucketSize(b.getBucketSize() + sizeToChange);
+					Entities.mergeDirect(b);
+					return b;
+				} catch (TransactionException | NoSuchElementException e) {
+					LOG.error("Error updating bucket " + bucketName + " size by " + sizeToChange,e);
+				}
+				return null;
+			}
+			
+		};
+		
+		Entities.asTransaction(incrementSize).apply(bucketName);
 	}
 }
