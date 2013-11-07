@@ -35,6 +35,7 @@ import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.Projections;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
@@ -114,17 +115,16 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public <T,R> T create(@Nonnull String bucketName, 
-			@Nonnull String ownerCanonicalId,
-			@Nonnull String ownerIamUserId,
+			@Nonnull User owner,
 			@Nonnull String acl, 
 			@Nonnull String location,
-			@Nullable CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<T,R> resourceModifier) throws Exception, TransactionException {
 
 		Bucket newBucket = new Bucket(bucketName);
 		try {
 			Bucket foundBucket = Transactions.find(newBucket);
 			if(foundBucket != null) {
-				if(foundBucket.getOwnerCanonicalId().equals(ownerCanonicalId)) {
+				if(foundBucket.getOwnerCanonicalId().equals(owner.getAccount().getCanonicalId())) {
 					throw new BucketAlreadyOwnedByYouException(bucketName);
 				} else {
 					throw new BucketAlreadyExistsException(bucketName);
@@ -138,13 +138,14 @@ public class DbBucketManagerImpl implements BucketManager {
 			throw new InternalErrorException(bucketName);
 		}
 		
-		newBucket.setOwnerCanonicalId(ownerCanonicalId);
+		newBucket.setOwnerCanonicalId(owner.getAccount().getCanonicalId());
+		newBucket.setOwnerDisplayName(owner.getAccount().getName());
+		newBucket.setOwnerIamUserId(owner.getUserId());
 		newBucket.setBucketSize(0L);
 		newBucket.setHidden(false);
 		newBucket.setAcl(acl);
 		newBucket.setLocation(location);
-		newBucket.setLoggingEnabled(false);
-		newBucket.setOwnerIamUserId(ownerIamUserId);
+		newBucket.setLoggingEnabled(false);		
 		newBucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
 		newBucket.setCreationDate(new Date());
 		

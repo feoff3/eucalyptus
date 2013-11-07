@@ -77,6 +77,9 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	@Column( name = "acl", length=8192)
 	private String acl; //A JSON encoded string that is the acl list.
 	
+	@Column( name = "owner_displayname")
+	protected String ownerDisplayName;
+	
 	/**
 	 * Map for running actual checks against. Saved to optimize multiple accesses. Caching
 	 */
@@ -113,6 +116,14 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	public void setOwnerIamUserId(String ownerIamUserId) {
 		this.ownerIamUserId = ownerIamUserId;
 	}
+	
+	public String getOwnerDisplayName() {
+		return ownerDisplayName;
+	}
+
+	public void setOwnerDisplayName(String ownerDisplayName) {
+		this.ownerDisplayName = ownerDisplayName;
+	}
 
 	/**
 	 * For internal and JPA use only. This returns a json string
@@ -137,7 +148,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 		
 		//Add the owner info if not already set
 		if(policy.getOwner() == null && this.getOwnerCanonicalId() != null) {
-			policy.setOwner(new CanonicalUser(this.getOwnerCanonicalId(),""));
+			policy.setOwner(new CanonicalUser(this.getOwnerCanonicalId(),this.getOwnerDisplayName()));
 		} else {
 			//Already present or can't be set
 		}

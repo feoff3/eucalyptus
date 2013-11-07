@@ -572,18 +572,13 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public CreateBucketResponseType createBucket(final CreateBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
-		String userId = null;
-		String canonicalId = null;
 		long bucketCount = 0;
+		User requestUser = null;
 		try {
-			canonicalId = Contexts.lookup(request.getCorrelationId()).getAccount().getCanonicalId();
-			userId = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID()).getUserId();
-			bucketCount = BucketManagers.getInstance().countByUser(userId, false, null);
-		} catch( AuthException e) {
-			LOG.error("Failed userID lookup for accesskeyID " + request.getAccessKeyID());
-			throw new AccessDeniedException(request.getBucket());
+			requestUser = Contexts.lookup(request.getCorrelationId()).getUser();
+			bucketCount = BucketManagers.getInstance().countByUser(requestUser.getUserId(), false, null);
 		} catch(ExecutionException e) {
-			LOG.error("Failed getting bucket count for user " + userId);
+			LOG.error("Failed getting bucket count for user " + requestUser.getUserId());
 			//Don't fail the operation, the count may not be important
 			bucketCount = 0;
 		} catch (NoSuchContextException e) {
@@ -612,14 +607,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				 */
 				if (ObjectStorageProperties.shouldEnforceUsageLimits
 						&& !Contexts.lookup().hasAdministrativePrivileges() &&					
-						BucketManagers.getInstance().countByAccount(canonicalId, true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
+						BucketManagers.getInstance().countByAccount(requestUser.getAccount().getCanonicalId(), true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
 
 				final AccessControlPolicy acPolicy = new AccessControlPolicy();				
-				acPolicy.setOwner(new CanonicalUser(canonicalId,""));
+				acPolicy.setOwner(buildCanonicalUser(requestUser.getAccount()));
 				acPolicy.setAccessControlList(
-						AclUtils.expandCannedAcl(request.getAccessControlList(), canonicalId, null));
+						AclUtils.expandCannedAcl(request.getAccessControlList(), requestUser.getAccount().getCanonicalId(), null));
 				
 				String aclString = S3AccessControlledEntity.marshallACPToString(acPolicy);
 				if(aclString == null) {
@@ -628,8 +623,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 						
 				return BucketManagers.getInstance().create(request.getBucket(),
-						canonicalId,
-						userId,
+						requestUser,
 						aclString,
 						request.getLocationConstraint(),
 						new CallableWithRollback<CreateBucketResponseType, Boolean>() {

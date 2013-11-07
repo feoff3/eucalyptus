@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -58,11 +59,10 @@ public interface BucketManager {
 	 * @throws TransactionException
 	 */
 	public abstract <T extends Object ,R extends Object> T create(String bucketName, 
-			 String ownerCanonicalId,
-			 String ownerIamUserId,
+			 User owner,
 			 String acl, 
 			 String location,			
-			 CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<T,R> resourceModifier) throws Exception, TransactionException;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.

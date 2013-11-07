@@ -115,18 +115,12 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     		this.setObjectUuid(generateInternalKey(requestId, objectKey));
     	}
     	
-    	this.setDeleted(false);
-    	String ownerCanonicalId = null;
-    	try {
-    		ownerCanonicalId = usr.getAccount().getCanonicalId();    		
-    	} catch(AuthException e) {
-    		LOG.error("Failed to lookup canonical ID for user: " + usr.getName() + " id= " + usr.getUserId());
-    		throw e;
-    	}
+    	this.setDeleted(false);    	
     	
     	String ownerIamId = usr.getUserId();
-    	this.setOwnerCanonicalId(ownerCanonicalId);
-    	this.setOwnerIamUserId(ownerIamId);
+    	this.setOwnerCanonicalId(usr.getAccount().getCanonicalId());
+    	this.setOwnerDisplayName(usr.getAccount().getName());
+    	this.setOwnerIamUserId(ownerIamId);    	
     	this.setObjectModifiedTimestamp(null);
     	this.setSize(contentLength);
     	this.setIsSnapshot(false);    	
@@ -150,17 +144,11 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	ObjectEntity deleteMarker = new ObjectEntity(this.getBucketName(), this.getObjectKey(), versionId);    	    
     	deleteMarker.setObjectUuid(generateInternalKey(requestId, objectKey));    	
     	deleteMarker.setDeleted(true);
-    	String ownerCanonicalId = null;
-    	try {
-    		usr.getAccount().getCanonicalId();    		
-    	} catch(AuthException e) {
-    		LOG.error("Failed to lookup canonical ID for user: " + usr.getName() + " id= " + usr.getUserId());
-    		throw e;
-    	}
     	
     	String ownerIamId = usr.getUserId();
-    	deleteMarker.setOwnerCanonicalId(ownerCanonicalId);
+    	deleteMarker.setOwnerCanonicalId(usr.getAccount().getCanonicalId());
     	deleteMarker.setOwnerIamUserId(ownerIamId);
+    	deleteMarker.setOwnerDisplayName(usr.getAccount().getName());
     	deleteMarker.setObjectModifiedTimestamp(null);
     	deleteMarker.setDeletedTimestamp(null);
     	return deleteMarker;
@@ -362,15 +350,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setKey(this.getObjectKey());
 		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
-		
-		String displayName = "";
-		try {
-			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
-		} catch(Exception ex) {
-			LOG.error("Failed to get display name/account name for canonical Id: " + this.getOwnerCanonicalId(),ex);
-			displayName = "";
-		}
-		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), displayName));		
+		e.setStorageClass(this.getStorageClass());
+		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), this.getOwnerDisplayName()));		
 		return e;
 	}
 	
