@@ -125,6 +125,7 @@ import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
+import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
 import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.storage.msgs.s3.TargetGrants;
@@ -893,8 +894,15 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, listBucket, null, 0)) {
 				//Get the listing from the back-end and copy results in.				
 				//return ospClient.listBucket(request);
-				ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
+				ListBucketResponseType reply = (ListBucketResponseType) request.getReply();				
 				int maxKeys = 1000;
+				reply.setMaxKeys(maxKeys);
+				reply.setName(request.getBucket());				
+				reply.setDelimiter(request.getDelimiter());
+				reply.setMarker(request.getMarker());
+				reply.setPrefix(request.getPrefix());								
+				reply.setIsTruncated(false);
+				
 				try {
 					if(!Strings.isNullOrEmpty(request.getMaxKeys())) {
 						maxKeys = Integer.parseInt(request.getMaxKeys());
@@ -913,6 +921,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 				
 				if(result != null) {
+					reply.setContents(new ArrayList<ListEntry>());
+					
 					for(ObjectEntity obj : result.getEntityList()){
 						reply.getContents().add(obj.toListEntry());
 					}
@@ -925,14 +935,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						reply.setNextMarker(((ObjectEntity)result.getLastEntry()).getObjectKey());
 					} else if(result.getLastEntry() instanceof String) {
 						reply.setNextMarker((String)result.getLastEntry());
+					} else {
+						reply.setNextMarker("");
 					}
+				} else {
+					//Do nothing
+//					reply.setContents(new ArrayList<ListEntry>());
 				}
-				
-				reply.setMaxKeys(maxKeys);
-				reply.setName(request.getBucket());				
-				reply.setDelimiter(request.getDelimiter());
-				reply.setMarker(request.getMarker());
-				reply.setPrefix(request.getPrefix());								
+											
 				return reply;
 			} else {
 				throw new AccessDeniedException(request.getBucket());
