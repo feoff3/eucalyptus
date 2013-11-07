@@ -234,6 +234,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			} else {
 				//No Callable, so no result, just save the entity as given.
 				object.setLastUpdateTimestamp(new Date());
+				object.seteTag("");
 			}
 			
 			//Update metadata post-call
@@ -400,7 +401,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				int resultKeyCount = 0;
 				String[] parts = null;
 				String prefixString = null;
-				boolean useDelimiter = Strings.isNullOrEmpty(delimiter);
+				boolean useDelimiter = !Strings.isNullOrEmpty(delimiter);
 				int pages = 0;
 				
 				// Iterate over result sets of size maxkeys + 1 since
@@ -418,9 +419,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 						break;
 					}
 					
-					for (ObjectEntity objectRecord : objectInfos) {						
-						// Check if it will get aggregated as a commonprefix
+					for (ObjectEntity objectRecord : objectInfos) {
 						if (useDelimiter) {
+							// Check if it will get aggregated as a commonprefix
 							parts = objectRecord.getObjectKey().substring(prefix.length()).split(delimiter);
 							if (parts.length > 1) {
 								prefixString = prefix + delimiter + parts[0] + delimiter;

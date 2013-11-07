@@ -41,6 +41,7 @@ import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.VersionEntry;
@@ -130,6 +131,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	this.setSize(contentLength);
     	this.setIsSnapshot(false);    	
     	this.setDeletedTimestamp(null);
+    	this.setStorageClass(ObjectStorageProperties.STORAGE_CLASS.STANDARD.toString());
     }
     
     /**
@@ -383,6 +385,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setVersionId(this.getVersionId());
 		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
+		
+		//TODO: FIXME!!!
 		e.setIsLatest(false);
 		
 		String displayName = "";
