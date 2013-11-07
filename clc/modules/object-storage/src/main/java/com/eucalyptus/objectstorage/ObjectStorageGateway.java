@@ -425,7 +425,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					acp.setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlList(), bucket.getOwnerCanonicalId(), requestUser.getAccount().getCanonicalId()));
 					objectEntity.setAcl(acp);
 					
-					final String fullObjectKey = objectEntity.getInternalKey();
+					final String fullObjectKey = objectEntity.getObjectUuid();
 					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
 					
 					return ObjectManagers.getInstance().create(request.getBucket(),
@@ -1519,7 +1519,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			try {
 				final DeleteVersionType backendRequest = (DeleteVersionType)request.regardingUserRequest(request);
 				backendRequest.setBucket(request.getBucket());
-				backendRequest.setKey(objectEntity.getInternalKey());
+				backendRequest.setKey(objectEntity.getObjectUuid());
 				backendRequest.setVersionid(request.getVersionid());
 				
 				ObjectManagers.getInstance().delete(objectEntity, new CallableWithRollback<DeleteVersionResponseType, Boolean>() {

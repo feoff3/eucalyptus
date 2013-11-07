@@ -107,9 +107,9 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     public void initializeForCreate(String bucketName, String objectKey, String versionId, String requestId, long contentLength, User usr) throws Exception {
     	this.setBucketName(bucketName);
     	this.setObjectKey(objectKey);
-    	if(this.getInternalKey() == null) {
+    	if(this.getObjectUuid() == null) {
     		//Generate a new internal key
-    		this.setInternalKey(generateInternalKey(requestId, objectKey));
+    		this.setObjectUuid(generateInternalKey(requestId, objectKey));
     	}
     	
     	this.setDeleted(false);
@@ -143,7 +143,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	}
     	
     	ObjectEntity deleteMarker = new ObjectEntity(this.getBucketName(), this.getObjectKey(), versionId);    	    
-    	deleteMarker.setInternalKey(generateInternalKey(requestId, objectKey));    	
+    	deleteMarker.setObjectUuid(generateInternalKey(requestId, objectKey));    	
     	deleteMarker.setDeleted(true);
     	String ownerCanonicalId = null;
     	try {
@@ -253,14 +253,14 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		return (getObjectModifiedTimestamp() == null);
 	}
 	
-	public String getInternalKey() {
+	public String getObjectUuid() {
 		return objectUuid;
 	}
-	
-	public void setInternalKey(String internalKey) {
-		this.objectUuid = internalKey;
+
+	public void setObjectUuid(String objectUuid) {
+		this.objectUuid = objectUuid;
 	}
-	
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -324,12 +324,17 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("deleted", true));
 	}
 	
+	/**
+	 * Return a ListEntry for this entity
+	 * @return
+	 */
 	public ListEntry toListEntry() {
 		ListEntry e = new ListEntry();
 		e.setEtag(this.geteTag());
 		e.setKey(this.getObjectKey());
 		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
+		
 		String displayName = "";
 		try {
 			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
@@ -341,6 +346,10 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		return e;
 	}
 	
+	/**
+	 * Return a VersionEntry for this entity
+	 * @return
+	 */
 	public VersionEntry toVersionEntry() {
 		VersionEntry e = new VersionEntry();
 		e.setEtag(this.geteTag());
@@ -348,9 +357,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setVersionId(this.getVersionId());
 		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
-
-		//TODO: fix this, need to add entry to record? avoid query lookup
 		e.setIsLatest(false);
+		
 		String displayName = "";
 		try {
 			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
