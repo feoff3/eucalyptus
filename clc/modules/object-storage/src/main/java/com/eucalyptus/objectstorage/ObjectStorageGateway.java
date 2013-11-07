@@ -925,12 +925,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						reply.getCommonPrefixes().add(new PrefixEntry(s));
 					}
 					reply.setIsTruncated(result.isTruncated);
-					if(result.getLastEntry() instanceof ObjectEntity) {
-						reply.setNextMarker(((ObjectEntity)result.getLastEntry()).getObjectKey());
-					} else if(result.getLastEntry() instanceof String) {
-						reply.setNextMarker((String)result.getLastEntry());
-					} else {
-						reply.setNextMarker("");
+					if(result.isTruncated) {
+						if(	result.getLastEntry() instanceof ObjectEntity) {					
+							reply.setNextMarker(((ObjectEntity)result.getLastEntry()).getObjectKey());
+						} else {
+							reply.setNextMarker(result.getLastEntry().toString());
+						}
 					}
 				} else {
 					//Do nothing
@@ -1152,7 +1152,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
 			}
 			
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {				
+			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+				request.setKey(objectEntity.getObjectUuid());
 				ospClient.getObject(request);
 				//ObjectGetter getter = new ObjectGetter(request);
 				//Threads.lookup(ObjectStorage.class, ObjectStorageGateway.ObjectGetter.class).limitTo(1).submit(getter);
@@ -1480,6 +1481,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchBucketException(request.getBucket());
 		} else {				
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, listBucket, null, 0)) {
+				//TODO: make almost the same as listBucket
 				//Get the listing from the back-end and copy results in.
 				return ospClient.listVersions(request);
 			} else {
