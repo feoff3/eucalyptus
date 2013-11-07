@@ -154,7 +154,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 			if(!object.getDeleted()) {
 				try {
 					object.setDeleted(true);
-					object.setVersionId(null); //remove version Id.
+					object.setVersionId(null); //remove version Id to remove delete marker
+					object.setDeletedTimestamp(new Date()); //mark deleting
 					Transactions.save(object);
 				} catch(TransactionException e) {
 					throw new InternalErrorException(object.getResourceFullName());

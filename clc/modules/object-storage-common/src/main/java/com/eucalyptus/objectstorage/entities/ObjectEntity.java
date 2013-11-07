@@ -78,7 +78,11 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     
     @Column(name="etag")
     private String eTag;
+    
+    @Column(name="deleted_date")
+    private Date deletedTimestamp; //The date the object was marked for real deletion (not a delete marker)
 
+	
 	/**
      * Used to denote the object as a snapshot, for special access-control considerations.
      */
@@ -126,7 +130,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	this.setOwnerIamUserId(ownerIamId);
     	this.setObjectModifiedTimestamp(null);
     	this.setSize(contentLength);
-    	
+    	this.setIsSnapshot(false);    	
+    	this.setDeletedTimestamp(null);
     }
     
     /**
@@ -157,9 +162,17 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	deleteMarker.setOwnerCanonicalId(ownerCanonicalId);
     	deleteMarker.setOwnerIamUserId(ownerIamId);
     	deleteMarker.setObjectModifiedTimestamp(null);
-    	
+    	deleteMarker.setDeletedTimestamp(null);
     	return deleteMarker;
     }
+    
+    public Date getDeletedTimestamp() {
+		return deletedTimestamp;
+	}
+
+	public void setDeletedTimestamp(Date deletedTimestamp) {
+		this.deletedTimestamp = deletedTimestamp;
+	}
     
     public void finalizeCreation(@Nullable String versionId, @Nullable Date lastModified, @Nonnull String etag) throws Exception {
     	this.seteTag(etag);
@@ -321,7 +334,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	 * if versionId != null, then is_deleted indicates a deleteMarker
 	 */
 	public static Criterion getNotDeletingRestriction() {
-		return Restrictions.and(Restrictions.isNotNull("versionId"), Restrictions.eq("deleted", true));
+		return Restrictions.isNotNull("deletedTimestamp");
 	}
 	
 	/**

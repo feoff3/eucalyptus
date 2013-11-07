@@ -66,7 +66,7 @@ import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
  * A "delete marker" entry with the given versionId. No corresponding backend resource guaranteed,
  * but may exist (e.g. another delete marker for backend)
  *  
- *   
+ * Users the ObjectEntity deletedTimestamp <> null to indicate pending deletion (not delete marker)
  * For deletion of an object with versionid set, null the versionId and set isDeleted=true. At
  * that point it is no-longer a delete-marker and can/will be cleaned from backend
  * 
