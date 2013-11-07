@@ -398,7 +398,6 @@ public class DbObjectManagerImpl implements ObjectManager {
 				
 				List<ObjectEntity> objectInfos = null;
 				int resultKeyCount = 0;
-				String objectKey = null;
 				String[] parts = null;
 				String prefixString = null;
 				boolean useDelimiter = Strings.isNullOrEmpty(delimiter);
@@ -406,8 +405,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				
 				// Iterate over result sets of size maxkeys + 1 since
 				// commonPrefixes collapse the list, we may examine many more records than maxkeys + 1
-				do {
-					objectKey = null;
+				do {				
 					parts = null;
 					prefixString = null;
 					
@@ -423,7 +421,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 					for (ObjectEntity objectRecord : objectInfos) {						
 						// Check if it will get aggregated as a commonprefix
 						if (useDelimiter) {
-							parts = objectKey.substring(prefix.length()).split(delimiter);
+							parts = objectRecord.getObjectKey().substring(prefix.length()).split(delimiter);
 							if (parts.length > 1) {
 								prefixString = prefix + delimiter + parts[0] + delimiter;
 								if (!commonPrefixes.contains(prefixString)) {
