@@ -64,13 +64,11 @@ package com.eucalyptus.objectstorage.util;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.text.ParseException;
 import java.util.Date;
 
 import org.apache.tools.ant.util.DateUtils;
 
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
-import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.util.Internets;
 

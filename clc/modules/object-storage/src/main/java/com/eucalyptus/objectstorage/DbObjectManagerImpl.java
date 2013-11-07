@@ -219,10 +219,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		
 				Date updatedDate = null;
 				//Update the record and cleanup
-				if(result != null) {
-					object.setVersionId(result.getVersionId());
-					object.seteTag(result.getEtag());
-					
+				if(result != null) {					
 					if(result.getLastModified() != null) {
 						updatedDate = OSGUtil.dateFromHeaderFormattedString(result.getLastModified());
 						if(updatedDate == null) {							
@@ -231,33 +228,32 @@ public class DbObjectManagerImpl implements ObjectManager {
 					} else {
 						updatedDate = new Date();					
 					}
+					
+					object.finalizeCreation(result.getVersionId(), updatedDate, result.getEtag());
 				} else {
 					throw new Exception("Backend returned null result");
-				}
-				
-				object.setObjectModifiedTimestamp(updatedDate);				
-
-				//Update metadata post-call
-				try {
-					Transactions.save(object);
-					return result;
-				} catch (Exception e) {
-					LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
-					throw e;
-				}
+				}							
 			} else {
 				//No Callable, so no result, just save the entity as given.
 				object.setLastUpdateTimestamp(new Date());
 			}
 			
-			//Update bucket size
+			//Update metadata post-call
 			try {
-				BucketManagers.getInstance().updateBucketSize(bucketName, object.getSize());
-			} catch(Exception e) {
-				LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", e);
-			}
-			
-			return result;
+				Transactions.save(object);
+				
+				//Update bucket size
+				try {
+					BucketManagers.getInstance().updateBucketSize(bucketName, object.getSize());
+				} catch(Exception e) {
+					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", e);
+				}
+				
+				return result;
+			} catch (Exception e) {
+				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
+				throw e;
+			}			
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
 			try {

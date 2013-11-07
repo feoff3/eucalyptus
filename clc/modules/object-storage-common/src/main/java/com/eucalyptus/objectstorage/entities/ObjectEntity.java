@@ -22,6 +22,8 @@ package com.eucalyptus.objectstorage.entities;
 
 import java.util.Date;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
@@ -36,6 +38,8 @@ import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Restrictions;
 
 import com.eucalyptus.auth.Accounts;
+import com.eucalyptus.auth.AuthException;
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
@@ -75,22 +79,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="etag")
     private String eTag;
 
-	public String geteTag() {
-		return eTag;
-	}
-
-	public void seteTag(String eTag) {
-		this.eTag = eTag;
-	}
-
-	public Date getObjectModifiedTimestamp() {
-		return objectModifiedTimestamp;
-	}
-
-	public void setObjectModifiedTimestamp(Date objectModifiedTimestamp) {
-		this.objectModifiedTimestamp = objectModifiedTimestamp;
-	}
-
 	/**
      * Used to denote the object as a snapshot, for special access-control considerations.
      */
@@ -107,6 +95,102 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.objectKey = objectKey;
         this.versionId = versionId;
     }
+    
+    /**
+     * Initialize this as a new object entity representing an object to PUT
+     * @param bucketName
+     * @param objectKey
+     * @param versionId
+     * @param requestId
+     * @param usr
+     */
+    public void initializeForCreate(String bucketName, String objectKey, String versionId, String requestId, long contentLength, User usr) throws Exception {
+    	this.setBucketName(bucketName);
+    	this.setObjectKey(objectKey);
+    	if(this.getInternalKey() == null) {
+    		//Generate a new internal key
+    		this.setInternalKey(generateInternalKey(requestId, objectKey));
+    	}
+    	
+    	this.setDeleted(false);
+    	String ownerCanonicalId = null;
+    	try {
+    		usr.getAccount().getCanonicalId();    		
+    	} catch(AuthException e) {
+    		LOG.error("Failed to lookup canonical ID for user: " + usr.getName() + " id= " + usr.getUserId());
+    		throw e;
+    	}
+    	
+    	String ownerIamId = usr.getUserId();
+    	this.setOwnerCanonicalId(ownerCanonicalId);
+    	this.setOwnerIamUserId(ownerIamId);
+    	this.setObjectModifiedTimestamp(null);
+    	this.setSize(contentLength);
+    	
+    }
+    
+    /**
+     * Creates a new 'DeleteMarker' object entity from this object
+     * @param versionId
+     * @param requestId
+     * @param usr
+     * @return
+     * @throws Exception
+     */
+    public ObjectEntity generateDeleteMarker(String versionId, String requestId, User usr) throws Exception {
+    	if(versionId == null) {
+    		throw new IllegalArgumentException("versionId cannot be null for delete marker generation");
+    	}
+    	
+    	ObjectEntity deleteMarker = new ObjectEntity(this.getBucketName(), this.getObjectKey(), versionId);    	    
+    	deleteMarker.setInternalKey(generateInternalKey(requestId, objectKey));    	
+    	deleteMarker.setDeleted(true);
+    	String ownerCanonicalId = null;
+    	try {
+    		usr.getAccount().getCanonicalId();    		
+    	} catch(AuthException e) {
+    		LOG.error("Failed to lookup canonical ID for user: " + usr.getName() + " id= " + usr.getUserId());
+    		throw e;
+    	}
+    	
+    	String ownerIamId = usr.getUserId();
+    	deleteMarker.setOwnerCanonicalId(ownerCanonicalId);
+    	deleteMarker.setOwnerIamUserId(ownerIamId);
+    	deleteMarker.setObjectModifiedTimestamp(null);
+    	
+    	return deleteMarker;
+    }
+    
+    public void finalizeCreation(@Nullable String versionId, @Nullable Date lastModified, @Nonnull String etag) throws Exception {
+    	this.seteTag(etag);
+    	if(lastModified != null) {
+    		this.setObjectModifiedTimestamp(lastModified);
+    	} else {
+    		this.setObjectModifiedTimestamp(new Date());
+    	}
+    	
+    	this.setVersionId(versionId);
+    }
+    
+	private static String generateInternalKey(String requestId, String key) {
+		return key + "-" + requestId;
+	}
+    
+	public String geteTag() {
+		return eTag;
+	}
+
+	public void seteTag(String eTag) {
+		this.eTag = eTag;
+	}
+
+	public Date getObjectModifiedTimestamp() {
+		return objectModifiedTimestamp;
+	}
+
+	public void setObjectModifiedTimestamp(Date objectModifiedTimestamp) {
+		this.objectModifiedTimestamp = objectModifiedTimestamp;
+	}
     
 	@Override
 	public String getResourceFullName() {

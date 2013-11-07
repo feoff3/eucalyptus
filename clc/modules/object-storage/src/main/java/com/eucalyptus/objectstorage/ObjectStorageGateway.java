@@ -304,10 +304,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 		return reply;
 	}
-	
-	private static String generateInternalKey(String correlationId, String requestKey) {
-		return requestKey + "-" + correlationId;
-	}
 
 	/* PUT object */
 	/*
@@ -392,17 +388,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new NoSuchBucketException(request.getBucket());
 				}
 
-				ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
-				
-				//Uniquely identifies this upload for this object
-				objectEntity.setInternalKey(generateInternalKey(request.getCorrelationId(), request.getKey()));
-
-				//Generate a versionId if necessary based on versioning status of bucket
-				String versionId = BucketManagers.getInstance().getVersionId(bucket);
-				objectEntity.setVersionId(versionId);
-				objectEntity.setDeleted(false);				
-				objectEntity.setOwnerCanonicalId(requestUser.getAccount().getCanonicalId());
-				objectEntity.setOwnerIamUserId(requestUser.getUserId());				
 				long newBucketSize = bucket.getBucketSize() == null ? 0 : bucket.getBucketSize();
 
 				//TODO: this should be done in binding.
@@ -411,24 +396,34 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
 				}
 				
-				try {
-					long objectSize = Long.parseLong(request.getContentLength());
-					objectEntity.setSize(objectSize);
+				long objectSize = -1;
+				try {					
+					objectSize = Long.parseLong(request.getContentLength());					
 					newBucketSize = bucket.getBucketSize() + objectSize;
 				} catch(Exception e) {
 					LOG.error("Could not parse content length into a long: " + request.getContentLength(), e);
 					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
 				}
+
+				ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
 				
+				//Generate a versionId if necessary based on versioning status of bucket
+				String versionId = BucketManagers.getInstance().getVersionId(bucket);
+
+				objectEntity.initializeForCreate(request.getBucket(), 
+						request.getKey(), 
+						versionId, 
+						request.getCorrelationId(),
+						objectSize,
+						requestUser);
+								
 				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, newBucketSize)) {
-					//Construct and set the ACP properly
+					//Construct and set the ACP properly, post Auth check so no self-auth can occur even accidentally
 					AccessControlPolicy acp = new AccessControlPolicy();
 					acp.setOwner(buildCanonicalUser(requestUser.getAccount()));
 					acp.setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlList(), bucket.getOwnerCanonicalId(), requestUser.getAccount().getCanonicalId()));
 					objectEntity.setAcl(acp);
 					
-					//Initialize the new row
-					objectEntity.setCreationTimestamp(null);
 					final String fullObjectKey = objectEntity.getInternalKey();
 					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
 					
