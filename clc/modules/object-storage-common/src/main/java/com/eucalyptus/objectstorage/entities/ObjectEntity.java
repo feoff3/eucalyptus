@@ -69,9 +69,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="storage_class")
     private String storageClass;
 
-    //If set in conjunction with the versionId == null, indicates the object is pending delete, if set with versionId != null, indicates DeleteMarker
     @Column(name="is_deleted")
-    private Boolean deleted; 
+    private Boolean deleted; //Indicates this is a delete marker 
             
     @Column(name="object_last_modified") //Distinct from the record modification date, tracks the backend response
     private Date objectModifiedTimestamp;
@@ -119,7 +118,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	this.setDeleted(false);
     	String ownerCanonicalId = null;
     	try {
-    		usr.getAccount().getCanonicalId();    		
+    		ownerCanonicalId = usr.getAccount().getCanonicalId();    		
     	} catch(AuthException e) {
     		LOG.error("Failed to lookup canonical ID for user: " + usr.getName() + " id= " + usr.getUserId());
     		throw e;
@@ -166,14 +165,11 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	return deleteMarker;
     }
     
-    public Date getDeletedTimestamp() {
-		return deletedTimestamp;
-	}
-
-	public void setDeletedTimestamp(Date deletedTimestamp) {
-		this.deletedTimestamp = deletedTimestamp;
-	}
-    
+    public void markDeleting() {
+    	this.setDeletedTimestamp(new Date());
+    	this.setVersionId(null);
+    }
+        
     public void finalizeCreation(@Nullable String versionId, @Nullable Date lastModified, @Nonnull String etag) throws Exception {
     	this.seteTag(etag);
     	if(lastModified != null) {
@@ -188,6 +184,15 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	private static String generateInternalKey(String requestId, String key) {
 		return key + "-" + requestId;
 	}
+	
+    public Date getDeletedTimestamp() {
+		return deletedTimestamp;
+	}
+
+	public void setDeletedTimestamp(Date deletedTimestamp) {
+		this.deletedTimestamp = deletedTimestamp;
+	}
+
     
 	public String geteTag() {
 		return eTag;
@@ -301,16 +306,25 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 				return false;
 		} else if (!bucketName.equals(other.bucketName))
 			return false;
+		
 		if (objectKey == null) {
 			if (other.objectKey != null)
 				return false;
 		} else if (!objectKey.equals(other.objectKey))
 			return false;
+		
 		if (versionId == null) {
 			if (other.versionId != null)
 				return false;
 		} else if (!versionId.equals(other.versionId))
 			return false;
+		
+		if (objectUuid == null) {
+			if (other.objectUuid != null)
+				return false;
+		} else if (!objectUuid.equals(other.objectUuid))
+			return false;
+		
 		return true;
 	}
 
