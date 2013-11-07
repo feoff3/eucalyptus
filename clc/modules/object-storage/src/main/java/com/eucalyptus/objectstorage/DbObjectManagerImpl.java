@@ -91,8 +91,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
 				Criteria search = Entities.createCriteria(ObjectEntity.class);			
 				List results = search.add(Example.create(searchExample))
-							.addOrder(Order.desc("object_create_date"))
-							.add(Restrictions.isNull("object_create_date"))
+							.addOrder(Order.desc("objectModifiedTimestamp"))
+							.add(Restrictions.isNull("objectModifiedTimestamp"))
 							.list();
 				db.commit();
 				return (List<ObjectEntity>)results;
@@ -120,7 +120,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
 				Criteria search = Entities.createCriteria(ObjectEntity.class);			
 				List results = search.add(Example.create(searchExample))
-							.addOrder(Order.desc("object_last_modified"))
+							.addOrder(Order.desc("objectModifiedTimestamp"))
 							.add(ObjectEntity.getNotPendingRestriction())
 							.add(ObjectEntity.getNotDeletingRestriction())
 							.setMaxResults(1).list();
@@ -147,21 +147,17 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 	@Override
 	public <T, F> void delete(ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
-		T result = null;
-						
-		if(resourceModifier != null) {
-			//Set to 'deleting'			
-			if(!object.getDeleted()) {
-				try {
-					object.setDeleted(true);
-					object.setVersionId(null); //remove version Id to remove delete marker
-					object.setDeletedTimestamp(new Date()); //mark deleting
-					Transactions.save(object);
-				} catch(TransactionException e) {
-					throw new InternalErrorException(object.getResourceFullName());
-				}
+		T result = null;					
+		//Set to 'deleting'			
+		if(!object.getDeleted()) {
+			try {
+				object.markDeleting();
+				object = Transactions.save(object);
+			} catch(TransactionException e) {
+				throw new InternalErrorException(object.getResourceFullName());
 			}
-			
+		}
+		if(resourceModifier != null) {			
 			try {
 				result = resourceModifier.call();
 			} catch(S3Exception e) {
@@ -180,9 +176,10 @@ public class DbObjectManagerImpl implements ObjectManager {
 			}
 		}
 		
+		//Fully remove the record.
 		try {
 			Transactions.delete(object);
-
+			
 			//Update bucket size
 			BucketManagers.getInstance().updateBucketSize(object.getBucketName(), -object.getSize());
 		} catch (TransactionException e) {
@@ -241,7 +238,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			
 			//Update metadata post-call
 			try {
-				Transactions.save(object);
+				object = Transactions.save(object);
 				
 				//Update bucket size
 				try {
@@ -362,18 +359,18 @@ public class DbObjectManagerImpl implements ObjectManager {
 				//This makes listVersion act like listObjects
 				if(latestOnly) {
 					searchObj.setDeleted(false);
-				} else {
 				}
 				
 				Criteria objCriteria = Entities.createCriteria(ObjectEntity.class);
 				objCriteria.setReadOnly(true);
 				objCriteria.setFetchSize(queryStrideSize);
 				objCriteria.add(Example.create(searchObj));
-				objCriteria.addOrder(Order.asc("objectKey"));
-				objCriteria.setMaxResults(queryStrideSize);
 				objCriteria.add(ObjectEntity.getNotPendingRestriction());
 				objCriteria.add(ObjectEntity.getNotDeletingRestriction());
-				objCriteria.add(ObjectEntity.getNotSnapshotRestriction());
+				objCriteria.add(ObjectEntity.getNotSnapshotRestriction());				
+				objCriteria.addOrder(Order.asc("objectKey"));
+				objCriteria.addOrder(Order.desc("objectModifiedTimestamp"));
+				objCriteria.setMaxResults(queryStrideSize);
 				
 				if (!Strings.isNullOrEmpty(fromKeyMarker)) {
 					objCriteria.add(Restrictions.gt("objectKey", fromKeyMarker));

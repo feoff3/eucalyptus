@@ -81,7 +81,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="deleted_date")
     private Date deletedTimestamp; //The date the object was marked for real deletion (not a delete marker)
 
-	
 	/**
      * Used to denote the object as a snapshot, for special access-control considerations.
      */
@@ -348,7 +347,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	 * if versionId != null, then is_deleted indicates a deleteMarker
 	 */
 	public static Criterion getNotDeletingRestriction() {
-		return Restrictions.isNotNull("deletedTimestamp");
+		return Restrictions.isNull("deletedTimestamp");
 	}
 	
 	/**
