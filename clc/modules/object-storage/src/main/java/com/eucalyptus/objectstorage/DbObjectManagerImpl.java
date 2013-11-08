@@ -262,11 +262,16 @@ public class DbObjectManagerImpl implements ObjectManager {
 		T result = null;					
 		//Set to 'deleting'			
 		if(!object.getDeleted()) {
+			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {
-				object.markForDeletion();
-				object = Transactions.save(object);
-			} catch(TransactionException e) {
+				object.markForDeletion();				
+				Entities.mergeDirect(object);
+			} catch(final Throwable f) {
 				throw new InternalErrorException(object.getResourceFullName());
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
 			}
 		}
 		if(resourceModifier != null) {			
