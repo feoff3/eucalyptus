@@ -242,13 +242,13 @@ public class DbObjectManagerImpl implements ObjectManager {
 				if(versionId == null) {
 					searchExample.setIsLatest(true);
 				}
+				
 				Criteria search = Entities.createCriteria(ObjectEntity.class);			
 				List<ObjectEntity> results = search.add(Example.create(searchExample))
 							.addOrder(Order.desc("objectModifiedTimestamp"))
 							.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
 							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
 							.list();
-				
 				
 				if(results == null || results.size() < 1) {
 					throw new NoSuchElementException();
@@ -257,14 +257,17 @@ public class DbObjectManagerImpl implements ObjectManager {
 				}
 				
 				db.commit();
-				return results.get(0);				
+				return results.get(0);
+				
 			} finally {
 				if(db != null && db.isActive()) {
 					db.rollback();
 				}
 			}
+		} catch(NoSuchElementException ex) { 
+			throw ex;
 		} catch(Exception e) {
-			LOG.error("Error getting object entity for " + bucketName + "/" + objectKey + "?version=" + versionId);
+			LOG.error("Error getting object entity for " + bucketName + "/" + objectKey + "?version=" + versionId, e);
 			throw e;
 		}		
 	}

@@ -362,7 +362,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		 * @return
 		 */
 		public static Criterion getFailedRestriction() {
-			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("createdTimestamp", getOldestFailedAllowed()));
+			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("creationTimestamp", getOldestFailedAllowed()));
 		}
 
 		/**

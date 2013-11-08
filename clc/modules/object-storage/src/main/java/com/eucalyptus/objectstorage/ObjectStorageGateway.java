@@ -1072,10 +1072,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			} catch(NoSuchElementException e) {
 				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
 			} catch (Exception e) {
+				if(e.getCause() instanceof NoSuchElementException) {
+					//Just in case
+					throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+				}
 				LOG.error(e);
 				throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + " , version= " +  request.getVersionId());
 			}
 			
+			//TODO: make sure to handle getVersion case on auth. May need different operation to handle that case
+			// since it is a different IAM check
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
 				request.setKey(objectEntity.getObjectUuid());
 				ospClient.getObject(request);
