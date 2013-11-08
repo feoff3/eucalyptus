@@ -240,6 +240,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		Tracker.die();
 		ObjectStorageProperties.shouldEnforceUsageLimits = true;
 		ObjectStorageProperties.enableVirtualHosting = true;
+		
+		reaperService.shutdownNow();
 
 		//Be sure it's empty
 		streamDataMap.clear();
