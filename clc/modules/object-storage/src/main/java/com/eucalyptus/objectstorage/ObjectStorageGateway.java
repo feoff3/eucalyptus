@@ -1064,38 +1064,32 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public GetObjectResponseType getObject(GetObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
+		
 		try {
-			User requestUser = Contexts.lookup().getUser();			
-			try {
-				//Handle the pass-through
-				objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
-			} catch(NoSuchElementException e) {
+			//Handle the pass-through
+			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+		} catch(NoSuchElementException e) {
+			throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+		} catch (Exception e) {
+			if(e.getCause() instanceof NoSuchElementException) {
+				//Just in case
 				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
-			} catch (Exception e) {
-				if(e.getCause() instanceof NoSuchElementException) {
-					//Just in case
-					throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
-				}
-				LOG.error(e);
-				throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + " , version= " +  request.getVersionId());
 			}
-			
-			//TODO: make sure to handle getVersion case on auth. May need different operation to handle that case
-			// since it is a different IAM check
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
-				request.setKey(objectEntity.getObjectUuid());
-				ospClient.getObject(request);
-				//ObjectGetter getter = new ObjectGetter(request);
-				//Threads.lookup(ObjectStorage.class, ObjectStorageGateway.ObjectGetter.class).limitTo(1).submit(getter);
-				return null;
-			} else {
-				throw new AccessDeniedException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
-			}
-			
-		} catch(Exception ex) {
-			throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+			LOG.error(e);
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + " , version= " +  request.getVersionId());
 		}
-	
+		
+		//TODO: make sure to handle getVersion case on auth. May need different operation to handle that case
+		// since it is a different IAM check
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+			request.setKey(objectEntity.getObjectUuid());
+			ospClient.getObject(request);
+			//ObjectGetter getter = new ObjectGetter(request);
+			//Threads.lookup(ObjectStorage.class, ObjectStorageGateway.ObjectGetter.class).limitTo(1).submit(getter);
+			return null;
+		} else {
+			throw new AccessDeniedException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+		}	
 	}
 
 	private class ObjectGetter implements Runnable {
