@@ -350,21 +350,27 @@ public class DbObjectManagerImpl implements ObjectManager {
 			}
 			
 			//Update metadata post-call
-			try {
-				ObjectEntity updatedEntity = null;
-				updatedEntity = Transactions.save(savedEntity);				
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {				
+				Entities.mergeDirect(savedEntity);
+
 				//Update bucket size
 				try {
-					BucketManagers.getInstance().updateBucketSize(bucketName, updatedEntity.getSize());
-				} catch(Exception e) {
-					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", e);
+					BucketManagers.getInstance().updateBucketSize(bucketName, savedEntity.getSize());
+				} catch(final Throwable f) {
+					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", f);
 				}
 				
+				db.commit();				
 				return result;
 			} catch (Exception e) {
 				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
 				throw e;
-			}			
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
 			try {
