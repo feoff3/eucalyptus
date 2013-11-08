@@ -250,7 +250,7 @@ public class AclUtils {
 	 */
 	public static AccessControlList expandCannedAcl(@Nonnull AccessControlList msgAcl, @Nullable final String bucketOwnerCanonicalId, @Nullable final String objectOwnerCanonicalId) throws EucalyptusCloudException {
 		if(msgAcl == null) {
-			return null;
+			throw new IllegalArgumentException("Null list received");
 		}
 		
 		AccessControlList outputList = new AccessControlList();

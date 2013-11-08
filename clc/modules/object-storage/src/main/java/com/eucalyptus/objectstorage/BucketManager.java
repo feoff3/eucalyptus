@@ -152,4 +152,6 @@ public interface BucketManager {
 	 * @return
 	 */
 	public long totalSizeOfAllBuckets();
+	
+	public boolean checkBucketName(String bucketName) throws Exception;
 }

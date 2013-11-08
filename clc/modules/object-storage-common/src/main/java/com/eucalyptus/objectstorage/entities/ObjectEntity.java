@@ -38,7 +38,6 @@ import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Restrictions;
 
 import com.eucalyptus.auth.Accounts;
-import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
@@ -51,7 +50,7 @@ import com.eucalyptus.storage.msgs.s3.VersionEntry;
 @PersistenceContext(name="eucalyptus_osg")
 @Table( name = "objects" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-public class ObjectEntity extends S3AccessControlledEntity implements Comparable {	
+public class ObjectEntity extends S3AccessControlledEntity implements Comparable {
 	@Column( name = "object_key" )
     private String objectKey;
 
@@ -82,14 +81,13 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="deleted_date")
     private Date deletedTimestamp; //The date the object was marked for real deletion (not a delete marker)
 
-	/**
-     * Used to denote the object as a snapshot, for special access-control considerations.
-     */
     @Column(name="is_snapshot")
-    private Boolean isSnapshot;
- 
- 
-    private static Logger LOG = Logger.getLogger( ObjectEntity.class );
+    private Boolean isSnapshot; //denote object as 'special' to omit from S3 api inclusion for listings etc. if needed since snapshots are not reachable by users via S3.
+    
+    @Column(name="is_latest")
+    private Boolean isLatest;
+    
+	private static Logger LOG = Logger.getLogger( ObjectEntity.class );
     
     public ObjectEntity() {}
 
@@ -125,6 +123,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	this.setSize(contentLength);
     	this.setIsSnapshot(false);    	
     	this.setDeletedTimestamp(null);
+    	this.setIsLatest(false);
     	this.setStorageClass(ObjectStorageProperties.STORAGE_CLASS.STANDARD.toString());
     }
     
@@ -151,10 +150,25 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	deleteMarker.setOwnerDisplayName(usr.getAccount().getName());
     	deleteMarker.setObjectModifiedTimestamp(null);
     	deleteMarker.setDeletedTimestamp(null);
+    	deleteMarker.setIsLatest(true);
     	return deleteMarker;
     }
     
-    public void markDeleting() {
+    public void makeNotLatest() {
+    	if(this.getVersionId() != null) {
+    		//Versioned.
+    		this.setIsLatest(false);    		
+    	} else {
+    		this.setIsLatest(false);
+    		this.markForDeletion();
+    	}
+    }
+    
+    public void makeLatest() {
+    	this.setIsLatest(true);
+    }
+    
+    public void markForDeletion() {
     	this.setDeletedTimestamp(new Date());
     	this.setVersionId(null);
     }
@@ -166,8 +180,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	} else {
     		this.setObjectModifiedTimestamp(new Date());
     	}
-    	
     	this.setVersionId(versionId);
+    	this.makeLatest();    	
     }
     
 	private static String generateInternalKey(String requestId, String key) {
@@ -268,6 +282,14 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		this.objectUuid = objectUuid;
 	}
 
+	public Boolean getIsLatest() {
+		return isLatest;
+	}
+
+	public void setIsLatest(Boolean isLatest) {
+		this.isLatest = isLatest;
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -325,19 +347,49 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		this.isSnapshot = isSnapshot;
 	}
 	
-	public static Criterion getNotSnapshotRestriction() {
-		return Restrictions.ne("isSnapshot", true);
-	}
-	
-	public static Criterion getNotPendingRestriction() {
-		return Restrictions.isNotNull("objectModifiedTimestamp");
-	}
-	
-	/* versionId == null && is_deleted == true
-	 * if versionId != null, then is_deleted indicates a deleteMarker
-	 */
-	public static Criterion getNotDeletingRestriction() {
-		return Restrictions.isNull("deletedTimestamp");
+	public static class QueryHelpers {
+		public static Criterion getNotSnapshotRestriction() {
+			return Restrictions.ne("isSnapshot", true);
+		}
+		
+		public static Criterion getNotPendingRestriction() {
+			return Restrictions.isNotNull("objectModifiedTimestamp");
+		}
+		
+		/**
+		 * The condition to determine if an object record is failed -- where failed means the PUT did not complete
+		 * and it was not handled cleanly on failure. e.g. OSG failed before it could finalize the object record
+		 * @return
+		 */
+		public static Criterion getFailedRestriction() {
+			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("createdTimestamp", getFailedWindowTime()));
+		}
+
+		/**
+		 * The condition to determine that an object record is marked for cleanup.
+		 * @return
+		 */
+		public static Criterion getDeletedRestriction() {
+			return Restrictions.isNotNull("deletedTimestamp");		
+		}
+
+		/**
+		 * Returns timestamp for detecting failed-put records. Any record with created timestamp less than
+		 * this value that have not been completed are considered failed.
+		 */
+		public static Date getFailedWindowTime() {
+			long now = new Date().getTime();
+			//Subtract the failed window hours.
+			long windowStart = now - (1000L * 60 * 60 * ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getFailedPutTimeoutHours());
+			return new Date(windowStart);
+		}
+
+		/* versionId == null && is_deleted == true
+		 * if versionId != null, then is_deleted indicates a deleteMarker
+		 */
+		public static Criterion getNotDeletingRestriction() {
+			return Restrictions.isNull("deletedTimestamp");
+		}
 	}
 	
 	/**

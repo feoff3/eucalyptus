@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -149,6 +152,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	private static ObjectStorageProviderClient ospClient = null;
 	protected static ConcurrentHashMap<String, ChannelBuffer> streamDataMap = new ConcurrentHashMap<String, ChannelBuffer>();
 	protected static final String USR_EMAIL_KEY = "email";//lookup for account admins email
+
+	private static final int REAPER_POOL_SIZE = 1;
+	private static final ScheduledThreadPoolExecutor reaperService = new ScheduledThreadPoolExecutor(REAPER_POOL_SIZE);
+
+	private static final long REAPER_INTIAL_DELAY_SEC = 120; //2 minutes to let system initialize fully before starting reaper
+	private static final long REAPER_PERIOD_SEC = 60; //Run every minute
 	
 	public ObjectStorageGateway() {}
 	
@@ -160,9 +169,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	/**
 	 * Configure 
 	 */
-	public static void configure() {		
+	public static void configure() {
 		synchronized(ObjectStorageGateway.class) {
-			if(ospClient == null) {		
+			if(ospClient == null) {
 				//TODO: zhill - wtf? Is this just priming the config? why is it unused.
 				//lol yes. Lame, must be fixed.
 				ObjectStorageGatewayInfo osgInfo = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo();
@@ -203,6 +212,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public static void enable() throws EucalyptusCloudException {
 		LOG.debug("Enabling ObjectStorageGateway");
 		ospClient.enable();
+		reaperService.scheduleAtFixedRate(new ObjectReaperTask(), REAPER_INTIAL_DELAY_SEC , REAPER_PERIOD_SEC, TimeUnit.SECONDS);
 		LOG.debug("Enabling ObjectStorageGateway complete");
 	}
 
@@ -234,33 +244,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		//Be sure it's empty
 		streamDataMap.clear();
 		LOG.debug("Checking ObjectStorageGateway preconditions");
-	}
-	
-	/**
-	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
-	 */
-	private boolean checkBucketName(String bucketName) {
-		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
-			return false;
-		if(bucketName.length() < 3 || bucketName.length() > 255)
-			return false;
-		String[] addrParts = bucketName.split("\\.");
-		boolean ipFormat = true;
-		if(addrParts.length == 4) {
-			for(String addrPart : addrParts) {
-				try {
-					Integer.parseInt(addrPart);
-				} catch(NumberFormatException ex) {
-					ipFormat = false;
-					break;
-				}
-			}
-		} else {
-			ipFormat = false;
-		}		
-		if(ipFormat)
-			return false;
-		return true;
 	}
 	
 	public static CanonicalUser buildCanonicalUser(Account accnt) {
@@ -482,6 +465,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				//This is required because there is a race between the first chunk
 				//and the first data-only chunk.
 				//Hacking around it to make progress on other ops, should revisit -ns
+				
+				//Proper solution is probably to aggregate the chunks to a ChannelBuffer in the Netty code, similar to HttpChunkAggregator
+				// but passing the message along with reference to the ChannelBuffer rather than this map-based solution.
 				for (int i=0; i < retryCount; ++i) {
 					if (writeBuffer == null) {
 						LOG.info("Stream Data Map is empty, retrying: " + (i + 1) + " of " + retryCount);
@@ -586,7 +572,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new InternalErrorException(request.getBucket());
 		}
 		
-		//Fake entity for auth check
+		//Fake entity for auth check, need the name to allow checks against
 		final S3AccessControlledEntity fakeBucketEntity = new S3AccessControlledEntity() {			
 			@Override
 			public String getResourceFullName() {
@@ -597,7 +583,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucketEntity, null, bucketCount + 1)) {
 			try {
 				//Check the validity of the bucket name.				
-				if (!checkBucketName(request.getBucket())) {
+				if (!BucketManagers.getInstance().checkBucketName(request.getBucket())) {
 					throw new InvalidBucketNameException(request.getBucket());
 				}
 
@@ -605,8 +591,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				 * This is a secondary check, independent to the iam quota check, based on the configured max bucket count property.
 				 * The count does not include "hidden" buckets for snapshots etc since the user has no direct control of those via the s3 endpoint 
 				 */
-				if (ObjectStorageProperties.shouldEnforceUsageLimits
-						&& !Contexts.lookup().hasAdministrativePrivileges() &&					
+				if (ObjectStorageProperties.shouldEnforceUsageLimits && 
+						!Contexts.lookup().hasAdministrativePrivileges() &&					
 						BucketManagers.getInstance().countByAccount(requestUser.getAccount().getCanonicalId(), true, null) >= ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getStorageMaxBucketsPerAccount()) {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
@@ -725,8 +711,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ListAllMyBucketsList bucketList = new ListAllMyBucketsList();
 		bucketList.setBuckets(new ArrayList<BucketListEntry>());
 		for(Bucket b : buckets ) {
-			bucketList.getBuckets().add(new BucketListEntry(b.getBucketName(),
-					OSGUtil.dateToRFC822FormattedString(b.getCreationDate())));
+			bucketList.getBuckets().add(b.toBucketListEntry());
 		}
 		return bucketList;
 	}
@@ -1277,6 +1262,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchKeyException(request.getKey());
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
+				//TODO: implement the db changes here.
 				return ospClient.copyObject(request);
 			} else {		
 				throw new AccessDeniedException(request.getBucket());			

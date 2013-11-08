@@ -20,6 +20,7 @@
 
 package com.eucalyptus.objectstorage;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -91,8 +92,119 @@ public class DbObjectManagerImpl implements ObjectManager {
 				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
 				Criteria search = Entities.createCriteria(ObjectEntity.class);			
 				List results = search.add(Example.create(searchExample))
-							.addOrder(Order.desc("objectModifiedTimestamp"))
 							.add(Restrictions.isNull("objectModifiedTimestamp"))
+							.list();
+				db.commit();
+				return (List<ObjectEntity>)results;
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
+		} catch(NoSuchElementException e) {
+			//Nothing, return empty list
+			return new ArrayList<ObjectEntity>(0);
+		} catch(Exception e) {
+			LOG.error("Error fetching pending write records for object " + bucketName + "/" + objectKey + "?versionId=" + versionId);
+			throw e;
+		}
+	}
+	
+	/**
+	 * Finds all object records and keeps latest, marks rest for deletion if enabledVersioning == false, or just removes isLatest if enabledVersioning == true
+	 * @param bucketName
+	 * @param objectKey
+	 * @return
+	 * @throws Exception
+	 */
+	@Override
+	public void consolidateObjectNullVersionRecords(String bucketName, String objectKey, boolean enabledVersioning) throws Exception {
+		//Return the latest version based on the created date.
+		EntityTransaction db = Entities.get(ObjectEntity.class);
+		try {
+			ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
+			Criteria search = Entities.createCriteria(ObjectEntity.class);			
+			List<ObjectEntity> results = (List<ObjectEntity>)(search.add(Example.create(searchExample))
+					.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+					.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+					.addOrder(Order.desc("objectModifiedTimestamp"))
+					.list());
+			
+			if(results != null && results.size() > 0) {
+				results.get(0).makeLatest();
+			}
+			
+			try {
+				//Set all but the newest to be deleted
+				for(ObjectEntity obj : results.subList(1, results.size())) {
+					obj.makeNotLatest();
+				}
+			} catch(IndexOutOfBoundsException e) {
+					//Either 0 or 1 result, nothing to do
+			}
+			db.commit();
+		} catch(NoSuchElementException e) {
+			//Nothing to do.
+		} catch(Exception e) {
+			LOG.error("Error consolidationg Object records for " + bucketName + "/" + objectKey + " versioning enabled = " + enabledVersioning);
+			throw e;
+		} finally {
+			if(db != null && db.isActive()) {
+				db.rollback();
+			}
+		}
+	}
+	
+	/**
+	 * Returns all completed versions (by objectUuid, not versionId) of the object. Does
+	 * not include records marked for deletion
+	 * @param bucketName
+	 * @param objectKey
+	 * @return list of object entities that match in descending order by object modified timestamp
+	 * @throws Exception
+	 */
+	@Override
+	public List<ObjectEntity> getObjectNullVersionRecords(String bucketName, String objectKey) throws Exception {
+		try {
+			//Return the latest version based on the created date.
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {
+				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
+				Criteria search = Entities.createCriteria(ObjectEntity.class);			
+				List results = search.add(Example.create(searchExample))
+							.addOrder(Order.desc("objectModifiedTimestamp"))
+							.add(Restrictions.isNotNull("objectModifiedTimestamp"))
+							.add(Restrictions.isNull("versionId"))
+							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+							.list();
+				db.commit();
+				return (List<ObjectEntity>)results;
+			} finally {
+				if(db != null && db.isActive()) {
+					db.rollback();
+				}
+			}
+		} catch(NoSuchElementException e) {
+			return new ArrayList<ObjectEntity>(0);
+		} catch(Exception e) {
+			LOG.error("Error fetching metadata records for object " + bucketName + "/" + objectKey);
+			throw e;
+		}
+	}
+	
+	/**
+	 * Returns the ObjectEntities that have failed or are marked for deletion
+	 */
+	@Override
+	public List<ObjectEntity> getFailedOrDeleted() throws Exception {
+		try {
+			//Return the latest version based on the created date.
+			EntityTransaction db = Entities.get(ObjectEntity.class);
+			try {
+				ObjectEntity searchExample = new ObjectEntity();
+				Criteria search = Entities.createCriteria(ObjectEntity.class);			
+				List results = search.add(Example.create(searchExample))
+							.add(Restrictions.or(ObjectEntity.QueryHelpers.getDeletedRestriction(), ObjectEntity.QueryHelpers.getFailedRestriction()))
 							.list();
 				db.commit();
 				return (List<ObjectEntity>)results;
@@ -104,7 +216,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		} catch(NoSuchElementException e) {
 			//Swallow this exception, return null;
 		} catch(Exception e) {
-			LOG.error("Error fetching pending write records for object " + bucketName + "/" + objectKey + "?versionId=" + versionId);
+			LOG.error("Error fetching failed or deleted object records");
 			throw e;
 		}
 		
@@ -121,8 +233,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 				Criteria search = Entities.createCriteria(ObjectEntity.class);			
 				List results = search.add(Example.create(searchExample))
 							.addOrder(Order.desc("objectModifiedTimestamp"))
-							.add(ObjectEntity.getNotPendingRestriction())
-							.add(ObjectEntity.getNotDeletingRestriction())
+							.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
 							.setMaxResults(1).list();
 				db.commit();
 				if(results == null || results.size() < 1) {
@@ -151,7 +263,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		//Set to 'deleting'			
 		if(!object.getDeleted()) {
 			try {
-				object.markDeleting();
+				object.markForDeletion();
 				object = Transactions.save(object);
 			} catch(TransactionException e) {
 				throw new InternalErrorException(object.getResourceFullName());
@@ -366,9 +478,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 				objCriteria.setReadOnly(true);
 				objCriteria.setFetchSize(queryStrideSize);
 				objCriteria.add(Example.create(searchObj));
-				objCriteria.add(ObjectEntity.getNotPendingRestriction());
-				objCriteria.add(ObjectEntity.getNotDeletingRestriction());
-				objCriteria.add(ObjectEntity.getNotSnapshotRestriction());				
+				objCriteria.add(ObjectEntity.QueryHelpers.getNotPendingRestriction());
+				objCriteria.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction());
+				objCriteria.add(ObjectEntity.QueryHelpers.getNotSnapshotRestriction());				
 				objCriteria.addOrder(Order.asc("objectKey"));
 				objCriteria.addOrder(Order.desc("objectModifiedTimestamp"));
 				objCriteria.setMaxResults(queryStrideSize);

@@ -20,6 +20,8 @@
 
 package com.eucalyptus.objectstorage;
 
+import java.util.List;
+
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -147,5 +149,35 @@ public interface ObjectManager {
 	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws S3Exception, TransactionException;
 	
 	public abstract <T extends SetRESTObjectAccessControlPolicyResponseType, F> T setAcp(ObjectEntity object, AccessControlPolicy acp, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException;
+	
+	/**
+	 * Gets all object entities that are determined to be failed or deleted.
+	 * Failure detection is based on timestamp comparision is limited by the
+	 * {@link ObjectStorageGatewayInfo.failedPutTimeoutHours}. Normal failure
+	 * cases are handled by marking the record for deletion, but if the OSG itself
+	 * fails during an upload the timestamp is used
+	 * @return
+	 * @throws Exception
+	 */
+	public List<ObjectEntity> getFailedOrDeleted() throws Exception;
+	
+	/** 
+	 * All records with null versionId for the given object
+	 * @param bucketName
+	 * @param objectKey
+	 * @return
+	 * @throws Exception
+	 */
+	public List<ObjectEntity> getObjectNullVersionRecords(String bucketName, String objectKey) throws Exception;
+
+	/**
+	 * Marks all but the latest (by objectModifiedTimestamp) as deleting for cleanup. May not
+	 * actually do the cleanup
+	 * @param bucketName
+	 * @param objectKey
+	 * @param enabledVersioning
+	 * @throws Exception
+	 */
+	public void consolidateObjectNullVersionRecords(String bucketName, String objectKey, boolean enabledVersioning) throws Exception;
 	
 }

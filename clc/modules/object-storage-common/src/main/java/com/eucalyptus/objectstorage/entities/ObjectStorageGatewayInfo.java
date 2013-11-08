@@ -85,22 +85,31 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 public class ObjectStorageGatewayInfo extends AbstractPersistent {
 	@Column(name = "osg_name", unique=true)
 	private String name;
+	
 	@ConfigurableField( description = "Maximum number of buckets per account", displayName = "Maximum buckets per account" )
 	@Column( name = "storage_max_buckets_per_user" )
 	private Integer storageMaxBucketsPerAccount;
+	
 	@ConfigurableField( description = "Maximum size per bucket", displayName = "Maximum bucket size (MB)" )
 	@Column( name = "storage_max_bucket_size_mb" )
 	private Integer storageMaxBucketSizeInMB;
+	
 	@ConfigurableField( description = "Image cache size", displayName = "Space reserved for unbundling images (MB)" )
 	@Column( name = "storage_cache_size_mb" )
 	private Integer storageMaxCacheSizeInMB;
+	
 	@ConfigurableField( description = "Disk space reserved for snapshots", displayName = "Space reserved for snapshots (GB)" )
 	@Column( name = "storage_snapshot_size_gb" )
 	private Integer storageMaxTotalSnapshotSizeInGb;
+	
 	@ConfigurableField( description = "Total ObjectStorage storage capacity for Objects", displayName = "ObjectStorage object capacity (GB)" )
 	@Column( name = "storage_total_capacity" )
 	private Integer storageMaxTotalCapacity;
-
+	
+	@ConfigurableField( description = "Number of hours to wait for object PUT operations to be allowed to complete before cleanup.", displayName = "Object PUT failure cleanup (Hours)", initial="24" )
+	@Column( name = "failed_put_timeout_hours" )
+	private Integer failedPutTimeoutHours;
+	
 	public ObjectStorageGatewayInfo() {}
 
 	public ObjectStorageGatewayInfo(final String name, 
@@ -166,6 +175,15 @@ public class ObjectStorageGatewayInfo extends AbstractPersistent {
 		this.storageMaxTotalCapacity = storageMaxTotalCapacity;
 	}
 	
+	public Integer getFailedPutTimeoutHours() {
+		return failedPutTimeoutHours;
+	}
+
+	public void setFailedPutTimeoutHours(Integer failedPutTimeoutHours) {
+		this.failedPutTimeoutHours = failedPutTimeoutHours;
+	}
+
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -201,6 +219,7 @@ public class ObjectStorageGatewayInfo extends AbstractPersistent {
 					(int)(ObjectStorageProperties.MAX_BUCKET_SIZE / ObjectStorageProperties.M),
 					(int)(ObjectStorageProperties.IMAGE_CACHE_SIZE / ObjectStorageProperties.M),
 					ObjectStorageProperties.MAX_TOTAL_SNAPSHOT_SIZE, Integer.MAX_VALUE);
+			gatewayInfo.setFailedPutTimeoutHours(ObjectStorageProperties.DEFAULT_PUT_TIMEOUT_HOURS);
 			db.add(gatewayInfo);
 		} finally {
 			db.commit();

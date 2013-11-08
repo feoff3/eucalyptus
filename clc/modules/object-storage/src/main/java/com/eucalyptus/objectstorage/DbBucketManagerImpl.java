@@ -56,6 +56,33 @@ public class DbBucketManagerImpl implements BucketManager {
 	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
 	
 	/**
+	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
+	 */
+	public boolean checkBucketName(String bucketName) throws Exception {		
+		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
+			return false;
+		if(bucketName.length() < 3 || bucketName.length() > 255)
+			return false;
+		String[] addrParts = bucketName.split("\\.");
+		boolean ipFormat = true;
+		if(addrParts.length == 4) {
+			for(String addrPart : addrParts) {
+				try {
+					Integer.parseInt(addrPart);
+				} catch(NumberFormatException ex) {
+					ipFormat = false;
+					break;
+				}
+			}
+		} else {
+			ipFormat = false;
+		}		
+		if(ipFormat)
+			return false;
+		return true;
+	}
+	
+	/**
 	 * Does the bucket contain snapshots...
 	 * @param bucketName
 	 * @return

@@ -160,7 +160,8 @@ public class ObjectStorageProperties {
 	
 	//15 minutes
 	public final static long EXPIRATION_LIMIT = 900000;
-	
+
+	public static final Integer DEFAULT_PUT_TIMEOUT_HOURS = 24; //An upload not marked completed or deleted in 24 hours from record creation will be considered 'failed'
 	
 	public enum CannedACL {
 		private_only { public String toString() { return "private"; }}, 
