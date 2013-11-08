@@ -338,7 +338,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public ListAllMyBucketsResponseType listAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {		
 		ListAllMyBucketsResponseType reply = (ListAllMyBucketsResponseType) request.getReply();
 		try {			
-			User requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			User requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			
 			//The euca-types
 			ListAllMyBucketsList myBucketList = new ListAllMyBucketsList();
@@ -376,7 +376,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Error establishing request user", e);			
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -404,7 +404,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		CreateBucketResponseType reply = (CreateBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -434,7 +434,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -462,7 +462,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -489,7 +489,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			User requestUser = null;
 			try {
-				requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			} catch(Exception e) {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -535,7 +535,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			User requestUser = null;
 			try {
-				requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			} catch(Exception e) {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -560,7 +560,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			User requestUser = null;
 			try {
-				requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			} catch(Exception e) {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -626,7 +626,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetObjectAccessControlPolicyResponseType reply = (GetObjectAccessControlPolicyResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -666,7 +666,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public GetObjectResponseType getObject(final GetObjectType request) throws EucalyptusCloudException {
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -730,7 +730,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		//TODO: This is common. Stop repeating.
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -804,7 +804,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketLocationResponseType reply = (GetBucketLocationResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -843,7 +843,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		SetBucketLoggingStatusResponseType reply = (SetBucketLoggingStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -877,7 +877,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketLoggingStatusResponseType reply = (GetBucketLoggingStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -912,7 +912,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketVersioningStatusResponseType reply = (GetBucketVersioningStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -940,7 +940,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		SetBucketVersioningStatusResponseType reply = (SetBucketVersioningStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -968,7 +968,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		ListVersionsResponseType reply = (ListVersionsResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 		} catch(Exception e) {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
@@ -1052,7 +1052,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			User requestUser = null;
 			try {
-				requestUser = Accounts.lookupUserById(request.getEffectiveUserId());
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
 			} catch(Exception e) {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
