@@ -48,7 +48,7 @@ public interface BucketManager {
 	 * @param sizeToChange
 	 * @throws TransactionException
 	 */
-	public abstract void updateBucketSize(String bucketName, long sizeToChange) throws TransactionException;
+	public abstract void updateBucketSize(String bucketName, long sizeToChange) throws Exception;
 	
 	/**
 	 * Create the bucket
@@ -62,7 +62,7 @@ public interface BucketManager {
 			 User owner,
 			 String acl, 
 			 String location,			
-			 CallableWithRollback<T,R> resourceModifier) throws Exception, TransactionException;
+			 CallableWithRollback<T,R> resourceModifier) throws Exception;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
@@ -71,7 +71,7 @@ public interface BucketManager {
 	 */
 	public abstract Bucket get( String bucketName,
 			 boolean includeHidden,
-			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws Exception;
 	/**
 	 * Returns list of buckets owned by id. Buckets are detached from any persistence session.
 	 * @param ownerCanonicalId
@@ -80,7 +80,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> list( String ownerCanonicalId, 
 			 boolean includeHidden, 
-			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws Exception;
 
 	/**
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -88,7 +88,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> listByUser( String userIamId, 
 			boolean includeHidden,  
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Returns count of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -96,14 +96,14 @@ public interface BucketManager {
 	 */
 	public abstract long countByUser( String userIamId, 
 			boolean includeHidden, 
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	/**
 	 * Returns count of buckets owned by account id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */	
 	public abstract long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			CallableWithRollback<?,?> resourceModifier) throws ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Checks if bucket exists.
@@ -111,15 +111,7 @@ public interface BucketManager {
 	 * @return
 	 */
 	public abstract boolean exists( String bucketName,  
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
-	
-	/**
-	 * Delete the bucket by name. Idempotent operation.
-	 * Does *NOT* enforce emptiness checks or any other policy on the bucket
-	 * @param bucketName
-	 */
-	public abstract <T> T delete( String bucketName,  
-			CallableWithRollback<T,?> resourceModifier)  throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
@@ -130,11 +122,11 @@ public interface BucketManager {
 	 * @param bucketEntity
 	 */
 	public abstract <T> T delete(Bucket bucketEntity, 
-			CallableWithRollback<T,?> resourceModifier) throws TransactionException, S3Exception;
+			CallableWithRollback<T,?> resourceModifier) throws Exception;
 		
-	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
-	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;
-	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;	
+	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws Exception;	
+	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws Exception;
+	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws Exception;	
 	
 	/**
 	 * Get a versionId for an object, since this is based on the bucket config
@@ -143,7 +135,7 @@ public interface BucketManager {
 	 * @throws TransactionException
 	 * @throws S3Exception
 	 */
-	public abstract String getVersionId(Bucket bucketEntity) throws TransactionException, S3Exception;
+	public abstract String getVersionId(Bucket bucketEntity) throws Exception;
 	
 	/**
 	 * Returns the approximate total size of all objects in all buckets

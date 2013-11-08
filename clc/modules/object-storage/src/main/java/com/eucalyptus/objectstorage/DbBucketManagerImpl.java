@@ -116,14 +116,16 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public Bucket get(@Nonnull String bucketName,
 			@Nonnull boolean includeHidden,
-			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws Exception {
 		try {
 			Bucket searchExample = new Bucket(bucketName);
 			if(!includeHidden) {				
 				searchExample.setHidden(false);
 			}
 			return Transactions.find(searchExample);
-		} catch (TransactionException e) {
+		} catch (NoSuchElementException e) {
+			throw e;
+		} catch (Exception e) {
 			LOG.error("Error querying bucket existence in db",e);
 			throw e;
 		}		
@@ -131,10 +133,12 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public boolean exists(@Nonnull String bucketName,
-			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws Exception {
 		try {
 			return (Transactions.find(new Bucket(bucketName)) != null);
-		} catch (TransactionException e) {
+		} catch (NoSuchElementException e) {
+			return false;		
+		} catch (Exception e) {
 			LOG.error("Error querying bucket existence in db",e);
 			throw e;
 		}
@@ -159,7 +163,7 @@ public class DbBucketManagerImpl implements BucketManager {
 			}
 		} catch(NoSuchElementException e) {
 			//Expected result, continue	
-		} catch(TransactionException e) {
+		} catch(Exception e) {
 			//Lookup failed.
 			LOG.error("Lookup for bucket " + bucketName + " failed during creation checks. Cannot proceed.",e);
 			throw new InternalErrorException(bucketName);
@@ -206,24 +210,6 @@ public class DbBucketManagerImpl implements BucketManager {
 		return result;			
 	}
 	
-	@Override
-	public <T> T delete(String bucketName, 
-			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
-		
-		Bucket searchEntity = new Bucket(bucketName);
-		try {
-			Transactions.find(searchEntity);
-		} catch(TransactionException e) {
-			LOG.error("Transaction error during bucket lookup for " + bucketName);
-			throw e;
-		} catch(NoSuchElementException e) {
-			LOG.debug("Nothing to do to delete bucket " + bucketName + " not found in db.");
-			//Nothing to do. continue to resource modification
-		}
-		
-		return delete(searchEntity, resourceModifier);
-	}
-
 	@Override
 	public <T> T delete(Bucket bucketEntity, 
 			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
