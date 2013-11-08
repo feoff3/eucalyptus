@@ -307,13 +307,13 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
+	public <T extends PutObjectResponseType, F> T create(final String bucketName, final ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
-			
+			ObjectEntity savedEntity = null;
 			//Persist the new record in the 'pending' state.
 			try {
-				object = Transactions.saveDirect(object);
+				savedEntity = Transactions.saveDirect(object);
 			} catch(TransactionException e) {
 				//Fail. Could not persist.
 				LOG.error("Transaction error creating initial object metadata for " + object.getResourceFullName(), e);
@@ -339,23 +339,23 @@ public class DbObjectManagerImpl implements ObjectManager {
 						updatedDate = new Date();					
 					}
 					
-					object.finalizeCreation(result.getVersionId(), updatedDate, result.getEtag());
+					savedEntity.finalizeCreation(result.getVersionId(), updatedDate, result.getEtag());
 				} else {
 					throw new Exception("Backend returned null result");
 				}							
 			} else {
 				//No Callable, so no result, just save the entity as given.
-				object.setLastUpdateTimestamp(new Date());
-				object.seteTag("");
+				savedEntity.setLastUpdateTimestamp(new Date());
+				savedEntity.seteTag("");
 			}
 			
 			//Update metadata post-call
 			try {
-				object = Transactions.save(object);
-				
+				ObjectEntity updatedEntity = null;
+				updatedEntity = Transactions.save(savedEntity);				
 				//Update bucket size
 				try {
-					BucketManagers.getInstance().updateBucketSize(bucketName, object.getSize());
+					BucketManagers.getInstance().updateBucketSize(bucketName, updatedEntity.getSize());
 				} catch(Exception e) {
 					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", e);
 				}

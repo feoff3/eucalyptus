@@ -362,7 +362,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		 * @return
 		 */
 		public static Criterion getFailedRestriction() {
-			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("createdTimestamp", getFailedWindowTime()));
+			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("createdTimestamp", getOldestFailedAllowed()));
 		}
 
 		/**
@@ -377,10 +377,15 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		 * Returns timestamp for detecting failed-put records. Any record with created timestamp less than
 		 * this value that have not been completed are considered failed.
 		 */
-		public static Date getFailedWindowTime() {
+		public static Date getOldestFailedAllowed() {
 			long now = new Date().getTime();
 			//Subtract the failed window hours.
-			long windowStart = now - (1000L * 60 * 60 * ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getFailedPutTimeoutHours());
+			Integer windowHrs = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getFailedPutTimeoutHours();			
+			if(windowHrs == null) {
+				return new Date(0); //1970 epoch
+			}
+			
+			long windowStart = now - (1000L * 60 * 60 * windowHrs);
 			return new Date(windowStart);
 		}
 
