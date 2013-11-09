@@ -55,9 +55,13 @@ import com.google.common.base.Objects;
 public class DbBucketManagerImpl implements BucketManager {
 	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
 	
-	/**
+    	public void start() throws Exception {}
+    	public void stop() throws Exception {}
+    	
+    	/**
 	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
 	 */
+    	@Override
 	public boolean checkBucketName(String bucketName) throws Exception {		
 		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
 			return false;
@@ -400,6 +404,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 	
+	@Override
 	public <T> T setVersioning(@Nonnull Bucket bucketEntity, 
 			@Nonnull VersioningStatus newState, 
 			@Nullable CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception {

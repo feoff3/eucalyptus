@@ -40,6 +40,8 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatu
  */
 public interface BucketManager {
 
+    	public abstract void start() throws Exception;
+    	public abstract void stop() throws Exception;
 	
 	/**
 	 * Change bucket size estimate. sizeToChange can be any value. Negatives decrement, positives
@@ -123,9 +125,37 @@ public interface BucketManager {
 	 */
 	public abstract <T> T delete(Bucket bucketEntity, 
 			CallableWithRollback<T,?> resourceModifier) throws Exception;
-		
-	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws Exception;	
+	
+	/**
+	 * Update the ACP
+	 * @param bucketEntity
+	 * @param acl
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws Exception;
+	
+	/**
+	 * Update the logging status
+	 * @param bucketEntity
+	 * @param loggingEnabled
+	 * @param destBucket
+	 * @param destPrefix
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
 	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws Exception;
+	
+	/**
+	 * Update versioning status
+	 * @param bucketEntity
+	 * @param newState
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
 	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws Exception;	
 	
 	/**
@@ -145,5 +175,12 @@ public interface BucketManager {
 	 */
 	public long totalSizeOfAllBuckets();
 	
+	/** 
+	 * Check name for s3 compliance on bucket names
+	 * 
+	 * @param bucketName
+	 * @return
+	 * @throws Exception
+	 */
 	public boolean checkBucketName(String bucketName) throws Exception;
 }

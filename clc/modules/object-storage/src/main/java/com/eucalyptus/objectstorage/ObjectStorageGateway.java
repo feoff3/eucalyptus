@@ -156,14 +156,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 	private static final Random rand = new Random(System.currentTimeMillis()); //for anything that needs randomization
 	
-	private static final int REAPER_POOL_SIZE = 1;
-	private static final int OBJECT_REPAIR_POOL_MAX_SIZE = 10;
+	private static final int REAPER_POOL_SIZE = 1;	
 	private static final long REAPER_INTIAL_DELAY_SEC = 120; //2 minutes to let system initialize fully before starting reaper
 	private static final int REAPER_PERIOD_SEC = 60; //Run every minute
 	
 	private static final ScheduledExecutorService REAPER_EXECUTOR = Executors.newScheduledThreadPool(REAPER_POOL_SIZE);
-	private static final ExecutorService HISTORY_REPAIR_EXECUTOR = Executors.newCachedThreadPool();
-
 	
 	public ObjectStorageGateway() {}
 	
@@ -254,8 +251,24 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectStorageProperties.shouldEnforceUsageLimits = true;
 		ObjectStorageProperties.enableVirtualHosting = true;
 		
-		REAPER_EXECUTOR.shutdownNow();
-		HISTORY_REPAIR_EXECUTOR.shutdownNow();
+		try {
+		    List<Runnable> r = REAPER_EXECUTOR.shutdownNow();
+		    LOG.info("Object reaper shutdown. Found " + r.size() + " pending tasks");
+		} catch(final Throwable f) {
+		    LOG.error("Error shutting down object-reaper.",f);
+		}
+		
+		try {
+		    ObjectManagers.getInstance().stop();
+		} catch(Exception e) {
+		    LOG.error("Error stopping object manager",e);
+		}
+		
+		try {
+		    BucketManagers.getInstance().stop();
+		} catch(Exception e) {
+		    LOG.error("Error stopping bucket manager",e);
+		}
 
 		//Be sure it's empty
 		streamDataMap.clear();
@@ -396,8 +409,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 									}
 								}				
 							}
-						);
-					
+						);					
 					return response;		
 				} else {
 					throw new AccessDeniedException(request.getBucket());			

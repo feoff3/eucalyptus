@@ -26,6 +26,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.persistence.EntityTransaction;
 
@@ -55,7 +57,21 @@ import com.google.common.base.Strings;
  */
 public class DbObjectManagerImpl implements ObjectManager {
 	private static final Logger LOG = Logger.getLogger(DbObjectManagerImpl.class);
+	private static final ExecutorService HISTORY_REPAIR_EXECUTOR = Executors.newCachedThreadPool();
 	
+    	public void start() throws Exception {
+    	    //Do nothing
+    	}
+    	
+    	public void stop() throws Exception {
+    	    try {
+    		List<Runnable> pendingTasks = HISTORY_REPAIR_EXECUTOR.shutdownNow();
+    		LOG.info("Stopping ObjectManager... Found " + pendingTasks.size() + " pending tasks at time of shutdown");
+    	    } catch(final Throwable f) {
+    		LOG.error("Error stopping ObjectManager", f);
+    	    }
+    	}
+    
 	@Override
 	public <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws Exception {
 		try {
@@ -404,14 +420,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", f);
 				}	
 				
-				try {
-				    	//Only do the minor repair. The full repair can be handled later. The 'latest' repair doesn't require the full history
-					repairObjectLatest(savedEntity.getBucketName(), savedEntity.getObjectKey());
-				} catch(final Throwable f) {
-					LOG.warn("Error setting object history for " + bucketName + "/" + savedEntity.getObjectKey() + " continuing. Read-repair should fix it later.", f);
-				}				
 				db.commit();							
-				return result;
 			} catch (Exception e) {
 				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
 				throw e;
@@ -420,6 +429,14 @@ public class DbObjectManagerImpl implements ObjectManager {
 					db.rollback();
 				}
 			}
+			
+			try {
+			    	//Only do the minor repair. The full repair can be handled later. The 'latest' repair doesn't require the full history
+				repairObjectLatest(savedEntity.getBucketName(), savedEntity.getObjectKey());
+			} catch(final Throwable f) {
+				LOG.warn("Error setting object history for " + bucketName + "/" + savedEntity.getObjectKey() + " continuing. Read-repair should fix it later.", f);
+			}
+			return result;
 		} catch(S3Exception e) {
 			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
 			try {
