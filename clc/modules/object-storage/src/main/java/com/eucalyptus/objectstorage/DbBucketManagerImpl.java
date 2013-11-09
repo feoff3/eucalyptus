@@ -450,7 +450,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		if(b.isVersioningEnabled()) {
 			return UUID.randomUUID().toString().replaceAll("-", "");
 		} else {
-			return null;
+			return ObjectEntity.NULL_VERSION_STRING;
 		}
 	}
 	

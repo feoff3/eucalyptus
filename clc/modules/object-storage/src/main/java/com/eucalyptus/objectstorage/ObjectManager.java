@@ -160,13 +160,4 @@ public interface ObjectManager {
 	 * @throws Exception
 	 */
 	public List<ObjectEntity> getFailedOrDeleted() throws Exception;
-	
-	/** 
-	 * All records with null versionId for the given object
-	 * @param bucketName
-	 * @param objectKey
-	 * @return
-	 * @throws Exception
-	 */
-	public List<ObjectEntity> getObjectNullVersionRecords(String bucketName, String objectKey) throws Exception;	
 }

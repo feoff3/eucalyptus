@@ -46,6 +46,8 @@ import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
+import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 
 /**
@@ -118,86 +120,112 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 	
 	/**
+	 * A more limited version of read-repair, it just modifies the 'islatest' tag, but will not mark any for deletion
+	 */
+	private static final Predicate<ObjectEntity> SET_LATEST_PREDICATE = new Predicate<ObjectEntity>() {
+		public boolean apply(ObjectEntity example) {
+			try {
+				example.setIsLatest(true);
+				Criteria search = Entities.createCriteria(ObjectEntity.class);
+				List<ObjectEntity> results = search.add(Example.create(example))
+						.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+						.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+						.addOrder(Order.desc("objectModifiedTimestamp"))
+						.list();
+				
+				if(results != null && results.size() > 1) {				
+					try {
+						//Set all but the first element as not latest
+						for(ObjectEntity obj : results.subList(1, results.size())) {
+							obj.makeNotLatest();										
+						}
+					} catch(IndexOutOfBoundsException e) {
+						//Either 0 or 1 result, nothing to do
+					}
+				}
+			} catch(NoSuchElementException e) {
+				//Nothing to do.
+			} catch(Exception e) {
+				LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/" + example.getObjectKey());
+				return false;
+			}
+			return true;
+		}
+	};
+		
+	/**
+	 * This is the proper function to use for doing read-repair operations
+	 */
+	private static final Predicate<ObjectEntity> REPAIR_OBJECT_HISTORY_PREDICATE = new Predicate<ObjectEntity>() {
+		public boolean apply(ObjectEntity example) {
+			try {					
+				Criteria search = Entities.createCriteria(ObjectEntity.class);
+				List<ObjectEntity> results = search.add(Example.create(example))
+						.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+						.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+						.addOrder(Order.desc("objectModifiedTimestamp"))
+						.list();
+				
+				ObjectEntity lastViewed = null;
+				if(results != null) {
+					//Set all but the first element as not latest
+					for(ObjectEntity obj : results) {
+						obj.setIsLatest(false);
+						
+						if(obj.isNullVersioned()) {
+							if(lastViewed != null && lastViewed.isNullVersioned()) {
+								obj.markForDeletion();
+							}
+							lastViewed = obj;
+						} else {
+							lastViewed = null;
+						}
+					}
+					
+					//Ensure the latest (by objectModifiedTimestamp) is the 'latest'
+					if(results.size() > 0) {
+						results.get(0).makeNotLatest();
+					}
+				}
+			} catch(NoSuchElementException e) {
+				//Nothing to do.
+			} catch(Exception e) {
+				LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/" + example.getObjectKey());
+				return false;
+			}
+			return false;
+		}
+	};
+	
+	/**
 	 * Finds all object records and keeps latest, marks rest for deletion if enabledVersioning == false, or just removes isLatest if enabledVersioning == true
 	 * @param bucketName
 	 * @param objectKey
 	 * @return
 	 * @throws Exception
 	 */
-	public void repairObjectLatest(String bucketName, String objectKey) throws Exception {
-		//Return the latest version based on the created date.
-		EntityTransaction db = Entities.get(ObjectEntity.class);
+	public void repairObjectLatest(String bucketName, String objectKey) throws Exception {	
+		ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
 		try {
-			ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
-			searchExample.setIsLatest(true);
-			Criteria search = Entities.createCriteria(ObjectEntity.class);
-			List<ObjectEntity> results = search.add(Example.create(searchExample))
-					.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
-					.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
-					.addOrder(Order.desc("objectModifiedTimestamp"))
-					.list();
-			
-			if(results != null && results.size() > 1) {				
-				try {
-					//Set all but the newest to be deleted
-					for(ObjectEntity obj : results.subList(1, results.size())) {
-						obj.makeNotLatest();
-						if(obj.getVersionId() == null) {
-							//Mark explicitly for deletion by reaper
-							obj.markForDeletion();
-						}
-					}
-				} catch(IndexOutOfBoundsException e) {
-						//Either 0 or 1 result, nothing to do
-				}
-			}
-			db.commit();
-		} catch(NoSuchElementException e) {
-			//Nothing to do.
-		} catch(Exception e) {
-			LOG.error("Error consolidationg Object records for " + bucketName + "/" + objectKey);
-			throw e;
-		} finally {
-			if(db != null && db.isActive()) {
-				db.rollback();
-			}
+			Entities.asTransaction(SET_LATEST_PREDICATE).apply(searchExample);
+		} catch(final Throwable f) {
+			LOG.error("Error in version/null repair",f);
 		}
 	}
 	
 	/**
-	 * Returns all completed versions (by objectUuid, not versionId) of the object. Does
-	 * not include records marked for deletion
+	 * Scans the object for any contiguous "null" versioned records and removes all but most recent.
+	 * Only modifies contiguous, non-deleted records where the versionId="null" (as a string).
 	 * @param bucketName
 	 * @param objectKey
-	 * @return list of object entities that match in descending order by object modified timestamp
 	 * @throws Exception
 	 */
-	@Override
-	public List<ObjectEntity> getObjectNullVersionRecords(String bucketName, String objectKey) throws Exception {
+	public void doReadRepair(String bucketName, String objectKey) throws Exception {
+		ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
 		try {
-			//Return the latest version based on the created date.
-			EntityTransaction db = Entities.get(ObjectEntity.class);
-			try {
-				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
-				Criteria search = Entities.createCriteria(ObjectEntity.class);			
-				List results = search.add(Example.create(searchExample))
-							.addOrder(Order.desc("objectModifiedTimestamp"))
-							.add(Restrictions.isNotNull("objectModifiedTimestamp"))
-							.add(Restrictions.isNull("versionId"))
-							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
-							.list();
-				db.commit();
-				return (List<ObjectEntity>)results;
-			} finally {
-				if(db != null && db.isActive()) {
-					db.rollback();
-				}
-			}
-		} catch(NoSuchElementException e) {
-			return new ArrayList<ObjectEntity>(0);
-		} catch(Exception e) {
-			LOG.error("Error fetching metadata records for object " + bucketName + "/" + objectKey);
-			throw e;
+			Entities.asTransaction(REPAIR_OBJECT_HISTORY_PREDICATE).apply(searchExample);
+		} catch(final Throwable f) {
+			LOG.error("Error in version/null repair",f);
 		}
 	}
 	
@@ -377,7 +405,14 @@ public class DbObjectManagerImpl implements ObjectManager {
 					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", f);
 				}
 				
-				db.commit();				
+				db.commit();
+				
+				try {
+					this.repairObjectLatest(bucketName, object.getObjectKey());
+				} catch(final Throwable f) {
+					//Don't fail the operation because of this
+					LOG.error("Error ensuring latest set uniquely on " + bucketName + "/" + object.getObjectKey());
+				}
 				return result;
 			} catch (Exception e) {
 				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());
@@ -463,8 +498,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 
 	@Override
-	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey)
-			throws TransactionException, Exception {
+	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey) throws Exception {
 		return listVersionsPaginated(bucketName, maxKeys, prefix, delimiter, startKey, null, true);
 		
 	}
@@ -476,8 +510,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			String delimiter,
 			String fromKeyMarker,
 			String fromVersionId,
-			boolean latestOnly)
-			throws TransactionException, Exception {
+			boolean latestOnly) throws Exception {
 		
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		try {
@@ -494,6 +527,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				//This makes listVersion act like listObjects
 				if(latestOnly) {
 					searchObj.setDeleted(false);
+					searchObj.setIsLatest(true);
 				}
 				
 				Criteria objCriteria = Entities.createCriteria(ObjectEntity.class);

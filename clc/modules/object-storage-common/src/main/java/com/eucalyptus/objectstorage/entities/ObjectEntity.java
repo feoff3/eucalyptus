@@ -27,7 +27,9 @@ import javax.annotation.Nullable;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 import org.apache.log4j.Logger;
 import org.hibernate.annotations.Cache;
@@ -51,6 +53,9 @@ import com.eucalyptus.storage.msgs.s3.VersionEntry;
 @Table( name = "objects" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
 public class ObjectEntity extends S3AccessControlledEntity implements Comparable {
+	@Transient
+	public static final String NULL_VERSION_STRING = "null";
+	
 	@Column( name = "object_key" )
     private String objectKey;
 
@@ -95,6 +100,13 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.bucketName = bucketName;
         this.objectKey = objectKey;
         this.versionId = versionId;
+    }
+    
+    @PrePersist
+    public void ensureVersionIdNotNulL() {
+    	if(this.versionId == null) {
+    		this.versionId = NULL_VERSION_STRING;
+    	}
     }
     
     /**
@@ -155,13 +167,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     }
     
     public void makeNotLatest() {
-    	if(this.getVersionId() != null) {
-    		//Versioned.
-    		this.setIsLatest(false);    		
-    	} else {
-    		this.setIsLatest(false);
-    		this.markForDeletion();
-    	}
+    	this.setIsLatest(false);
     }
     
     public void makeLatest() {
@@ -288,6 +294,10 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 
 	public void setIsLatest(Boolean isLatest) {
 		this.isLatest = isLatest;
+	}
+	
+	public boolean isNullVersioned() {
+		return NULL_VERSION_STRING.equals(this.versionId);
 	}
 	
 	@Override
