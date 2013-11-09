@@ -46,7 +46,6 @@ import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
-import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 
@@ -220,7 +219,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	 * @param objectKey
 	 * @throws Exception
 	 */
-	public void doReadRepair(String bucketName, String objectKey) throws Exception {
+	public void doFullRepair(String bucketName, String objectKey) throws Exception {
 		ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
 		try {
 			Entities.asTransaction(REPAIR_OBJECT_HISTORY_PREDICATE).apply(searchExample);
@@ -403,16 +402,15 @@ public class DbObjectManagerImpl implements ObjectManager {
 					BucketManagers.getInstance().updateBucketSize(bucketName, savedEntity.getSize());
 				} catch(final Throwable f) {
 					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .", f);
-				}
-				
-				db.commit();
+				}	
 				
 				try {
-					this.repairObjectLatest(bucketName, object.getObjectKey());
+				    	//Only do the minor repair. The full repair can be handled later. The 'latest' repair doesn't require the full history
+					repairObjectLatest(savedEntity.getBucketName(), savedEntity.getObjectKey());
 				} catch(final Throwable f) {
-					//Don't fail the operation because of this
-					LOG.error("Error ensuring latest set uniquely on " + bucketName + "/" + object.getObjectKey());
-				}
+					LOG.warn("Error setting object history for " + bucketName + "/" + savedEntity.getObjectKey() + " continuing. Read-repair should fix it later.", f);
+				}				
+				db.commit();							
 				return result;
 			} catch (Exception e) {
 				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version " + object.getVersionId());

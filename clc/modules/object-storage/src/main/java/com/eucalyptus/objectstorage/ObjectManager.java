@@ -160,4 +160,15 @@ public interface ObjectManager {
 	 * @throws Exception
 	 */
 	public List<ObjectEntity> getFailedOrDeleted() throws Exception;
+	
+	/**
+	 * Fix an object history if needed. Scans the sorted object records and marks
+	 * latest as well as marking contiguous null-versioned records for deletion to
+	 * remove contiguous nulls in the version history
+	 * 
+	 * @param bucketName
+	 * @param objectKey
+	 * @throws Exception
+	 */
+	public void doFullRepair(String bucketName, String objectKey) throws Exception;
 }

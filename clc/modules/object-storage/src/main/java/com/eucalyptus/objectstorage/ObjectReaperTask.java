@@ -58,7 +58,7 @@ public class ObjectReaperTask implements Runnable {
 							throw ex;
 						}
 					}
-					deleteRequest.setUser(requestUser);
+					
 					if(requestUser.getKeys() != null && requestUser.getKeys().size() > 0) {
 						deleteRequest.setAccessKeyID(requestUser.getKeys().get(0).getAccessKey());
 					} else {
@@ -71,6 +71,8 @@ public class ObjectReaperTask implements Runnable {
 							throw new AuthException("Could not setup auth properly for delete request");
 						}
 					}
+					
+					deleteRequest.setUser(requestUser);
 					deleteRequest.setBucket(obj.getBucketName());
 					deleteRequest.setKey(obj.getObjectUuid());
 					

@@ -25,10 +25,12 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
@@ -41,6 +43,8 @@ import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.Account;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.component.ComponentIds;
+import com.eucalyptus.component.ServiceConfiguration;
+import com.eucalyptus.component.Topology;
 import com.eucalyptus.component.annotation.ServiceOperation;
 import com.eucalyptus.component.id.Eucalyptus;
 import com.eucalyptus.configurable.ConfigurableClass;
@@ -49,7 +53,6 @@ import com.eucalyptus.configurable.PropertyDirectory;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.NoSuchContextException;
-import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.objectstorage.auth.OSGAuthorizationHandler;
 import com.eucalyptus.objectstorage.bittorrent.Tracker;
 import com.eucalyptus.objectstorage.entities.Bucket;
@@ -119,9 +122,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
 import com.eucalyptus.objectstorage.util.AclUtils;
-import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
-import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
@@ -135,6 +136,7 @@ import com.eucalyptus.util.EucalyptusCloudException;
 import com.eucalyptus.util.Exceptions;
 import com.google.common.base.Function;
 import com.google.common.base.Strings;
+import com.google.gwt.thirdparty.guava.common.collect.Iterables;
 
 import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.ComponentProperty;
@@ -152,11 +154,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	protected static ConcurrentHashMap<String, ChannelBuffer> streamDataMap = new ConcurrentHashMap<String, ChannelBuffer>();
 	protected static final String USR_EMAIL_KEY = "email";//lookup for account admins email
 
+	private static final Random rand = new Random(System.currentTimeMillis()); //for anything that needs randomization
+	
 	private static final int REAPER_POOL_SIZE = 1;
-	private static final ScheduledThreadPoolExecutor reaperService = new ScheduledThreadPoolExecutor(REAPER_POOL_SIZE);
-
+	private static final int OBJECT_REPAIR_POOL_MAX_SIZE = 10;
 	private static final long REAPER_INTIAL_DELAY_SEC = 120; //2 minutes to let system initialize fully before starting reaper
-	private static final long REAPER_PERIOD_SEC = 60; //Run every minute
+	private static final int REAPER_PERIOD_SEC = 60; //Run every minute
+	
+	private static final ScheduledExecutorService REAPER_EXECUTOR = Executors.newScheduledThreadPool(REAPER_POOL_SIZE);
+	private static final ExecutorService HISTORY_REPAIR_EXECUTOR = Executors.newCachedThreadPool();
+
 	
 	public ObjectStorageGateway() {}
 	
@@ -211,7 +218,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public static void enable() throws EucalyptusCloudException {
 		LOG.debug("Enabling ObjectStorageGateway");
 		ospClient.enable();
-		reaperService.scheduleAtFixedRate(new ObjectReaperTask(), REAPER_INTIAL_DELAY_SEC , REAPER_PERIOD_SEC, TimeUnit.SECONDS);
+		int intervalSec = REAPER_PERIOD_SEC;
+		try {
+		    intervalSec = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getCleanupTaskIntervalSeconds();
+		} catch(final Throwable f) {
+		    LOG.error("Error getting configured reaper task interval. Using default: " + REAPER_PERIOD_SEC, f);
+		}
+		
+		REAPER_EXECUTOR.scheduleAtFixedRate(new ObjectReaperTask(), REAPER_INTIAL_DELAY_SEC , intervalSec, TimeUnit.SECONDS);
 		LOG.debug("Enabling ObjectStorageGateway complete");
 	}
 
@@ -240,7 +254,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectStorageProperties.shouldEnforceUsageLimits = true;
 		ObjectStorageProperties.enableVirtualHosting = true;
 		
-		reaperService.shutdownNow();
+		REAPER_EXECUTOR.shutdownNow();
+		HISTORY_REPAIR_EXECUTOR.shutdownNow();
 
 		//Be sure it's empty
 		streamDataMap.clear();
@@ -361,18 +376,15 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					final String fullObjectKey = objectEntity.getObjectUuid();
 					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
 					
-					return ObjectManagers.getInstance().create(request.getBucket(),
-							objectEntity,
+					PutObjectResponseType response = ObjectManagers.getInstance().create(request.getBucket(), objectEntity,
 							new CallableWithRollback<PutObjectResponseType,Boolean>() {
-
 								@Override
 								public PutObjectResponseType call() throws S3Exception, Exception {
 									return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
 								}
-
+								
 								@Override
-								public Boolean rollback(PutObjectResponseType arg) throws S3Exception,
-										Exception {
+								public Boolean rollback(PutObjectResponseType arg) throws Exception {
 									DeleteObjectType deleteRequest = new DeleteObjectType();
 									deleteRequest.setBucket(request.getBucket());
 									deleteRequest.setKey(fullObjectKey);
@@ -382,10 +394,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 									} else {
 										return false;
 									}
-								}						
+								}				
 							}
-							);
+						);
 					
+					return response;		
 				} else {
 					throw new AccessDeniedException(request.getBucket());			
 				}
@@ -1434,17 +1447,25 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 	}
 
+	/**
+	 * Returns an IP for an enabled OSG if the bucket exists. Throws exception if not.
+	 * For multiple OSG, a random IP is returned from the set of ENABLED OSG IPs.
+	 * @param bucket
+	 * @return
+	 * @throws EucalyptusCloudException
+	 */
 	public static InetAddress getBucketIp(String bucket) throws EucalyptusCloudException {
-		EntityWrapper<Bucket> db = EntityWrapper.get(Bucket.class);
-		try {
-			Bucket searchBucket = new Bucket(bucket);
-			db.getUniqueEscape(searchBucket);
-			return ObjectStorageProperties.getWalrusAddress();
-		} catch (EucalyptusCloudException ex) {
-			throw ex;
-		} finally {
-			db.rollback();
+	    try {		
+		if(BucketManagers.getInstance().exists(bucket, null)) {
+		    ServiceConfiguration[] osgs =  Iterables.toArray(Topology.lookupMany(ObjectStorage.class), ServiceConfiguration.class);
+		    if(osgs != null && osgs.length > 0) {			
+			return osgs[rand.nextInt(osgs.length - 1)].getInetAddress();
+		    }
 		}
+		throw new NoSuchElementException(bucket);
+	    } catch (Exception ex) {
+		throw new EucalyptusCloudException(ex);
+	    }	    	    
 	}
 
 }

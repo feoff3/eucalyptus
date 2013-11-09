@@ -65,7 +65,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="version_id")
     private String versionId; //VersionId is required to uniquely identify ACLs and auth
 
-    @Column(name="objectUuid")
+    @Column(name="objectUuid", unique=true)
     private String objectUuid; //The a uuid for this specific object content & request
 
 	@Column(name="size")

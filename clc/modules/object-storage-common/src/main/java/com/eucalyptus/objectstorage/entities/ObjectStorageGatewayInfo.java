@@ -77,6 +77,8 @@ import com.eucalyptus.entities.AbstractPersistent;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 
+
+//TODO: make this is a static class, not an entity, one config shared by all of the OSGs
 @Entity
 @PersistenceContext(name="eucalyptus_osg")
 @Table( name = "osg_info" )
@@ -110,6 +112,17 @@ public class ObjectStorageGatewayInfo extends AbstractPersistent {
 	@Column( name = "failed_put_timeout_hours" )
 	private Integer failedPutTimeoutHours;
 	
+	@ConfigurableField( description = "Interval, in seconds, at which cleanup tasks are initiated for removing old/stale objects.", displayName = "Cleanup interval (seconds)", initial="60")
+	public Integer cleanupTaskIntervalSeconds;	
+	
+	public Integer getCleanupTaskIntervalSeconds() {
+		return cleanupTaskIntervalSeconds;
+	}
+
+	public void setCleanupTaskIntervalSeconds(Integer cleanupTaskIntervalSeconds) {
+		this.cleanupTaskIntervalSeconds = cleanupTaskIntervalSeconds;
+	}
+
 	public ObjectStorageGatewayInfo() {}
 
 	public ObjectStorageGatewayInfo(final String name, 
@@ -220,6 +233,7 @@ public class ObjectStorageGatewayInfo extends AbstractPersistent {
 					(int)(ObjectStorageProperties.IMAGE_CACHE_SIZE / ObjectStorageProperties.M),
 					ObjectStorageProperties.MAX_TOTAL_SNAPSHOT_SIZE, Integer.MAX_VALUE);
 			gatewayInfo.setFailedPutTimeoutHours(ObjectStorageProperties.DEFAULT_PUT_TIMEOUT_HOURS);
+			gatewayInfo.setCleanupTaskIntervalSeconds(ObjectStorageProperties.DEFAULT_CLEANUP_INTERVAL_SEC);
 			db.add(gatewayInfo);
 		} finally {
 			db.commit();
