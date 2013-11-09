@@ -430,9 +430,18 @@ public class DbObjectManagerImpl implements ObjectManager {
 				}
 			}
 			
+			//Schedule an async full repair operation.
+			final String objectName = savedEntity.getObjectKey();
 			try {
-			    	//Only do the minor repair. The full repair can be handled later. The 'latest' repair doesn't require the full history
-				repairObjectLatest(savedEntity.getBucketName(), savedEntity.getObjectKey());
+			    HISTORY_REPAIR_EXECUTOR.submit(new Runnable() {
+				public void run() {
+				    try {
+					doFullRepair(bucketName, objectName);			    	
+				    } catch(final Throwable f) {
+					LOG.error("Error during object history consolidation for " + bucketName + "/" + objectName, f);
+				    }
+				}
+			    });
 			} catch(final Throwable f) {
 				LOG.warn("Error setting object history for " + bucketName + "/" + savedEntity.getObjectKey() + " continuing. Read-repair should fix it later.", f);
 			}
