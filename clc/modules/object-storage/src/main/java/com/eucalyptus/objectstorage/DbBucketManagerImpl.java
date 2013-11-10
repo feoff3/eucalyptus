@@ -166,7 +166,9 @@ public class DbBucketManagerImpl implements BucketManager {
 				}
 			}
 		} catch(NoSuchElementException e) {
-			//Expected result, continue	
+			//Expected result, continue
+		} catch(S3Exception e) {
+			throw e;
 		} catch(Exception e) {
 			//Lookup failed.
 			LOG.error("Lookup for bucket " + bucketName + " failed during creation checks. Cannot proceed.",e);
