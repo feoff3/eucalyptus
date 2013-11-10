@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.List;
 
 import com.eucalyptus.entities.TransactionException;
+import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
@@ -84,7 +85,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public long count(String bucketName) throws Exception;
+	public long count(Bucket bucket) throws Exception;
 
 	/**
 	 * Does specified object exist
@@ -94,7 +95,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> boolean exists(String bucketName, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws Exception;
+	public abstract <T,F> boolean exists(Bucket bucket, String objectKey, String versionId,  CallableWithRollback<T, F> resourceModifier) throws Exception;
 	
 	/**
 	 * Get the entity record, not the content
@@ -104,7 +105,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract ObjectEntity get(String bucketName, String objectKey, String versionId) throws Exception;
+	public abstract ObjectEntity get(Bucket bucket, String objectKey, String versionId) throws Exception;
 	
 	/**
 	 * List the objects in the given bucket
@@ -116,7 +117,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxRecordCount, String prefix, String delimiter, String startKey) throws Exception;
+	public abstract PaginatedResult<ObjectEntity> listPaginated(Bucket bucket, int maxRecordCount, String prefix, String delimiter, String startKey) throws Exception;
 
 	/**
 	 * List the object versions in the given bucket
@@ -130,7 +131,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws Exception;
+	public abstract PaginatedResult<ObjectEntity> listVersionsPaginated(Bucket bucket, int maxKeys, String prefix, String delimiter, String startKey, String startVersionId, boolean includeDeleteMarkers) throws Exception;
 	
 	/**
 	 * Delete the object entity
@@ -141,7 +142,7 @@ public interface ObjectManager {
 	 * @throws S3Exception
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> void delete(ObjectEntity object,  CallableWithRollback<T, F> resourceModifier) throws Exception;
+	public abstract <T,F> void delete(Bucket bucket, ObjectEntity object,  CallableWithRollback<T, F> resourceModifier) throws Exception;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state
@@ -149,7 +150,7 @@ public interface ObjectManager {
 	 * @param object
 	 * @param versionIdSupplier
 	 */
-	public abstract <T extends PutObjectResponseType, F> T create(String bucketName, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws Exception;
+	public abstract <T extends PutObjectResponseType, F> T create(Bucket bucket, ObjectEntity object, CallableWithRollback<T,F> resourceModifier) throws Exception;
 	
 	public abstract <T extends SetRESTObjectAccessControlPolicyResponseType, F> T setAcp(ObjectEntity object, AccessControlPolicy acp, CallableWithRollback<T, F> resourceModifier) throws Exception;
 	
@@ -173,5 +174,5 @@ public interface ObjectManager {
 	 * @param objectKey
 	 * @throws Exception
 	 */
-	public void doFullRepair(String bucketName, String objectKey) throws Exception;
+	public void doFullRepair(Bucket bucket, String objectKey) throws Exception;
 }

@@ -41,6 +41,7 @@ import org.hibernate.criterion.Restrictions;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
+import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -73,27 +74,27 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T, F> boolean exists(String bucketName, String objectKey, String versionId,
+	public <T, F> boolean exists(Bucket bucket, String objectKey, String versionId,
 			CallableWithRollback<T, F> resourceModifier) throws Exception {
 		try {
-			return get(bucketName, objectKey, versionId) != null;
+			return get(bucket, objectKey, versionId) != null;
 		} catch (NoSuchElementException e) {
 			return false;
 		} catch (Exception e) {
-			LOG.error("Error determining existence of " + bucketName + "/" + objectKey + " , version=" + versionId);
+			LOG.error("Error determining existence of " + bucket.getBucketName() + "/" + objectKey + " , version=" + versionId);
 			throw e;
 		}
 	}
 
 	@Override
-	public long count(String bucketName) throws Exception {
+	public long count(Bucket bucket) throws Exception {
 		EntityTransaction db = Entities.get(ObjectEntity.class);
-		ObjectEntity exampleObject = new ObjectEntity(bucketName, null, null);
+		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null, null);
 		exampleObject.setDeleted(false);
 		try {
 			return Entities.count(exampleObject);
 		} catch (Throwable e) {
-			LOG.error("Error getting object count for bucket " + bucketName, e);
+			LOG.error("Error getting object count for bucket " + bucket.getBucketName(), e);
 			throw new Exception(e);
 		} finally {
 			db.rollback();
@@ -110,12 +111,12 @@ public class DbObjectManagerImpl implements ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public List<ObjectEntity> getPendingWrites(String bucketName, String objectKey, String versionId) throws Exception {
+	public List<ObjectEntity> getPendingWrites(Bucket bucket, String objectKey, String versionId) throws Exception {
 		try {
 			// Return the latest version based on the created date.
 			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {
-				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
+				ObjectEntity searchExample = new ObjectEntity(bucket.getBucketName(), objectKey, versionId);
 				Criteria search = Entities.createCriteria(ObjectEntity.class);
 				List results = search.add(Example.create(searchExample))
 						.add(Restrictions.isNull("objectModifiedTimestamp")).list();
@@ -130,7 +131,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			// Nothing, return empty list
 			return new ArrayList<ObjectEntity>(0);
 		} catch (Exception e) {
-			LOG.error("Error fetching pending write records for object " + bucketName + "/" + objectKey + "?versionId="
+			LOG.error("Error fetching pending write records for object " + bucket.getBucketName() + "/" + objectKey + "?versionId="
 					+ versionId);
 			throw e;
 		}
@@ -174,47 +175,6 @@ public class DbObjectManagerImpl implements ObjectManager {
 	/**
 	 * This is the proper function to use for doing read-repair operations
 	 */
-	private static final Predicate<ObjectEntity> REPAIR_OBJECT_HISTORY_PREDICATE = new Predicate<ObjectEntity>() {
-		public boolean apply(ObjectEntity example) {
-			try {
-				Criteria search = Entities.createCriteria(ObjectEntity.class);
-				List<ObjectEntity> results = search.add(Example.create(example))
-						.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
-						.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
-						.addOrder(Order.desc("objectModifiedTimestamp")).list();
-				
-				ObjectEntity lastViewed = null;
-				if (results != null && results.size() > 0) {
-					try {
-						results.get(0).makeLatest();
-
-						// Set all but the first element as not latest
-						for (ObjectEntity obj : results.subList(1, results.size())) {
-							obj.makeNotLatest();
-
-							if (obj.isNullVersioned()) {
-								if (lastViewed != null && lastViewed.isNullVersioned()) {
-									obj.markForDeletion();
-								}
-								lastViewed = obj;
-							} else {
-								lastViewed = null;
-							}
-						}
-					} catch (IndexOutOfBoundsException e) {
-						// Either 0 or 1 result, nothing to do
-					}
-				}
-			} catch (NoSuchElementException e) {
-				// Nothing to do.
-			} catch (Exception e) {
-				LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/"
-						+ example.getObjectKey());
-				return false;
-			}
-			return true;
-		}
-	};
 
 	/**
 	 * Finds all object records and keeps latest, marks rest for deletion if
@@ -244,10 +204,53 @@ public class DbObjectManagerImpl implements ObjectManager {
 	 * @param objectKey
 	 * @throws Exception
 	 */
-	public void doFullRepair(String bucketName, String objectKey) throws Exception {
-		ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, null);
+	public void doFullRepair(final Bucket bucket, final String objectKey) throws Exception {
+		ObjectEntity searchExample = new ObjectEntity(bucket.getBucketName(), objectKey, null);
+		
+		final Predicate<ObjectEntity> repairPredicate = new Predicate<ObjectEntity>() {
+			public boolean apply(ObjectEntity example) {
+				try {
+					Criteria search = Entities.createCriteria(ObjectEntity.class);
+					List<ObjectEntity> results = search.add(Example.create(example))
+							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+							.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+							.addOrder(Order.desc("objectModifiedTimestamp")).list();
+					
+					ObjectEntity lastViewed = null;
+					if (results != null && results.size() > 0) {
+						try {
+							results.get(0).makeLatest();
+
+							// Set all but the first element as not latest
+							for (ObjectEntity obj : results.subList(1, results.size())) {
+								obj.makeNotLatest();
+								
+								if (obj.isNullVersioned()) {								
+									if(bucket.isVersioningDisabled() || 
+											(lastViewed != null && lastViewed.isNullVersioned())) {
+										obj.markForDeletion();
+									}
+									lastViewed = obj;
+								} else {
+									lastViewed = null;
+								}
+							}
+						} catch (IndexOutOfBoundsException e) {
+							// Either 0 or 1 result, nothing to do
+						}
+					}
+				} catch (NoSuchElementException e) {
+					// Nothing to do.
+				} catch (Exception e) {
+					LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/"
+							+ example.getObjectKey());
+					return false;
+				}
+				return true;
+			}
+		};
 		try {
-			Entities.asTransaction(REPAIR_OBJECT_HISTORY_PREDICATE).apply(searchExample);
+			Entities.asTransaction(repairPredicate).apply(searchExample);
 		} catch (final Throwable f) {
 			LOG.error("Error in version/null repair", f);
 		}
@@ -264,8 +267,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			try {
 				ObjectEntity searchExample = new ObjectEntity();
 				Criteria search = Entities.createCriteria(ObjectEntity.class);
-				List results = search
-						.add(Example.create(searchExample))
+				List results = search.add(Example.create(searchExample))
 						.add(Restrictions.or(ObjectEntity.QueryHelpers.getDeletedRestriction(),
 								ObjectEntity.QueryHelpers.getFailedRestriction())).list();
 				db.commit();
@@ -286,12 +288,12 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public ObjectEntity get(String bucketName, String objectKey, String versionId) throws Exception {
+	public ObjectEntity get(Bucket bucket, String objectKey, String versionId) throws Exception {
 		try {
 			// Return the latest version based on the created date.
 			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {
-				ObjectEntity searchExample = new ObjectEntity(bucketName, objectKey, versionId);
+				ObjectEntity searchExample = new ObjectEntity(bucket.getBucketName(), objectKey, versionId);
 				if (versionId == null) {
 					searchExample.setIsLatest(true);
 				}
@@ -305,10 +307,10 @@ public class DbObjectManagerImpl implements ObjectManager {
 				if (results == null || results.size() < 1) {
 					throw new NoSuchElementException();
 				} else if (results.size() > 1) {
-					this.repairObjectLatest(bucketName, objectKey);
+					this.repairObjectLatest(bucket.getBucketName(), objectKey);
 					
-					//Do async repair if necessary
-					fireRepairTask(bucketName, objectKey);
+					//Do async repair if necessary to remove old data if overwritten
+					fireRepairTask(bucket, objectKey);
 				}
 
 				db.commit();
@@ -322,13 +324,13 @@ public class DbObjectManagerImpl implements ObjectManager {
 		} catch (NoSuchElementException ex) {
 			throw ex;
 		} catch (Exception e) {
-			LOG.error("Error getting object entity for " + bucketName + "/" + objectKey + "?version=" + versionId, e);
+			LOG.error("Error getting object entity for " + bucket.getBucketName() + "/" + objectKey + "?version=" + versionId, e);
 			throw e;
 		}
 	}
 
 	@Override
-	public <T, F> void delete(ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws Exception {
+	public <T, F> void delete(Bucket bucket, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws Exception {
 		T result = null;
 		// Set to 'deleting'
 		if (!object.getDeleted()) {
@@ -382,7 +384,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T extends PutObjectResponseType, F> T create(final String bucketName, final ObjectEntity object,
+	public <T extends PutObjectResponseType, F> T create(final Bucket bucket, final ObjectEntity object,
 			CallableWithRollback<T, F> resourceModifier) throws S3Exception, TransactionException {
 		T result = null;
 		try {
@@ -433,15 +435,15 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 				// Update bucket size
 				try {
-					BucketManagers.getInstance().updateBucketSize(bucketName, savedEntity.getSize());
+					BucketManagers.getInstance().updateBucketSize(bucket.getBucketName(), savedEntity.getSize());
 				} catch (final Throwable f) {
-					LOG.warn("Error updating bucket " + bucketName + " total object size. Not failing object put of .",
+					LOG.warn("Error updating bucket " + bucket.getBucketName() + " total object size. Not failing object put of .",
 							f);
 				}
 
 				db.commit();
 			} catch (Exception e) {
-				LOG.error("Error saving metadata object:" + bucketName + "/" + object.getObjectKey() + " version "
+				LOG.error("Error saving metadata object:" + bucket.getBucketName() + "/" + object.getObjectKey() + " version "
 						+ object.getVersionId());
 				throw e;
 			} finally {
@@ -450,11 +452,11 @@ public class DbObjectManagerImpl implements ObjectManager {
 				}
 			}
 
-			fireRepairTask(bucketName, savedEntity.getObjectKey());
+			fireRepairTask(bucket, savedEntity.getObjectKey());
 
 			return result;
 		} catch (S3Exception e) {
-			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
+			LOG.error("Error creating object: " + bucket.getBucketName() + "/" + object.getObjectKey());
 			try {
 				// Call the rollback. It is up to the provider to ensure the
 				// rollback is correct for that backend
@@ -466,7 +468,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			}
 			throw e;
 		} catch (Exception e) {
-			LOG.error("Error creating object: " + bucketName + "/" + object.getObjectKey());
+			LOG.error("Error creating object: " + bucket.getBucketName() + "/" + object.getObjectKey());
 
 			try {
 				if (resourceModifier != null) {
@@ -479,7 +481,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		}
 	}
 
-	protected void fireRepairTask(final String bucket, final String objectKey) {
+	protected void fireRepairTask(final Bucket bucket, final String objectKey) {
 		try {
 			HISTORY_REPAIR_EXECUTOR.submit(new Runnable() {
 				public void run() {
@@ -552,14 +554,14 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public PaginatedResult<ObjectEntity> listPaginated(String bucketName, int maxKeys, String prefix, String delimiter,
+	public PaginatedResult<ObjectEntity> listPaginated(final Bucket bucket, int maxKeys, String prefix, String delimiter,
 			String startKey) throws Exception {
-		return listVersionsPaginated(bucketName, maxKeys, prefix, delimiter, startKey, null, true);
+		return listVersionsPaginated(bucket, maxKeys, prefix, delimiter, startKey, null, true);
 
 	}
 
 	@Override
-	public PaginatedResult<ObjectEntity> listVersionsPaginated(String bucketName, int maxEntries, String prefix,
+	public PaginatedResult<ObjectEntity> listVersionsPaginated(final Bucket bucket, int maxEntries, String prefix,
 			String delimiter, String fromKeyMarker, String fromVersionId, boolean latestOnly) throws Exception {
 
 		EntityTransaction db = Entities.get(ObjectEntity.class);
@@ -574,7 +576,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			if (maxEntries >= 0) {
 				final int queryStrideSize = maxEntries + 1;
 				ObjectEntity searchObj = new ObjectEntity();
-				searchObj.setBucketName(bucketName);
+				searchObj.setBucketName(bucket.getBucketName());
 
 				// Return latest version, so exclude delete markers as well.
 				// This makes listVersion act like listObjects
@@ -697,7 +699,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 			return result;
 		} catch (Exception e) {
-			LOG.error("Error generating paginated object list of bucket " + bucketName, e);
+			LOG.error("Error generating paginated object list of bucket " + bucket.getBucketName(), e);
 			throw e;
 		} finally {
 			db.rollback();

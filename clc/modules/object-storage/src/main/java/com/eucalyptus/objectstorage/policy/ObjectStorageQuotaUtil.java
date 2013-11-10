@@ -98,7 +98,7 @@ public class ObjectStorageQuotaUtil {
   
   public static long countBucketObjectNumber(String bucketName) throws AuthException {    
 	  try {
-		  return ObjectManagers.getInstance().count(bucketName);
+		  return ObjectManagers.getInstance().count(BucketManagers.getInstance().get(bucketName, true, null));
 	  } catch(Exception e) {
 		  throw new AuthException("Failed to search object", e);
 	  }

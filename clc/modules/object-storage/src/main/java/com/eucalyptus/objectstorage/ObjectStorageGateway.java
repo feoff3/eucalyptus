@@ -156,8 +156,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 	private static final Random rand = new Random(System.currentTimeMillis()); //for anything that needs randomization
 	
-	private static final int REAPER_POOL_SIZE = 1;	
-	private static final long REAPER_INTIAL_DELAY_SEC = 120; //2 minutes to let system initialize fully before starting reaper
+	private static final int REAPER_POOL_SIZE = 2;	
+	private static final long REAPER_INITIAL_DELAY_SEC = 120; //2 minutes to let system initialize fully before starting reaper
+	private static final long BUCKET_CLEANER_INITIAL_DELAY_SEC = 145; //2 minutes to let system initialize fully before starting bucket cleaner
 	private static final int REAPER_PERIOD_SEC = 60; //Run every minute
 	
 	private static final ScheduledExecutorService REAPER_EXECUTOR = Executors.newScheduledThreadPool(REAPER_POOL_SIZE);
@@ -222,7 +223,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		    LOG.error("Error getting configured reaper task interval. Using default: " + REAPER_PERIOD_SEC, f);
 		}
 		
-		REAPER_EXECUTOR.scheduleAtFixedRate(new ObjectReaperTask(), REAPER_INTIAL_DELAY_SEC , intervalSec, TimeUnit.SECONDS);
+		REAPER_EXECUTOR.scheduleAtFixedRate(new ObjectReaperTask(), REAPER_INITIAL_DELAY_SEC , intervalSec, TimeUnit.SECONDS);
+		REAPER_EXECUTOR.scheduleAtFixedRate(new BucketCleanerTask(), BUCKET_CLEANER_INITIAL_DELAY_SEC , intervalSec, TimeUnit.SECONDS);
 		LOG.debug("Enabling ObjectStorageGateway complete");
 	}
 
@@ -389,7 +391,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					final String fullObjectKey = objectEntity.getObjectUuid();
 					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
 					
-					PutObjectResponseType response = ObjectManagers.getInstance().create(request.getBucket(), objectEntity,
+					PutObjectResponseType response = ObjectManagers.getInstance().create(bucket, objectEntity,
 							new CallableWithRollback<PutObjectResponseType,Boolean>() {
 								@Override
 								public PutObjectResponseType call() throws S3Exception, Exception {
@@ -644,7 +646,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 				long objectCount = 0;
 				try {
-					objectCount = ObjectManagers.getInstance().count(bucket.getBucketName());
+					objectCount = ObjectManagers.getInstance().count(bucket);
 				} catch(Exception e) {
 					//Bail if we can't confirm bucket is empty.
 					LOG.error("Error fetching object count for bucket " + bucket.getBucketName());
@@ -792,7 +794,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 		
 		try {
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);		
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), null);		
 		} catch(NoSuchElementException e) {
 			//Nothing to do, object doesn't exist. Return 204 per S3 spec
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
@@ -807,7 +809,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
 			//Get the listing from the back-end and copy results in.
 			try {
-				ObjectManagers.getInstance().delete(objectEntity,
+				ObjectManagers.getInstance().delete(bucket, objectEntity,
 						new CallableWithRollback<DeleteObjectResponseType,Boolean>() {
 					public DeleteObjectResponseType call() throws S3Exception, Exception {
 						return ospClient.deleteObject(request);
@@ -871,7 +873,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			
 			PaginatedResult<ObjectEntity> result = null;
 			try {
-				result = ObjectManagers.getInstance().listPaginated(request.getBucket(), maxKeys, request.getPrefix(), request.getDelimiter(), request.getMarker());									
+				result = ObjectManagers.getInstance().listPaginated(listBucket, maxKeys, request.getPrefix(), request.getDelimiter(), request.getMarker());									
 			} catch(Exception e) {
 				LOG.error("Error getting object listing for bucket: " + request.getBucket(), e);
 				throw new InternalErrorException(request.getBucket());
@@ -913,8 +915,18 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
+		Bucket bucket = null;
 		try {
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(request.getBucket());
+		} catch(Exception e) {
+			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		try {
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), request.getVersionId());
 		} catch(NoSuchElementException e) {
 			throw new NoSuchKeyException(request.getBucket());
 		} catch(Exception e) {
@@ -1013,8 +1025,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectEntity objectEntity = null;
 		Bucket bucket = null;
 		try {
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
 			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), request.getVersionId());		
 		} catch(NoSuchElementException e) {
 			if(objectEntity == null) {
 				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
@@ -1089,10 +1101,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public GetObjectResponseType getObject(GetObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
-		
+		Bucket bucket = null;
 		try {
 			//Handle the pass-through
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionId());
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), request.getVersionId());
 		} catch(NoSuchElementException e) {
 			throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
 		} catch (Exception e) {
@@ -1139,11 +1152,13 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public GetObjectExtendedResponseType getObjectExtended(GetObjectExtendedType request) throws EucalyptusCloudException {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
+		Bucket bucket = null;
 		try {
 			User requestUser = Contexts.lookup().getUser();			
 			try {
 				//Handle the pass-through
-				objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);
+				bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+				objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), null);
 			} catch(NoSuchElementException e) {
 				throw new NoSuchBucketException(request.getBucket());
 			}
@@ -1203,7 +1218,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		ObjectEntity objectEntity = null;
 		try {
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), null);
 		} catch(NoSuchElementException e) {
 			throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey());
 		} catch(Exception e) {
@@ -1413,8 +1428,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		ObjectEntity objectEntity = null;
 		Bucket bucket = null;
 		try {
-			objectEntity = ObjectManagers.getInstance().get(request.getBucket(), request.getKey(), request.getVersionid());
 			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), request.getVersionid());			
 		} catch(NoSuchElementException e) {
 			throw new NoSuchVersionException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionid());
 		} catch(Exception e) {
