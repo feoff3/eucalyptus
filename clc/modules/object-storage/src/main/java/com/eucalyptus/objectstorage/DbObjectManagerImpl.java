@@ -183,24 +183,23 @@ public class DbObjectManagerImpl implements ObjectManager {
 				
 				ObjectEntity lastViewed = null;
 				if(results != null) {
+				    try {					
 					//Set all but the first element as not latest
-					for(ObjectEntity obj : results) {
-						obj.setIsLatest(false);
-						
-						if(obj.isNullVersioned()) {
-							if(lastViewed != null && lastViewed.isNullVersioned()) {
-								obj.markForDeletion();
-							}
-							lastViewed = obj;
-						} else {
-							lastViewed = null;
+					for(ObjectEntity obj : results.subList(1, results.size())) {
+					    obj.makeNotLatest();
+					    
+					    if(obj.isNullVersioned()) {
+						if(lastViewed != null && lastViewed.isNullVersioned()) {
+						    obj.markForDeletion();
 						}
+						lastViewed = obj;
+					    } else {
+						lastViewed = null;
+					    }
 					}
-					
-					//Ensure the latest (by objectModifiedTimestamp) is the 'latest'
-					if(results.size() > 0) {
-						results.get(0).makeNotLatest();
-					}
+				    } catch(IndexOutOfBoundsException e) {
+					//Either 0 or 1 result, nothing to do
+				    }				    
 				}
 			} catch(NoSuchElementException e) {
 				//Nothing to do.
@@ -208,7 +207,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 				LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/" + example.getObjectKey());
 				return false;
 			}
-			return false;
+			return true;
 		}
 	};
 	
@@ -412,6 +411,12 @@ public class DbObjectManagerImpl implements ObjectManager {
 			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {				
 				Entities.mergeDirect(savedEntity);
+
+				try {
+				    doFullRepair(bucketName, savedEntity.getObjectKey());			    	
+				} catch(final Throwable f) {
+				    LOG.error("Error during object history consolidation for " + bucketName + "/" + savedEntity.getObjectKey(), f);
+				}
 
 				//Update bucket size
 				try {
