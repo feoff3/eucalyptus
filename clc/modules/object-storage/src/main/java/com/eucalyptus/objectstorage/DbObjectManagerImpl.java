@@ -411,13 +411,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			EntityTransaction db = Entities.get(ObjectEntity.class);
 			try {				
 				Entities.mergeDirect(savedEntity);
-
-				try {
-				    doFullRepair(bucketName, savedEntity.getObjectKey());			    	
-				} catch(final Throwable f) {
-				    LOG.error("Error during object history consolidation for " + bucketName + "/" + savedEntity.getObjectKey(), f);
-				}
-
+		
 				//Update bucket size
 				try {
 					BucketManagers.getInstance().updateBucketSize(bucketName, savedEntity.getSize());
