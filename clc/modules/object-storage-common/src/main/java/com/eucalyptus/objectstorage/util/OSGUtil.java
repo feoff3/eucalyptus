@@ -69,7 +69,6 @@ import java.util.Date;
 import org.apache.tools.ant.util.DateUtils;
 
 import com.eucalyptus.objectstorage.exceptions.ObjectStorageException;
-import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.util.Internets;
 
@@ -127,11 +126,56 @@ public class OSGUtil {
 	 * @param d
 	 * @return
 	 */
-	public static String dateToFormattedString(Date d) {
+	public static String dateToHeaderFormattedString(Date d) {
 		if(d == null) { 
 			return null;
+		} else {
+			try {
+				return DateUtils.format(d.getTime(), DateUtils.ALT_ISO8601_DATE_PATTERN);
+			} catch(Exception e) {
+				return null;
+			}
+		}
+	}
+	
+	public static Date dateFromHeaderFormattedString(String header) {
+		if(header == null) { 
+			return null;
 		} else {		
-			return DateUtils.format(d.getTime(), DateUtils.ALT_ISO8601_DATE_PATTERN);
+			try {
+				return DateUtils.parseIso8601DateTimeOrDate(header);
+			} catch (Exception e) {				
+				return null;
+			}
+		}
+	}
+	
+	public static Date dateFromRFC822FormattedString(String dateStr) {
+		if(dateStr == null) { 
+			return null;
+		} else {
+			try {
+				return DateUtils.parseRfc822DateTime(dateStr);
+			} catch (Exception e) {				
+				return null;
+			}
+		}
+	}
+	
+	/**
+	 * Helper to do the RFC822 formatting
+	 * @param d
+	 * @return
+	 */
+	public static String dateToRFC822FormattedString(Date d) {
+		if(d == null) {
+			return null;
+		} else {
+			try {
+				return DateUtils.format(d.getTime(), DateUtils.RFC822_DATETIME_PATTERN);
+			} catch(Exception e) {
+				return null;
+			}
 		}
 	}
 }

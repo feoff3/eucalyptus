@@ -30,7 +30,9 @@ import javax.persistence.Table;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
+import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 
 @Entity
 @PersistenceContext(name="eucalyptus_osg")
@@ -79,7 +81,7 @@ public class Bucket extends S3AccessControlledEntity {
 	}
 	
 	@Override
-	protected String getResourceFullName() {
+	public String getResourceFullName() {
 		return getBucketName();
 	}
 
@@ -204,5 +206,9 @@ public class Bucket extends S3AccessControlledEntity {
 		} else if (!bucketName.equals(other.bucketName))
 			return false;
 		return true;
+	}
+	
+	public BucketListEntry toBucketListEntry() {
+		return new BucketListEntry(this.getBucketName(), OSGUtil.dateToRFC822FormattedString(this.getCreationDate()));
 	}
 }

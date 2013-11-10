@@ -20,24 +20,42 @@
 
 package com.eucalyptus.objectstorage.entities;
 
+import java.util.Date;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.PersistenceContext;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 import org.apache.log4j.Logger;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 import org.hibernate.annotations.OptimisticLocking;
-import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Restrictions;
+
+import com.eucalyptus.auth.Accounts;
+import com.eucalyptus.auth.principal.User;
+import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.storage.msgs.s3.CanonicalUser;
+import com.eucalyptus.storage.msgs.s3.ListEntry;
+import com.eucalyptus.storage.msgs.s3.VersionEntry;
 
 @Entity
 @OptimisticLocking(type = OptimisticLockType.NONE)
 @PersistenceContext(name="eucalyptus_osg")
 @Table( name = "objects" )
 @Cache( usage = CacheConcurrencyStrategy.TRANSACTIONAL )
-public class ObjectEntity extends S3AccessControlledEntity implements Comparable {	
+public class ObjectEntity extends S3AccessControlledEntity implements Comparable {
+	@Transient
+	public static final String NULL_VERSION_STRING = "null";
+	
 	@Column( name = "object_key" )
     private String objectKey;
 
@@ -47,26 +65,34 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="version_id")
     private String versionId; //VersionId is required to uniquely identify ACLs and auth
 
-    @Column(name="size")
+    @Column(name="objectUuid", unique=true)
+    private String objectUuid; //The a uuid for this specific object content & request
+
+	@Column(name="size")
     private Long size;
 
     @Column(name="storage_class")
     private String storageClass;
 
     @Column(name="is_deleted")
-    private Boolean deleted;
-    
-    @Column(name="is_last")
-    private Boolean last;
+    private Boolean deleted; //Indicates this is a delete marker 
             
-    /**
-     * Used to denote the object as a snapshot, for special access-control considerations.
-     */
+    @Column(name="object_last_modified") //Distinct from the record modification date, tracks the backend response
+    private Date objectModifiedTimestamp;
+    
+    @Column(name="etag")
+    private String eTag;
+    
+    @Column(name="deleted_date")
+    private Date deletedTimestamp; //The date the object was marked for real deletion (not a delete marker)
+
     @Column(name="is_snapshot")
-    private Boolean isSnapshot;
- 
- 
-    private static Logger LOG = Logger.getLogger( ObjectEntity.class );
+    private Boolean isSnapshot; //denote object as 'special' to omit from S3 api inclusion for listings etc. if needed since snapshots are not reachable by users via S3.
+    
+    @Column(name="is_latest")
+    private Boolean isLatest;
+    
+	private static Logger LOG = Logger.getLogger( ObjectEntity.class );
     
     public ObjectEntity() {}
 
@@ -76,8 +102,125 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.versionId = versionId;
     }
     
+    @PrePersist
+    public void ensureVersionIdNotNulL() {
+    	if(this.versionId == null) {
+    		this.versionId = NULL_VERSION_STRING;
+    	}
+    }
+    
+    /**
+     * Initialize this as a new object entity representing an object to PUT
+     * @param bucketName
+     * @param objectKey
+     * @param versionId
+     * @param requestId
+     * @param usr
+     */
+    public void initializeForCreate(String bucketName, String objectKey, String versionId, String requestId, long contentLength, User usr) throws Exception {
+    	this.setBucketName(bucketName);
+    	this.setObjectKey(objectKey);
+    	if(this.getObjectUuid() == null) {
+    		//Generate a new internal key
+    		this.setObjectUuid(generateInternalKey(requestId, objectKey));
+    	}
+    	
+    	this.setDeleted(false);    	
+    	
+    	String ownerIamId = usr.getUserId();
+    	this.setOwnerCanonicalId(usr.getAccount().getCanonicalId());
+    	this.setOwnerDisplayName(usr.getAccount().getName());
+    	this.setOwnerIamUserId(ownerIamId);    	
+    	this.setObjectModifiedTimestamp(null);
+    	this.setSize(contentLength);
+    	this.setIsSnapshot(false);    	
+    	this.setDeletedTimestamp(null);
+    	this.setIsLatest(false);
+    	this.setStorageClass(ObjectStorageProperties.STORAGE_CLASS.STANDARD.toString());
+    }
+    
+    /**
+     * Creates a new 'DeleteMarker' object entity from this object
+     * @param versionId
+     * @param requestId
+     * @param usr
+     * @return
+     * @throws Exception
+     */
+    public ObjectEntity generateDeleteMarker(String versionId, String requestId, User usr) throws Exception {
+    	if(versionId == null) {
+    		throw new IllegalArgumentException("versionId cannot be null for delete marker generation");
+    	}
+    	
+    	ObjectEntity deleteMarker = new ObjectEntity(this.getBucketName(), this.getObjectKey(), versionId);    	    
+    	deleteMarker.setObjectUuid(generateInternalKey(requestId, objectKey));    	
+    	deleteMarker.setDeleted(true);
+    	
+    	String ownerIamId = usr.getUserId();
+    	deleteMarker.setOwnerCanonicalId(usr.getAccount().getCanonicalId());
+    	deleteMarker.setOwnerIamUserId(ownerIamId);
+    	deleteMarker.setOwnerDisplayName(usr.getAccount().getName());
+    	deleteMarker.setObjectModifiedTimestamp(null);
+    	deleteMarker.setDeletedTimestamp(null);
+    	deleteMarker.setIsLatest(true);
+    	return deleteMarker;
+    }
+    
+    public void makeNotLatest() {
+    	this.setIsLatest(false);
+    }
+    
+    public void makeLatest() {
+    	this.setIsLatest(true);
+    }
+    
+    public void markForDeletion() {
+    	this.setDeletedTimestamp(new Date());
+    	this.setVersionId(null);
+    }
+        
+    public void finalizeCreation(@Nullable String versionId, @Nullable Date lastModified, @Nonnull String etag) throws Exception {
+    	this.seteTag(etag);
+    	if(lastModified != null) {
+    		this.setObjectModifiedTimestamp(lastModified);
+    	} else {
+    		this.setObjectModifiedTimestamp(new Date());
+    	}
+    	this.setVersionId(versionId);
+    	this.makeLatest();    	
+    }
+    
+	private static String generateInternalKey(String requestId, String key) {
+		return key + "-" + requestId;
+	}
+	
+    public Date getDeletedTimestamp() {
+		return deletedTimestamp;
+	}
+
+	public void setDeletedTimestamp(Date deletedTimestamp) {
+		this.deletedTimestamp = deletedTimestamp;
+	}
+
+    
+	public String geteTag() {
+		return eTag;
+	}
+
+	public void seteTag(String eTag) {
+		this.eTag = eTag;
+	}
+
+	public Date getObjectModifiedTimestamp() {
+		return objectModifiedTimestamp;
+	}
+
+	public void setObjectModifiedTimestamp(Date objectModifiedTimestamp) {
+		this.objectModifiedTimestamp = objectModifiedTimestamp;
+	}
+    
 	@Override
-	protected String getResourceFullName() {
+	public String getResourceFullName() {
 		return getBucketName() + "/" + getObjectKey();
 	}
 
@@ -113,13 +256,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         this.storageClass = storageClass;
     }
     
-    /*
-    public Map<String, String> getUserMetadataMap() throws Exception {    	    	
-    	JSONObject jsonMap = (JSONObject)JSONSerializer.toJSON(this.getUserMetadata());
-    	return (Map<String,String>)jsonMap;
-    }
-    */
-    
     public Boolean getDeleted() {
 		return deleted;
 	}
@@ -140,15 +276,30 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
         return this.objectKey.compareTo(((ObjectEntity)o).getObjectKey());
     }
 
+	public boolean isPending() {
+		return (getObjectModifiedTimestamp() == null);
+	}
 	
-	public Boolean getLast() {
-		return last;
+	public String getObjectUuid() {
+		return objectUuid;
 	}
 
-	public void setLast(Boolean last) {
-		this.last = last;
+	public void setObjectUuid(String objectUuid) {
+		this.objectUuid = objectUuid;
 	}
 
+	public Boolean getIsLatest() {
+		return isLatest;
+	}
+
+	public void setIsLatest(Boolean isLatest) {
+		this.isLatest = isLatest;
+	}
+	
+	public boolean isNullVersioned() {
+		return NULL_VERSION_STRING.equals(this.versionId);
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -176,16 +327,25 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 				return false;
 		} else if (!bucketName.equals(other.bucketName))
 			return false;
+		
 		if (objectKey == null) {
 			if (other.objectKey != null)
 				return false;
 		} else if (!objectKey.equals(other.objectKey))
 			return false;
+		
 		if (versionId == null) {
 			if (other.versionId != null)
 				return false;
 		} else if (!versionId.equals(other.versionId))
 			return false;
+		
+		if (objectUuid == null) {
+			if (other.objectUuid != null)
+				return false;
+		} else if (!objectUuid.equals(other.objectUuid))
+			return false;
+		
 		return true;
 	}
 
@@ -196,8 +356,97 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 	public void setIsSnapshot(Boolean isSnapshot) {
 		this.isSnapshot = isSnapshot;
 	}
-
-	public void setResourceAcl(AccessControlPolicy policy) {
+	
+	public static class QueryHelpers {
+		public static Criterion getNotSnapshotRestriction() {
+			return Restrictions.ne("isSnapshot", true);
+		}
 		
+		public static Criterion getNotPendingRestriction() {
+			return Restrictions.isNotNull("objectModifiedTimestamp");
+		}
+		
+		/**
+		 * The condition to determine if an object record is failed -- where failed means the PUT did not complete
+		 * and it was not handled cleanly on failure. e.g. OSG failed before it could finalize the object record
+		 * @return
+		 */
+		public static Criterion getFailedRestriction() {
+			return Restrictions.and(Restrictions.isNull("objectModifiedTimestamp"), Restrictions.le("creationTimestamp", getOldestFailedAllowed()));
+		}
+
+		/**
+		 * The condition to determine that an object record is marked for cleanup.
+		 * @return
+		 */
+		public static Criterion getDeletedRestriction() {
+			return Restrictions.isNotNull("deletedTimestamp");		
+		}
+
+		/**
+		 * Returns timestamp for detecting failed-put records. Any record with created timestamp less than
+		 * this value that have not been completed are considered failed.
+		 */
+		public static Date getOldestFailedAllowed() {
+			long now = new Date().getTime();
+			//Subtract the failed window hours.
+			Integer windowHrs = ObjectStorageGatewayInfo.getObjectStorageGatewayInfo().getFailedPutTimeoutHours();			
+			if(windowHrs == null) {
+				return new Date(0); //1970 epoch
+			}
+			
+			long windowStart = now - (1000L * 60 * 60 * windowHrs);
+			return new Date(windowStart);
+		}
+
+		/* versionId == null && is_deleted == true
+		 * if versionId != null, then is_deleted indicates a deleteMarker
+		 */
+		public static Criterion getNotDeletingRestriction() {
+			return Restrictions.isNull("deletedTimestamp");
+		}
 	}
+	
+	/**
+	 * Return a ListEntry for this entity
+	 * @return
+	 */
+	public ListEntry toListEntry() {
+		ListEntry e = new ListEntry();
+		e.setEtag(this.geteTag());
+		e.setKey(this.getObjectKey());
+		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
+		e.setSize(this.getSize());
+		e.setStorageClass(this.getStorageClass());
+		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), this.getOwnerDisplayName()));		
+		return e;
+	}
+	
+	/**
+	 * Return a VersionEntry for this entity
+	 * @return
+	 */
+	public VersionEntry toVersionEntry() {
+		VersionEntry e = new VersionEntry();
+		e.setEtag(this.geteTag());
+		e.setKey(this.getObjectKey());
+		e.setVersionId(this.getVersionId());
+		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
+		e.setSize(this.getSize());
+		
+		//TODO: FIXME!!!
+		e.setIsLatest(false);
+		
+		String displayName = "";
+		try {
+			displayName = Accounts.lookupAccountByCanonicalId(this.getOwnerCanonicalId()).getName();
+		} catch(Exception ex) {
+			LOG.error("Failed to get display name/account name for canonical Id: " + this.getOwnerCanonicalId(),ex);
+			displayName = "";
+		}
+		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), displayName));
+		return e;
+	}
+	
+	//TODO: add delete marker support. Fix is to use super-type for versioning entry and sub-types for version vs deleteMarker
 }

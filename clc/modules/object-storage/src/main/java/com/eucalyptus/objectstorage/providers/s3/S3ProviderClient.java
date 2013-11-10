@@ -75,9 +75,7 @@ import com.amazonaws.services.s3.model.VersionListing;
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
-import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
-import com.eucalyptus.context.NoSuchContextException;
 import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.objectstorage.ObjectStorageProviderClient;
 import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderClientProperty;
@@ -329,6 +327,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		LOG.debug("Disable completed successfully");
 	}
 
+	protected CanonicalUser getCanonicalUser(User usr) throws AuthException {
+		return new CanonicalUser(usr.getAccount().getCanonicalId(), usr.getAccount().getName());
+	}
+	
 	/*
 	 * TODO: add multi-account support on backend and then this can be a pass-thru to backend for bucket listing.
 	 * Multiplexing a single eucalyptus account on the backend means we have to track all of the user buckets ourselves
@@ -338,24 +340,26 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public ListAllMyBucketsResponseType listAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {		
 		ListAllMyBucketsResponseType reply = (ListAllMyBucketsResponseType) request.getReply();
-		try {
+		try {			
+			User requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+			
 			//The euca-types
 			ListAllMyBucketsList myBucketList = new ListAllMyBucketsList();
 			myBucketList.setBuckets(new ArrayList<BucketListEntry>());
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-
+			
+			
 			//The s3 client types
-			AmazonS3Client s3Client = this.getS3Client(ctx.getUser(), request.getAccessKeyID());
+			AmazonS3Client s3Client = this.getS3Client(requestUser, request.getAccessKeyID());
 			ListBucketsRequest listRequest = new ListBucketsRequest();
 
 			//Map s3 client result to euca response message
 			List<Bucket> result = s3Client.listBuckets(listRequest);
 			for(Bucket b : result) {
-				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToFormattedString(b.getCreationDate())));
+				myBucketList.getBuckets().add(new BucketListEntry(b.getName(), OSGUtil.dateToHeaderFormattedString(b.getCreationDate())));
 			}
 
 			reply.setBucketList(myBucketList);
-			reply.setOwner(new CanonicalUser(ctx.getAccount().getCanonicalId(), ctx.getUser().getName()));
+			reply.setOwner(getCanonicalUser(requestUser));
 		} catch (Exception e) {
 			LOG.debug(e, e);
 			throw new EucalyptusCloudException(e);
@@ -375,18 +379,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Error establishing request user", e);			
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}	
 
 		// call the storage manager to save the bucket to disk
@@ -411,18 +407,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		CreateBucketResponseType reply = (CreateBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}	
 
 		// call the storage manager to save the bucket to disk
@@ -449,18 +437,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}	
 
 		// call the storage manager to save the bucket to disk
@@ -485,19 +465,12 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
+		
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -517,7 +490,15 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public PutObjectResponseType putObject(PutObjectType request, InputStream inputData) throws EucalyptusCloudException {
 		try {
-			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			User requestUser = null;
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+			} catch(Exception e) {
+				LOG.error("Lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			
+			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 			PutObjectResult result = null;
 			try {
 				ObjectMetadata metadata = getS3ObjectMetadata(request);
@@ -537,7 +518,8 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Null result. Internal error");
 			} else {
 				reply.setEtag(result.getETag());
-				reply.setVersionId(result.getVersionId());				
+				reply.setVersionId(result.getVersionId());
+				reply.setLastModified(OSGUtil.dateToHeaderFormattedString(new Date()));
 			}
 			return reply;
 		} catch(Exception e) {
@@ -554,11 +536,20 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public DeleteObjectResponseType deleteObject(DeleteObjectType request) throws EucalyptusCloudException {
 		try {
-			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			User requestUser = null;
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+			} catch(Exception e) {
+				LOG.error("Lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			
+			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 			s3Client.deleteObject(request.getBucket(), request.getKey());
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
 			reply.setStatus(HttpResponseStatus.NO_CONTENT);
 			reply.setStatusMessage("NO CONTENT");
+			reply.set_return(true);
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object", e);
@@ -570,7 +561,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public ListBucketResponseType listBucket(ListBucketType request) throws EucalyptusCloudException {
 		ListBucketResponseType reply = (ListBucketResponseType) request.getReply();
 		try {
-			AmazonS3Client s3Client = getS3Client(Contexts.lookup(request.getCorrelationId()).getUser(), Contexts.lookup(request.getCorrelationId()).getUser().getUserId());
+			User requestUser = null;
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+			} catch(Exception e) {
+				LOG.error("Lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 			ListObjectsRequest listRequest = new ListObjectsRequest();
 			listRequest.setBucketName(request.getBucket());
 			listRequest.setDelimiter(Strings.isNullOrEmpty(request.getDelimiter()) ? null : request.getDelimiter());
@@ -601,10 +599,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				//Add entry, note that the canonical user is set based on requesting user, not returned user
 				reply.getContents().add(new ListEntry(
 						obj.getKey(),
-						OSGUtil.dateToFormattedString(obj.getLastModified()),
+						OSGUtil.dateToHeaderFormattedString(obj.getLastModified()),
 						obj.getETag(),
 						obj.getSize(),
-						ObjectStorageGateway.buildCanonicalUser(Contexts.lookup(request.getCorrelationId()).getAccount()),
+						getCanonicalUser(requestUser),
 						obj.getStorageClass()));
 			}
 
@@ -627,25 +625,16 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	}
 
 	@Override
-	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(
-			GetObjectAccessControlPolicyType request)
-					throws EucalyptusCloudException {
+	public GetObjectAccessControlPolicyResponseType getObjectAccessControlPolicy(GetObjectAccessControlPolicyType request) throws EucalyptusCloudException {
 		GetObjectAccessControlPolicyResponseType reply = (GetObjectAccessControlPolicyResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
+		
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -666,29 +655,26 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public SetRESTBucketAccessControlPolicyResponseType setRESTBucketAccessControlPolicy(
 			SetRESTBucketAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		//This is a no-op in the current design because we track ACP at the OSG only. Backend uses all 'private'
-		SetRESTBucketAccessControlPolicyResponseType reply = (SetRESTBucketAccessControlPolicyResponseType)request.getReply();
-		reply.setBucket(request.getBucket());
-		reply.setStatus(HttpResponseStatus.OK);
-		reply.setStatusMessage("OK");
-		return reply;
+		throw new NotImplementedException("?acl");
 	}
 
 	@Override
 	public SetRESTObjectAccessControlPolicyResponseType setRESTObjectAccessControlPolicy(
 			SetRESTObjectAccessControlPolicyType request)
 					throws EucalyptusCloudException {
-		//This is a no-op in the current design because we track ACP at the OSG only. Backend uses all 'private'
-		SetRESTObjectAccessControlPolicyResponseType reply = (SetRESTObjectAccessControlPolicyResponseType)request.getReply();
-		reply.setBucket(request.getBucket());
-		reply.setStatus(HttpResponseStatus.OK);
-		reply.setStatusMessage("OK");
-		return reply;
+		throw new NotImplementedException("?acl");
 	}
 
 	@Override
 	public GetObjectResponseType getObject(final GetObjectType request) throws EucalyptusCloudException {
-		AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+		User requestUser = null;
+		try {
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
+		AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 		GetObjectRequest getRequest = new GetObjectRequest(request.getBucket(), request.getKey());
 		try {
 			ObjectMetadata metadata = null;
@@ -755,23 +741,12 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	public GetObjectExtendedResponseType getObjectExtended(final GetObjectExtendedType request) throws EucalyptusCloudException {
 		//TODO: This is common. Stop repeating.
 		User requestUser = null;
-		String canonicalId = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			canonicalId = ctx.getAccount().getCanonicalId();
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
-				canonicalId = requestUser.getAccount().getCanonicalId();
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}
-
-		}	
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
 
 		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
 		Boolean getMetaData = request.getGetMetaData();
@@ -817,6 +792,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			if(byteRangeEnd != null) {
 				httpResponse.addHeader("Content-Range", byteRangeStart + "-" + byteRangeEnd + "/" + response.getObjectMetadata().getContentLength());
 			}
+			//TODO: fix this, should be really generic, no Context handling etc
 			Channel channel = request.getChannel();
 			channel.write(httpResponse);
 			S3ObjectInputStream input = response.getObjectContent();
@@ -840,18 +816,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketLocationResponseType reply = (GetBucketLocationResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
 
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -874,17 +843,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		CopyObjectResponseType reply = (CopyObjectResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
+		} catch(Exception ex) {
+			LOG.error("Fallback non-context-based lookup of user and canonical id failed", ex);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}			
 		String sourceBucket = request.getSourceBucket();
 		String sourceKey = request.getSourceObject();
 		String sourceVersionId = request.getSourceVersionId();
@@ -943,17 +906,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		SetBucketLoggingStatusResponseType reply = (SetBucketLoggingStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}
 
 		try {
@@ -984,17 +940,10 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketLoggingStatusResponseType reply = (GetBucketLoggingStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}
 
 		try {
@@ -1026,18 +975,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		GetBucketVersioningStatusResponseType reply = (GetBucketVersioningStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
 
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -1061,18 +1003,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		SetBucketVersioningStatusResponseType reply = (SetBucketVersioningStatusResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
 
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -1096,19 +1031,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		ListVersionsResponseType reply = (ListVersionsResponseType) request.getReply();
 		User requestUser = null;
 		try {
-			Context ctx = Contexts.lookup(request.getCorrelationId());
-			requestUser = ctx.getUser();
-		} catch(NoSuchContextException e) {
-			LOG.error("No context found for correlationId " + request.getCorrelationId(), e);
-
-			try {
-				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());				
-			} catch(Exception ex) {
-				LOG.error("Fallback non-context-based lookup of user and canonical id failed", e);
-				throw new EucalyptusCloudException("Cannot create bucket without user identity");
-			}			
-		}	
-
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot create bucket without user identity");
+		}
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			ListVersionsRequest listVersionsRequest = new ListVersionsRequest(request.getBucket(), 
@@ -1153,7 +1080,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 					v = new VersionEntry();
 					v.setKey(summary.getKey()); 
 					v.setVersionId(summary.getVersionId()); 
-					v.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified())); 
+					v.setLastModified(OSGUtil.dateToHeaderFormattedString(summary.getLastModified())); 
 					v.setEtag(summary.getETag());
 					v.setIsLatest(summary.isLatest());
 					v.setOwner(owner);
@@ -1163,7 +1090,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 					d = new DeleteMarkerEntry();
 					d.setIsLatest(summary.isLatest());
 					d.setKey(summary.getKey());
-					d.setLastModified(OSGUtil.dateToFormattedString(summary.getLastModified()));
+					d.setLastModified(OSGUtil.dateToHeaderFormattedString(summary.getLastModified()));
 					d.setOwner(owner);
 					d.setVersionId(summary.getVersionId());
 					deleteMarkers.add(d);
@@ -1186,7 +1113,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	@Override
 	public DeleteVersionResponseType deleteVersion(DeleteVersionType request) throws EucalyptusCloudException {
 		try {
-			AmazonS3Client s3Client = getS3Client(Contexts.lookup().getUser(), request.getAccessKeyID());
+			User requestUser = null;
+			try {
+				requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+			} catch(Exception e) {
+				LOG.error("Lookup of user and canonical id failed", e);
+				throw new EucalyptusCloudException("Cannot create bucket without user identity");
+			}
+			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 			s3Client.deleteVersion(request.getBucket(), request.getKey(), request.getVersionid());
 			DeleteVersionResponseType reply = (DeleteVersionResponseType) request.getReply();
 			reply.setStatus(HttpResponseStatus.NO_CONTENT);
@@ -1197,6 +1131,4 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			throw new EucalyptusCloudException(e);
 		}
 	}
-
-
 }

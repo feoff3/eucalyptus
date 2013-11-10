@@ -160,7 +160,10 @@ public class ObjectStorageProperties {
 	
 	//15 minutes
 	public final static long EXPIRATION_LIMIT = 900000;
-	
+
+	public static final Integer DEFAULT_PUT_TIMEOUT_HOURS = 24; //An upload not marked completed or deleted in 24 hours from record creation will be considered 'failed'
+
+	public static final Integer DEFAULT_CLEANUP_INTERVAL_SEC = 60; //60 seconds between cleanup tasks.
 	
 	public enum CannedACL {
 		private_only { public String toString() { return "private"; }}, 
@@ -274,49 +277,6 @@ public class ObjectStorageProperties {
 	public enum RequiredSOAPTags {
 		AWSAccessKeyId, Timestamp, Signature
 	}
-	
-	/*
-	 * Simply determines if the userId is a member of the groupId, very simplistic only for ALL_USERS and AUTHENTICATED_USERS, not arbitrary groups.
-	 * Arbitrary groups are not yet supported in ObjectStorage bucket policies/IAM policies.
-	 * userId should be a canonicalId
-	 */
-	public static boolean isUserMember(String userId, String groupId) {
-		if(Strings.isNullOrEmpty(groupId)) {
-			return false;
-		}
-		
-		try {
-			ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(groupId);
-			return isUserMember(userId, group);
-		} catch(IllegalArgumentException e) {
-			LOG.warn("Unknown group id requested for membership check: " + groupId);
-			return false;
-		}		
-	}
-	
-	/**
-	 * Just checks the basic S3 groups for membership of the userId.
-	 * Caller must ensure that the userId is a valid ID in the system. That is outside the scope of this method.
-	 * @param userId
-	 * @param group
-	 * @return
-	 */
-	public static boolean isUserMember(String userId, ObjectStorageProperties.S3_GROUP group) {
-		if(group == null) {
-			return false;
-		}
-		
-		if(ObjectStorageProperties.S3_GROUP.ALL_USERS_GROUP.equals(group)) {
-			return true;
-		}
-		
-		if(ObjectStorageProperties.S3_GROUP.AUTHENTICATED_USERS_GROUP.equals(group)
-				&& !Strings.isNullOrEmpty(userId) && !userId.equals(Principals.nobodyUser().getUserId())) {
-			return true;
-		}
-		
-		return false;
-	}
 
 	public static String getTrackerUrl() {
 		try {
@@ -326,35 +286,4 @@ public class ObjectStorageProperties {
 		}
 		return TRACKER_URL;
 	}
-	
-	public static InetAddress getWalrusAddress() throws EucalyptusCloudException {
-		if (Topology.isEnabled(ObjectStorage.class)) {
-			return Topology.lookup(ObjectStorage.class).getInetAddress();
-		} else {
-			throw new EucalyptusCloudException("Walrus not ENABLED");
-		}	    
-	}
-	
-	private static Iterator<ServiceConfiguration> rrStores;
-	private static Iterable<ServiceConfiguration> currentStores;
-	
-	public static List<InetAddress> getObjectStorageAddress() throws EucalyptusCloudException {
-		if (Topology.isEnabled(ObjectStorage.class)) {
-			Iterable<ServiceConfiguration> newStores = Topology.lookupMany(ObjectStorage.class);
-			List<InetAddress> addresses = new ArrayList<InetAddress>();
-			if(rrStores == null || (!Iterables.elementsEqual(currentStores, newStores))) {
-				currentStores = newStores;
-				rrStores = Iterators.cycle(currentStores);
-			}
-			Iterator<ServiceConfiguration> current = currentStores.iterator();
-			while(current.hasNext()) {
-				current.next();
-				addresses.add(rrStores.next().getInetAddress());
-			}
-			return addresses;
-		} else {
-			throw new EucalyptusCloudException("ObjectStorage not ENABLED");
-		}	    
-	}
-	
 }

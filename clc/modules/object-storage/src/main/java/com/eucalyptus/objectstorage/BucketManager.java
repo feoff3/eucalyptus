@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
@@ -39,6 +40,18 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatu
  */
 public interface BucketManager {
 
+    	public abstract void start() throws Exception;
+    	public abstract void stop() throws Exception;
+	
+	/**
+	 * Change bucket size estimate. sizeToChange can be any value. Negatives decrement, positives
+	 * increment the size
+	 * @param bucketName
+	 * @param sizeToChange
+	 * @throws TransactionException
+	 */
+	public abstract void updateBucketSize(String bucketName, long sizeToChange) throws Exception;
+	
 	/**
 	 * Create the bucket
 	 * @param bucketName
@@ -48,11 +61,10 @@ public interface BucketManager {
 	 * @throws TransactionException
 	 */
 	public abstract <T extends Object ,R extends Object> T create(String bucketName, 
-			 String ownerCanonicalId,
-			 String ownerIamUserId,
+			 User owner,
 			 String acl, 
 			 String location,			
-			 CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<T,R> resourceModifier) throws Exception;
 
 	/**
 	 * Returns a bucket's metadata object. Does NOT preserve the transaction context.
@@ -61,7 +73,7 @@ public interface BucketManager {
 	 */
 	public abstract Bucket get( String bucketName,
 			 boolean includeHidden,
-			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws Exception;
 	/**
 	 * Returns list of buckets owned by id. Buckets are detached from any persistence session.
 	 * @param ownerCanonicalId
@@ -70,7 +82,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> list( String ownerCanonicalId, 
 			 boolean includeHidden, 
-			 CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			 CallableWithRollback<?,?> resourceModifier) throws Exception;
 
 	/**
 	 * Returns list of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -78,7 +90,7 @@ public interface BucketManager {
 	 */
 	public abstract List<Bucket> listByUser( String userIamId, 
 			boolean includeHidden,  
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Returns count of buckets owned by user's iam id, in the given account. Buckets are detached from any persistence session.
@@ -86,14 +98,14 @@ public interface BucketManager {
 	 */
 	public abstract long countByUser( String userIamId, 
 			boolean includeHidden, 
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	/**
 	 * Returns count of buckets owned by account id, in the given account. Buckets are detached from any persistence session.
 	 * @return
 	 */	
 	public abstract long countByAccount(String canonicalId, 
 			boolean includeHidden, 
-			CallableWithRollback<?,?> resourceModifier) throws ExecutionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Checks if bucket exists.
@@ -101,15 +113,7 @@ public interface BucketManager {
 	 * @return
 	 */
 	public abstract boolean exists( String bucketName,  
-			CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException;
-	
-	/**
-	 * Delete the bucket by name. Idempotent operation.
-	 * Does *NOT* enforce emptiness checks or any other policy on the bucket
-	 * @param bucketName
-	 */
-	public abstract <T> T delete( String bucketName,  
-			CallableWithRollback<T,?> resourceModifier)  throws S3Exception, TransactionException;
+			CallableWithRollback<?,?> resourceModifier) throws Exception;
 	
 	/**
 	 * Delete the bucket represented by the detached entity
@@ -120,9 +124,63 @@ public interface BucketManager {
 	 * @param bucketEntity
 	 */
 	public abstract <T> T delete(Bucket bucketEntity, 
-			CallableWithRollback<T,?> resourceModifier) throws TransactionException, S3Exception;
-		
-	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws TransactionException, S3Exception;	
-	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;
-	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception;	
+			CallableWithRollback<T,?> resourceModifier) throws Exception;
+	
+	/**
+	 * Update the ACP
+	 * @param bucketEntity
+	 * @param acl
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract <T> T setAcp(Bucket bucketEntity, String acl, CallableWithRollback<T, ?> resourceModifier)  throws Exception;
+	
+	/**
+	 * Update the logging status
+	 * @param bucketEntity
+	 * @param loggingEnabled
+	 * @param destBucket
+	 * @param destPrefix
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract <T> T setLoggingStatus(Bucket bucketEntity, Boolean loggingEnabled, String destBucket, String destPrefix, CallableWithRollback<T, ?> resourceModifier) throws Exception;
+	
+	/**
+	 * Update versioning status
+	 * @param bucketEntity
+	 * @param newState
+	 * @param resourceModifier
+	 * @return
+	 * @throws Exception
+	 */
+	public abstract <T> T setVersioning(Bucket bucketEntity, VersioningStatus newState, CallableWithRollback<T, ?> resourceModifier) throws Exception;	
+	
+	/**
+	 * Get a versionId for an object, since this is based on the bucket config
+	 * @param bucketEntity
+	 * @return
+	 * @throws TransactionException
+	 * @throws S3Exception
+	 */
+	public abstract String getVersionId(Bucket bucketEntity) throws Exception;
+	
+	/**
+	 * Returns the approximate total size of all objects in all buckets
+	 * in the system. This is not guaranteed to be consistent. An approximation
+	 * at best.
+	 * @return
+	 */
+	public long totalSizeOfAllBuckets();
+	
+	/** 
+	 * Check name for s3 compliance on bucket names
+	 * 
+	 * @param bucketName
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean checkBucketName(String bucketName) throws Exception;
 }

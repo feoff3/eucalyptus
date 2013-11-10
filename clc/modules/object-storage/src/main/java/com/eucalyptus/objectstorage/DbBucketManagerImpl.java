@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nonnull;
@@ -34,6 +35,7 @@ import org.hibernate.Criteria;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.Projections;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.EntityWrapper;
 import com.eucalyptus.entities.TransactionException;
@@ -47,9 +49,42 @@ import com.eucalyptus.objectstorage.exceptions.s3.NoSuchBucketException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
+import com.google.common.base.Function;
+import com.google.common.base.Objects;
 
 public class DbBucketManagerImpl implements BucketManager {
 	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
+	
+    	public void start() throws Exception {}
+    	public void stop() throws Exception {}
+    	
+    	/**
+	 * Check that the bucket is a valid DNS name (or optionally can look like an IP)
+	 */
+    	@Override
+	public boolean checkBucketName(String bucketName) throws Exception {		
+		if(!bucketName.matches("^[A-Za-z0-9][A-Za-z0-9._-]+"))
+			return false;
+		if(bucketName.length() < 3 || bucketName.length() > 255)
+			return false;
+		String[] addrParts = bucketName.split("\\.");
+		boolean ipFormat = true;
+		if(addrParts.length == 4) {
+			for(String addrPart : addrParts) {
+				try {
+					Integer.parseInt(addrPart);
+				} catch(NumberFormatException ex) {
+					ipFormat = false;
+					break;
+				}
+			}
+		} else {
+			ipFormat = false;
+		}		
+		if(ipFormat)
+			return false;
+		return true;
+	}
 	
 	/**
 	 * Does the bucket contain snapshots...
@@ -85,14 +120,16 @@ public class DbBucketManagerImpl implements BucketManager {
 	@Override
 	public Bucket get(@Nonnull String bucketName,
 			@Nonnull boolean includeHidden,
-			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws Exception {
 		try {
 			Bucket searchExample = new Bucket(bucketName);
 			if(!includeHidden) {				
 				searchExample.setHidden(false);
 			}
 			return Transactions.find(searchExample);
-		} catch (TransactionException e) {
+		} catch (NoSuchElementException e) {
+			throw e;
+		} catch (Exception e) {
 			LOG.error("Error querying bucket existence in db",e);
 			throw e;
 		}		
@@ -100,10 +137,12 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public boolean exists(@Nonnull String bucketName,
-			@Nullable CallableWithRollback<?,?> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<?,?> resourceModifier) throws Exception {
 		try {
 			return (Transactions.find(new Bucket(bucketName)) != null);
-		} catch (TransactionException e) {
+		} catch (NoSuchElementException e) {
+			return false;		
+		} catch (Exception e) {
 			LOG.error("Error querying bucket existence in db",e);
 			throw e;
 		}
@@ -111,17 +150,16 @@ public class DbBucketManagerImpl implements BucketManager {
 
 	@Override
 	public <T,R> T create(@Nonnull String bucketName, 
-			@Nonnull String ownerCanonicalId,
-			@Nonnull String ownerIamUserId,
+			@Nonnull User owner,
 			@Nonnull String acl, 
 			@Nonnull String location,
-			@Nullable CallableWithRollback<T,R> resourceModifier) throws S3Exception, TransactionException {
+			@Nullable CallableWithRollback<T,R> resourceModifier) throws Exception, TransactionException {
 
 		Bucket newBucket = new Bucket(bucketName);
 		try {
 			Bucket foundBucket = Transactions.find(newBucket);
 			if(foundBucket != null) {
-				if(foundBucket.getOwnerCanonicalId().equals(ownerCanonicalId)) {
+				if(foundBucket.getOwnerCanonicalId().equals(owner.getAccount().getCanonicalId())) {
 					throw new BucketAlreadyOwnedByYouException(bucketName);
 				} else {
 					throw new BucketAlreadyExistsException(bucketName);
@@ -129,19 +167,20 @@ public class DbBucketManagerImpl implements BucketManager {
 			}
 		} catch(NoSuchElementException e) {
 			//Expected result, continue	
-		} catch(TransactionException e) {
+		} catch(Exception e) {
 			//Lookup failed.
 			LOG.error("Lookup for bucket " + bucketName + " failed during creation checks. Cannot proceed.",e);
 			throw new InternalErrorException(bucketName);
 		}
 		
-		newBucket.setOwnerCanonicalId(ownerCanonicalId);
+		newBucket.setOwnerCanonicalId(owner.getAccount().getCanonicalId());
+		newBucket.setOwnerDisplayName(owner.getAccount().getName());
+		newBucket.setOwnerIamUserId(owner.getUserId());
 		newBucket.setBucketSize(0L);
 		newBucket.setHidden(false);
 		newBucket.setAcl(acl);
 		newBucket.setLocation(location);
-		newBucket.setLoggingEnabled(false);
-		newBucket.setOwnerIamUserId(ownerIamUserId);
+		newBucket.setLoggingEnabled(false);		
 		newBucket.setVersioning(ObjectStorageProperties.VersioningStatus.Disabled.toString());
 		newBucket.setCreationDate(new Date());
 		
@@ -176,24 +215,6 @@ public class DbBucketManagerImpl implements BucketManager {
 	}
 	
 	@Override
-	public <T> T delete(String bucketName, 
-			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
-		
-		Bucket searchEntity = new Bucket(bucketName);
-		try {
-			Transactions.find(searchEntity);
-		} catch(TransactionException e) {
-			LOG.error("Transaction error during bucket lookup for " + bucketName);
-			throw e;
-		} catch(NoSuchElementException e) {
-			LOG.debug("Nothing to do to delete bucket " + bucketName + " not found in db.");
-			//Nothing to do. continue to resource modification
-		}
-		
-		return delete(searchEntity, resourceModifier);
-	}
-
-	@Override
 	public <T> T delete(Bucket bucketEntity, 
 			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
 		try {			
@@ -227,7 +248,11 @@ public class DbBucketManagerImpl implements BucketManager {
 			CallableWithRollback<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
-		searchBucket.setHidden(includeHidden);
+		if(includeHidden) {
+			searchBucket.setHidden(null);
+		} else {
+			searchBucket.setHidden(false);
+		}
 		List<Bucket> buckets = null;
 		try {
 			buckets = Transactions.findAll(searchBucket);
@@ -383,6 +408,7 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 	
+	@Override
 	public <T> T setVersioning(@Nonnull Bucket bucketEntity, 
 			@Nonnull VersioningStatus newState, 
 			@Nullable CallableWithRollback<T, ?> resourceModifier) throws TransactionException, S3Exception {
@@ -426,4 +452,52 @@ public class DbBucketManagerImpl implements BucketManager {
 		}
 	}
 
+	@Override
+	public String getVersionId(Bucket bucketEntity) throws TransactionException,
+			S3Exception {
+		Bucket b = Transactions.find(bucketEntity);
+		if(b.isVersioningEnabled()) {
+			return UUID.randomUUID().toString().replaceAll("-", "");
+		} else {
+			return ObjectEntity.NULL_VERSION_STRING;
+		}
+	}
+	
+	@Override
+	public long totalSizeOfAllBuckets() {
+		long size = -1;
+		final EntityTransaction db = Entities.get( Bucket.class );
+	    try {
+	    	size = Objects.firstNonNull( (Number) Entities.createCriteria( Bucket.class )
+	    			.setProjection( Projections.sum( "bucketSize" ) )
+	    			.setReadOnly( true )
+	    			.uniqueResult(), 0 ).longValue();
+	    	db.commit();
+	    } catch (Exception e) {
+	    	db.rollback();
+	    }
+	    return size;
+	}
+
+	@Override
+	public void updateBucketSize(String bucketName, final long sizeToChange) throws TransactionException {
+		Function<String, Bucket> incrementSize = new Function<String, Bucket>() {
+			@Override
+			public Bucket apply(String bucketName) {
+				Bucket b;
+				try {
+					b = Entities.uniqueResult(new Bucket(bucketName));
+					b.setBucketSize(b.getBucketSize() + sizeToChange);
+					Entities.mergeDirect(b);
+					return b;
+				} catch (TransactionException | NoSuchElementException e) {
+					LOG.error("Error updating bucket " + bucketName + " size by " + sizeToChange,e);
+				}
+				return null;
+			}
+			
+		};
+		
+		Entities.asTransaction(incrementSize).apply(bucketName);
+	}
 }
