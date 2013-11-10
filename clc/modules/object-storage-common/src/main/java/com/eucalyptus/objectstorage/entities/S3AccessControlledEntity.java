@@ -212,7 +212,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 				groupName = group.toString();
 				if(myAcl.containsKey(groupName) 
 						&& BitmapGrant.allows(permission, myAcl.get(groupName))
-						&& ObjectStorageProperties.isUserMember(canonicalId, groupName)) {
+						&& AclUtils.isUserMember(canonicalId, groupName)) {
 					//User is member of group and the group has permission
 					return true;
 				}

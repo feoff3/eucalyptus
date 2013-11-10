@@ -403,8 +403,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 				// This could be a long-lived operation...minutes
 				result = resourceModifier.call();
 
-				Date updatedDate = null;
 				// Update the record and cleanup
+				Date updatedDate = null;
 				if (result != null) {
 					if (result.getLastModified() != null) {
 						updatedDate = OSGUtil.dateFromHeaderFormattedString(result.getLastModified());
@@ -415,7 +415,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 						updatedDate = new Date();
 					}
 
-					savedEntity.finalizeCreation(result.getVersionId(), updatedDate, result.getEtag());
+					//Use the same versionId since that is generated here
+					savedEntity.finalizeCreation(object.getVersionId(), updatedDate, result.getEtag());
 				} else {
 					throw new Exception("Backend returned null result");
 				}

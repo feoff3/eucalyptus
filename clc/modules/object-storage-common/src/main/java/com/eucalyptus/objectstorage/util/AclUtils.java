@@ -12,6 +12,7 @@ import org.apache.log4j.Logger;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
+import com.eucalyptus.auth.principal.Principals;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
@@ -48,6 +49,49 @@ public class AclUtils {
 		for(ObjectStorageProperties.S3_GROUP g : ObjectStorageProperties.S3_GROUP.values()) {
 			groupUriMap.put(g.toString(), g);
 		}
+	}
+	
+	/*
+	 * Simply determines if the userId is a member of the groupId, very simplistic only for ALL_USERS and AUTHENTICATED_USERS, not arbitrary groups.
+	 * Arbitrary groups are not yet supported in ObjectStorage bucket policies/IAM policies.
+	 * userId should be a canonicalId
+	 */
+	public static boolean isUserMember(String userId, String groupId) {
+		if(Strings.isNullOrEmpty(groupId)) {
+			return false;
+		}
+		
+		try {
+			ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(groupId);
+			return isUserMember(userId, group);
+		} catch(IllegalArgumentException e) {
+			LOG.warn("Unknown group id requested for membership check: " + groupId);
+			return false;
+		}		
+	}
+	
+	/**
+	 * Just checks the basic S3 groups for membership of the userId.
+	 * Caller must ensure that the userId is a valid ID in the system. That is outside the scope of this method.
+	 * @param userId
+	 * @param group
+	 * @return
+	 */
+	public static boolean isUserMember(String userId, ObjectStorageProperties.S3_GROUP group) {
+		if(group == null) {
+			return false;
+		}
+		
+		if(ObjectStorageProperties.S3_GROUP.ALL_USERS_GROUP.equals(group)) {
+			return true;
+		}
+		
+		if(ObjectStorageProperties.S3_GROUP.AUTHENTICATED_USERS_GROUP.equals(group)
+				&& !Strings.isNullOrEmpty(userId) && !userId.equals(Principals.nobodyUser().getUserId())) {
+			return true;
+		}
+		
+		return false;
 	}
 	
 	/**
