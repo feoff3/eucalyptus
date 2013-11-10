@@ -248,7 +248,11 @@ public class DbBucketManagerImpl implements BucketManager {
 			CallableWithRollback<?,?> resourceModifier) throws TransactionException {
 		Bucket searchBucket = new Bucket();
 		searchBucket.setOwnerCanonicalId(ownerCanonicalId);
-		searchBucket.setHidden(includeHidden);
+		if(includeHidden) {
+			searchBucket.setHidden(null);
+		} else {
+			searchBucket.setHidden(false);
+		}
 		List<Bucket> buckets = null;
 		try {
 			buckets = Transactions.findAll(searchBucket);
