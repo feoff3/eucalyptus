@@ -123,6 +123,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTBucketAccessControlPolicyType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
+import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.storage.common.ChunkedDataStream;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
@@ -1047,7 +1048,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 
 			CanonicalUser owner = null;
 			try {
-				owner = ObjectStorageGateway.buildCanonicalUser(requestUser.getAccount());				
+				owner = AclUtils.buildCanonicalUser(requestUser.getAccount());				
 			} catch(AuthException e) {
 				LOG.error("Error getting request user's account during bucket version listing",e);
 				owner = null;

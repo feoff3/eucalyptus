@@ -123,10 +123,12 @@ import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationRespons
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
 import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
+import com.eucalyptus.storage.msgs.s3.Grantee;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
@@ -276,10 +278,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		streamDataMap.clear();
 		LOG.debug("Checking ObjectStorageGateway preconditions");
 	}
-	
-	public static CanonicalUser buildCanonicalUser(Account accnt) {
-		return new CanonicalUser(accnt.getCanonicalId(), accnt.getName());
-	}
 
 	/* (non-Javadoc)
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#UpdateObjectStorageConfiguration(com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType)
@@ -384,8 +382,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, newBucketSize)) {
 					//Construct and set the ACP properly, post Auth check so no self-auth can occur even accidentally
 					AccessControlPolicy acp = new AccessControlPolicy();
-					acp.setOwner(buildCanonicalUser(requestUser.getAccount()));
-					acp.setAccessControlList(AclUtils.expandCannedAcl(request.getAccessControlList(), bucket.getOwnerCanonicalId(), requestUser.getAccount().getCanonicalId()));
+					acp.setAccessControlList(request.getAccessControlList());
+					acp = AclUtils.processNewResourcePolicy(requestUser, acp, bucket.getOwnerCanonicalId());
+					
 					objectEntity.setAcl(acp);
 					
 					final String fullObjectKey = objectEntity.getObjectUuid();
@@ -575,11 +574,9 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new TooManyBucketsException(request.getBucket());					
 				}
 
-				final AccessControlPolicy acPolicy = new AccessControlPolicy();				
-				acPolicy.setOwner(buildCanonicalUser(requestUser.getAccount()));
-				acPolicy.setAccessControlList(
-						AclUtils.expandCannedAcl(request.getAccessControlList(), requestUser.getAccount().getCanonicalId(), null));
-				
+				AccessControlPolicy tmpPolicy = new AccessControlPolicy();
+				tmpPolicy.setAccessControlList(request.getAccessControlList());
+				AccessControlPolicy acPolicy = AclUtils.processNewResourcePolicy(requestUser, tmpPolicy , null);				
 				String aclString = S3AccessControlledEntity.marshallACPToString(acPolicy);
 				if(aclString == null) {
 					LOG.error("Unexpectedly got null for acl string. Cannot complete bucket creation with null acl");
@@ -720,7 +717,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			try {
 				List<Bucket> listing = BucketManagers.getInstance().list(accnt.getCanonicalId(), false, null);
 				response.setBucketList(generateBucketListing(listing));
-				response.setOwner(buildCanonicalUser(accnt));
+				response.setOwner(AclUtils.buildCanonicalUser(accnt));
 				return response;
 			} catch(Exception e) {
 				throw new InternalErrorException();

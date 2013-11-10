@@ -12,8 +12,11 @@ import org.apache.log4j.Logger;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
+import com.eucalyptus.auth.principal.Account;
 import com.eucalyptus.auth.principal.Principals;
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
+import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
 import com.eucalyptus.storage.msgs.s3.Grantee;
@@ -319,5 +322,50 @@ public class AclUtils {
 			}
 		}
 		return outputList;
+	}
+	
+	public static CanonicalUser buildCanonicalUser(Account accnt) {
+		return new CanonicalUser(accnt.getCanonicalId(), accnt.getName());
+	}
+	
+	/**
+	 * Ensures the the policy is not empty. If found empty or null, a 'private' policy is generated and returned.
+	 * If creating for an object, the BucketOnwerCanonicalId must not be null. If found null, then a bucket-creation is
+	 * expected and ACLs will be expanded as such.
+	 * @param requestUser
+	 * @param policy
+	 * @return
+	 */
+	public static AccessControlPolicy processNewResourcePolicy(User requestUser, AccessControlPolicy policy, String bucketOwnerCanonicalId) throws Exception {
+		AccessControlPolicy acPolicy = null;
+		if(policy != null) {
+			acPolicy = policy;
+		} else {
+			acPolicy = new AccessControlPolicy();
+		}
+
+		if(acPolicy.getOwner() == null) {
+			acPolicy.setOwner(buildCanonicalUser(requestUser.getAccount()));
+		}
+		
+		if(acPolicy.getAccessControlList() == null) {
+			acPolicy.setAccessControlList(new AccessControlList());		
+		}
+		
+		if(acPolicy.getAccessControlList().getGrants() == null ||
+				acPolicy.getAccessControlList().getGrants().size() == 0) {
+			//Add default 'fullcontrol' grant for owner.
+			acPolicy.getAccessControlList().getGrants().add(new Grant(new Grantee(buildCanonicalUser(requestUser.getAccount())),ObjectStorageProperties.Permission.FULL_CONTROL.toString()));
+		}
+		
+		if(bucketOwnerCanonicalId != null) {
+			acPolicy.setAccessControlList(
+					AclUtils.expandCannedAcl(acPolicy.getAccessControlList(), bucketOwnerCanonicalId, requestUser.getAccount().getCanonicalId()));
+		} else {
+			acPolicy.setAccessControlList(
+					AclUtils.expandCannedAcl(acPolicy.getAccessControlList(), requestUser.getAccount().getCanonicalId(), null));
+		}
+				
+		return acPolicy;
 	}
 }
