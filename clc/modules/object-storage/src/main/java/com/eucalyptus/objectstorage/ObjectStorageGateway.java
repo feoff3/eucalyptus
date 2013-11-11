@@ -696,8 +696,17 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		
 		//Create a fake bucket record just for IAM verification. The IAM policy is only valid for arn:s3:* so empty should match
+		/*
+		 * ListAllMyBuckets is a weird authentication for IAM because it is technically a bucket operation, but the request
+		 * is not against a specific bucket and the account admin cannot limit listallbuckets output on a per-bucket basis.
+		 * The only valid resource to grant s3:ListAllMyBuckets to is '*'.
+		 * 
+		 * This sets up a fake bucket so that the ACL checks and basic ownership checks can be passed, leaving just the IAM permission
+		 * check.
+		 */
 		Bucket fakeBucket = new Bucket();
-		fakeBucket.setBucketName("");
+		fakeBucket.setBucketName(""); // '*' should match this
+		fakeBucket.setOwnerCanonicalId(Contexts.lookup().getAccount().getCanonicalId()); // make requestor the owner of fake bucket
 		
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucket, null, 0)) {
 			ListAllMyBucketsResponseType response = (ListAllMyBucketsResponseType) request.getReply();

@@ -257,6 +257,7 @@ public class GetObjectAccessControlPolicyResponseType extends ObjectStorageRespo
 @AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_LISTALLMYBUCKETS])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
+@RequiresACLPermission(object=[], bucket=[]) //No ACL for list ALL buckets
 public class ListAllMyBucketsType extends ObjectStorageRequestType {}
 public class ListAllMyBucketsResponseType extends ObjectStorageResponseType {
 	CanonicalUser owner;

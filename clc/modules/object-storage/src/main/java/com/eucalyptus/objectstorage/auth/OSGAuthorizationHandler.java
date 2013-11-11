@@ -116,12 +116,15 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		Account requestAccount = null;
 		Context ctx = null;
 		try {
+			//Use context if available as it saves a DB lookup
 			try {
 				ctx = Contexts.lookup(request.getCorrelationId());
 				requestUser = ctx.getUser();
 				requestAccount = requestUser.getAccount();
 			} catch(NoSuchContextException e) {
 				ctx = null;
+				requestUser = null;
+				requestAccount = null;
 			}
 						
 			//This is not an expected path, but if no context found use the request credentials itself
@@ -156,14 +159,16 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 					if(bucketResourceEntity == null) {
 						LOG.error("Could not check access for operation due to no bucket resource entity found");
 						return false;
+					} else {
+						resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(bucketResourceEntity.getOwnerCanonicalId());
 					}
-					resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(bucketResourceEntity.getOwnerCanonicalId());
 				} else if(PolicySpec.S3_RESOURCE_OBJECT.equals(resourceType)) {
 					if(objectResourceEntity == null) {
 						LOG.error("Could not check access for operation due to no object resource entity found");
 						return false;
+					} else {
+						resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(objectResourceEntity.getOwnerCanonicalId());
 					}
-					resourceOwnerAccount = Accounts.lookupAccountByCanonicalId(objectResourceEntity.getOwnerCanonicalId());
 				}
 			} catch(AuthException e) {
 				LOG.error("Exception caught looking up resource owner. Disallowing operation.",e);
@@ -186,7 +191,6 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		}
 
 		/* ACL Checks: Is the user's account allowed? */
-		//TODO: zhill - bucketpolicies will supplant the acl check eventually. Will map ACL->bucket_policy.
 		Boolean aclAllow = false;		
 		if(requiredBucketACLPermissions != null && requiredBucketACLPermissions.length > 0) {
 			//Check bucket ACLs
