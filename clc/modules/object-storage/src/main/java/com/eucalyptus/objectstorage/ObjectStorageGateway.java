@@ -844,21 +844,14 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new NoSuchBucketException(request.getBucket());		
 		} catch(Exception e) {
 			LOG.error("Error getting bucket metadata for bucket " + request.getBucket());
-			throw new InternalErrorException(request.getBucket());	
+			throw new InternalErrorException(request.getBucket());
 		}
 		
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, listBucket, null, 0)) {
 			//Get the listing from the back-end and copy results in.				
 			//return ospClient.listBucket(request);
 			ListBucketResponseType reply = (ListBucketResponseType) request.getReply();				
-			int maxKeys = 1000;
-			reply.setMaxKeys(maxKeys);
-			reply.setName(request.getBucket());				
-			reply.setDelimiter(request.getDelimiter());
-			reply.setMarker(request.getMarker());
-			reply.setPrefix(request.getPrefix());								
-			reply.setIsTruncated(false);
-			
+			int maxKeys = 1000;			
 			try {
 				if(!Strings.isNullOrEmpty(request.getMaxKeys())) {
 					maxKeys = Integer.parseInt(request.getMaxKeys());
@@ -867,6 +860,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				LOG.error("Failed to parse maxKeys from request properly: " + request.getMaxKeys(), e);
 				throw new InvalidArgumentException("MaxKeys");
 			}
+			reply.setMaxKeys(maxKeys);
+			reply.setName(request.getBucket());				
+			reply.setDelimiter(request.getDelimiter());
+			reply.setMarker(request.getMarker());
+			reply.setPrefix(request.getPrefix());								
+			reply.setIsTruncated(false);			
 			
 			PaginatedResult<ObjectEntity> result = null;
 			try {
