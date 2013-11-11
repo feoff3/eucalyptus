@@ -647,7 +647,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 							// Check if it will get aggregated as a commonprefix
 							parts = objectRecord.getObjectKey().substring(prefix.length()).split(delimiter);
 							if (parts.length > 1) {
-								prefixString = prefix + delimiter + parts[0] + delimiter;
+								prefixString = prefix + parts[0] + delimiter;
 								if (!commonPrefixes.contains(prefixString)) {
 									if (resultKeyCount == maxEntries) {
 										// This is a new record, so we know
