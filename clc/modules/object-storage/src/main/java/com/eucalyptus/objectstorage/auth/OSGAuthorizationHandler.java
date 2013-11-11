@@ -118,14 +118,12 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		try {
 			try {
 				ctx = Contexts.lookup(request.getCorrelationId());
+				requestUser = ctx.getUser();
+				requestAccount = requestUser.getAccount();
 			} catch(NoSuchContextException e) {
 				ctx = null;
 			}
-			
-			if(ctx != null) { 
-				requestUser = ctx.getUser();
-			}
-			
+						
 			//This is not an expected path, but if no context found use the request credentials itself
 			if(requestUser == null && !Strings.isNullOrEmpty(request.getEffectiveUserId())) {
 				requestUser = Accounts.lookupUserById(request.getEffectiveUserId());

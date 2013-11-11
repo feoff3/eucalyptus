@@ -695,7 +695,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	public ListAllMyBucketsResponseType listAllMyBuckets(ListAllMyBucketsType request) throws EucalyptusCloudException {
 		logRequest(request);
 		
-		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, null, 0)) {
+		//Create a fake bucket record just for IAM verification. The IAM policy is only valid for arn:s3:* so empty should match
+		Bucket fakeBucket = new Bucket();
+		fakeBucket.setBucketName("");
+		
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucket, null, 0)) {
 			ListAllMyBucketsResponseType response = (ListAllMyBucketsResponseType) request.getReply();
 			/*
 			 * This is a strictly metadata operation, no backend is hit. The sync of metadata in OSG to backend is done elsewhere asynchronously.
