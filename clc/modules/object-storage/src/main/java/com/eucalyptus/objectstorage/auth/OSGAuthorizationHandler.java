@@ -103,7 +103,8 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 				requiredActions == null &&
 				!allowAdmin) {
 			//Insufficient permission set on the message type.
-			throw new IllegalArgumentException("Insufficient permission annotations on type: " + request.getClass().getName() + " cannot evaluate authorization");
+			LOG.error("Insufficient permission annotations on type: " + request.getClass().getName() + " cannot evaluate authorization");
+			return false;
 		}
 		
 		String resourceType = null;
@@ -150,7 +151,8 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		
 		Account resourceOwnerAccount = null;
 		if(resourceType == null) {
-			throw new IllegalArgumentException("No resource type found in request class annotations, cannot process.");
+			LOG.error("No resource type found in request class annotations, cannot process.");
+			return false;
 		} else {
 			try {
 				//Ensure we have the proper resource entities present and get owner info						
@@ -198,7 +200,8 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 			if(bucketResourceEntity == null) {
 				//There are bucket ACL requirements but no bucket entity to check. fail.
 				//Don't bother with other checks, this is an invalid state
-				throw new IllegalArgumentException("Null bucket resource, cannot evaluate bucket ACL");
+				LOG.error("Null bucket resource, cannot evaluate bucket ACL");
+				return false;
 			}
 			
 			//Evaluate the bucket ACL, any matching grant gives permission
@@ -212,7 +215,8 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 			if(objectResourceEntity == null) {
 				//There are object ACL requirements but no object entity to check. fail.
 				//Don't bother with other checks, this is an invalid state				
-				throw new IllegalArgumentException("Null bucket resource, cannot evaluate bucket ACL");
+				LOG.error("Null bucket resource, cannot evaluate bucket ACL");
+				return false;
 			}
 			for(ObjectStorageProperties.Permission permission : requiredObjectACLPermissions) {
 				aclAllow = aclAllow || objectResourceEntity.can(permission, requestAccount.getCanonicalId());
