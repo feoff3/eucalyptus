@@ -59,6 +59,7 @@ import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.entities.ObjectStorageGatewayInfo;
 import com.eucalyptus.objectstorage.entities.S3AccessControlledEntity;
+import com.eucalyptus.objectstorage.exceptions.s3.AccountProblemException;
 import com.eucalyptus.objectstorage.exceptions.s3.BucketNotEmptyException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidArgumentException;
 import com.eucalyptus.objectstorage.exceptions.s3.InvalidBucketNameException;
@@ -548,16 +549,17 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			bucketCount = 0;
 		}
 		
-		
 		//Fake entity for auth check, need the name to allow checks against
-		final S3AccessControlledEntity fakeBucketEntity = new S3AccessControlledEntity() {			
-			@Override
-			public String getResourceFullName() {
-				return request.getBucket();
-			}			
-		};
+		//TODO: refactor the bucket manager to make this easier
+		final Bucket fakeBucket = new Bucket(request.getBucket());
+		try {
+			fakeBucket.setOwnerCanonicalId(requestUser.getAccount().getCanonicalId());
+		} catch (AuthException e) {
+			LOG.error("No account found for user: " + requestUser.getUserId());
+			throw new AccountProblemException(requestUser.getUserId());
+		}
 		
-		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucketEntity, null, bucketCount + 1)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucket, null, bucketCount + 1)) {
 			try {
 				//Check the validity of the bucket name.				
 				if (!BucketManagers.getInstance().checkBucketName(request.getBucket())) {
