@@ -253,11 +253,18 @@ public class GetObjectAccessControlPolicyResponseType extends ObjectStorageRespo
 	AccessControlPolicy accessControlPolicy;
 }
 
-/* GET / */
+/* GET / on service. Lists buckets*/
+
+/*
+ * This is an exception rather than the rule for IAM checks. For implementing this
+ * we must create a fake bucket entry that will pass the ACL checks, leaving only
+ * the IAM checks. This is weird because the request isn't for a specific resource, but
+ * IAM requires a check of a permission against a specific resourceId.
+ */
 @AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_LISTALLMYBUCKETS])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
-@RequiresACLPermission(object=[], bucket=[]) //No ACL for list ALL buckets
+@RequiresACLPermission(object=[], bucket=[], ownerOnly=true)
 public class ListAllMyBucketsType extends ObjectStorageRequestType {}
 public class ListAllMyBucketsResponseType extends ObjectStorageResponseType {
 	CanonicalUser owner;

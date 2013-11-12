@@ -707,7 +707,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		Bucket fakeBucket = new Bucket();
 		fakeBucket.setBucketName("fakebucket"); // '*' should match this
 		fakeBucket.setOwnerCanonicalId(Contexts.lookup().getAccount().getCanonicalId()); // make requestor the owner of fake bucket
-		
+		request.setBucket(fakeBucket.getBucketName());
+				
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, fakeBucket, null, 0)) {
 			ListAllMyBucketsResponseType response = (ListAllMyBucketsResponseType) request.getReply();
 			/*

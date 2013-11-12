@@ -181,9 +181,9 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 		//Get the resourceId based on IAM resource type
 		String resourceId = null;
 		if(resourceId == null ) {
-			if(resourceType.equals(PolicySpec.S3_RESOURCE_BUCKET)) {
+			if(PolicySpec.S3_RESOURCE_BUCKET.equals(resourceType)) {
 				resourceId = request.getBucket();
-			} else if(resourceType.equals(PolicySpec.S3_RESOURCE_OBJECT)) {
+			} else if(PolicySpec.S3_RESOURCE_OBJECT.equals(resourceType)) {
 				resourceId = request.getKey();
 			}
 		}
