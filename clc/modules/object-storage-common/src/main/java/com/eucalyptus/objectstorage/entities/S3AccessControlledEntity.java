@@ -186,7 +186,9 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 	 * @throws Exception
 	 */
 	public AccessControlPolicy getAccessControlPolicy() throws Exception {
-		return MapToAccessControlPolicy.INSTANCE.apply(getDecodedAcl());
+		AccessControlPolicy policy = MapToAccessControlPolicy.INSTANCE.apply(getDecodedAcl());
+		policy.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), this.ownerDisplayName));
+		return policy;
 	}
 	
 	/**
