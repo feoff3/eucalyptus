@@ -82,8 +82,6 @@
 	<classpathentry exported="true" kind="lib" path="lib/antlrall.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/aopalliance-1.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/asm2-2.2.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/aspectjrt.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/aspectjweaver.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/avalon-framework-4.2.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/aws-java-sdk-1.5.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/axiom-api-1.2.8.jar"/>
@@ -185,7 +183,6 @@
 	<classpathentry exported="true" kind="lib" path="lib/jul-to-slf4j-1.5.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/junit-4.11.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/log4j-1.2.17.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/mail-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/manageontap.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/mule-core-3.4.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/mule-module-annotations-3.4.0.jar"/>
