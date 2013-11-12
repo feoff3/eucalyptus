@@ -1005,7 +1005,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 			}			
 			try {
-				return BucketManagers.getInstance().setAcp(bucket, aclString, null);
+				BucketManagers.getInstance().setAcp(bucket, aclString, null);
+				SetRESTBucketAccessControlPolicyResponseType reply = (SetRESTBucketAccessControlPolicyResponseType)request.getReply();
+				reply.setStatus(HttpResponseStatus.OK);
+				reply.setStatusMessage("OK");
+				reply.setCorrelationId(request.getCorrelationId());
+				return reply;
 			} catch(Exception e) {
 				LOG.error("Transaction error updating bucket ACL for bucket " + request.getBucket(),e);
 				throw new InternalErrorException(request.getBucket() + "?acl");
@@ -1068,8 +1073,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					}
 				}
 				
-				//Get the listing from the back-end and copy results in.
-				return ObjectManagers.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), null);
+				//Get the listing from the back-end and copy results in.				
+				ObjectManagers.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), null);
+				reply.setStatus(HttpResponseStatus.OK);
+				reply.setStatusMessage("OK");
+				reply.setCorrelationId(request.getCorrelationId());
+				return reply;
 			} catch(Exception e) {
 				LOG.error("Internal error during PUT object?acl for object " + request.getBucket() + "/" + request.getKey(), e);
 				throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
