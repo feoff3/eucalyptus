@@ -736,7 +736,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				throw new InternalErrorException();
 			}
 		} else {
-			throw new AccessDeniedException(request.getBucket());
+			throw new AccessDeniedException();
 		}		
 	}
 
