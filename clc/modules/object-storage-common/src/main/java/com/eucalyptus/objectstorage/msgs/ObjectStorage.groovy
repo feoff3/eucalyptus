@@ -283,7 +283,7 @@ public class HeadBucketResponseType extends ObjectStorageResponseType{}
 @AdminOverrideAllowed
 @RequiresPermission([PolicySpec.S3_CREATEBUCKET])
 @ResourceType(PolicySpec.S3_RESOURCE_BUCKET)
-@RequiresACLPermission(object=[], bucket=[]) //No ACLs for creating a bucket
+@RequiresACLPermission(object=[], bucket=[], ownerOnly=true) //No ACLs for creating a bucket, weird like ListAllMyBuckets.
 public class CreateBucketType extends ObjectStorageRequestType {
 	AccessControlList accessControlList;
 	String locationConstraint;
