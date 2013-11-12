@@ -736,7 +736,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				throw new InternalErrorException();
 			}
 		} else {
-			throw new AccessDeniedException();
+			AccessDeniedException ex = new AccessDeniedException();
+			ex.setResource("ListAllMyBuckets");
+			ex.setMessage("Insufficient permissions to list buckets. Check with your account administrator");
+			ex.setResourceType("Service");
+			throw ex;
 		}		
 	}
 
