@@ -505,25 +505,25 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public HeadBucketResponseType headBucket(HeadBucketType request) throws EucalyptusCloudException {
 		logRequest(request);
+		Bucket bucket = null;
 		try {	
-			Bucket bucket = BucketManagers.getInstance().get(request.getBucket(), Contexts.lookup().hasAdministrativePrivileges(), null);
-
-			if(bucket == null) {
-				throw new NoSuchBucketException(request.getBucket());				
-			}
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-				HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
-				reply.setBucket(bucket.getBucketName());
-				reply.setStatus(HttpResponseStatus.OK);
-				reply.setStatusMessage("OK");
-				reply.setTimestamp(new Date());
-				return reply;
-			} else {
-				throw new AccessDeniedException(request.getBucket());			
-			}
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);			
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(request.getBucket());
 		} catch(Exception e) {
 			LOG.error("Internal error finding bucket " + request.getBucket(), e);
 			throw new InternalErrorException(request.getBucket());
+		}
+		
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+			HeadBucketResponseType reply = (HeadBucketResponseType) request.getReply();
+			reply.setBucket(bucket.getBucketName());
+			reply.setStatus(HttpResponseStatus.OK);
+			reply.setStatusMessage("OK");
+			reply.setTimestamp(new Date());
+			return reply;
+		} else {
+			throw new AccessDeniedException(request.getBucket());			
 		}
 	}
 
@@ -755,29 +755,24 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		try {
 			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
 		} catch(NoSuchElementException e) {
-			//bucket not found
-			bucket = null;
+			throw new NoSuchBucketException(request.getBucket());
 		} catch(Exception e) {
 			LOG.error("Error getting metadata for object " + request.getBucket() + " " + request.getKey());
 			throw new InternalErrorException(request.getBucket() + "/?acl");
 		}
 		
-		if(bucket == null) {
-			throw new NoSuchBucketException(request.getBucket());
-		} else {
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-				//Get the listing from the back-end and copy results in.
-				GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType)request.getReply();
-				reply.setBucket(request.getBucket());
-				try {
-					reply.setAccessControlPolicy(bucket.getAccessControlPolicy());
-				} catch(Exception e) {
-					throw new InternalErrorException(request.getBucket() + "/?acl");
-				}
-				return reply;
-			} else {
-				throw new AccessDeniedException(request.getBucket());
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
+			//Get the listing from the back-end and copy results in.
+			GetBucketAccessControlPolicyResponseType reply = (GetBucketAccessControlPolicyResponseType)request.getReply();
+			reply.setBucket(request.getBucket());
+			try {
+				reply.setAccessControlPolicy(bucket.getAccessControlPolicy());
+			} catch(Exception e) {
+				throw new InternalErrorException(request.getBucket() + "/?acl");
 			}
+			return reply;
+		} else {
+			throw new AccessDeniedException(request.getBucket());
 		}
 	}
 
@@ -787,7 +782,8 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	@Override
 	public PostObjectResponseType postObject (PostObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
-		return ospClient.postObject(request);
+		throw new NotImplementedException("POST object");
+		//return ospClient.postObject(request);
 	}
 
 	/* (non-Javadoc)
@@ -1051,7 +1047,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
 		}
 		
-		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
 			
 			SetRESTObjectAccessControlPolicyResponseType reply = (SetRESTObjectAccessControlPolicyResponseType)request.getReply();
 			final String bucketOwnerId = bucket.getOwnerCanonicalId();
@@ -1132,7 +1128,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		
 		//TODO: make sure to handle getVersion case on auth. May need different operation to handle that case
 		// since it is a different IAM check
-		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
 			request.setKey(objectEntity.getObjectUuid());
 			ospClient.getObject(request);
 			//ObjectGetter getter = new ObjectGetter(request);
@@ -1166,27 +1162,24 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		logRequest(request);
 		ObjectEntity objectEntity = null;
 		Bucket bucket = null;
+		User requestUser = null;
 		try {
-			User requestUser = Contexts.lookup().getUser();			
-			try {
-				//Handle the pass-through
-				bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
-				objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), null);
-			} catch(NoSuchElementException e) {
-				throw new NoSuchBucketException(request.getBucket());
-			}
-						
-			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, null, objectEntity, 0)) {				
-				ospClient.getObjectExtended(request);
-				//return ospClient.getObjectExtended(request);
-				return null;
-			} else {
-				throw new AccessDeniedException(request.getBucket() + "/" + request.getKey());
-			}
-			
-		} catch(Exception ex) {
-			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+			requestUser = Contexts.lookup().getUser();
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), null);
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(request.getBucket());
+		} catch(Exception e) {
+			throw new InternalErrorException();
 		}		
+		
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {				
+			ospClient.getObjectExtended(request);
+			//return ospClient.getObjectExtended(request);
+			return null;
+		} else {
+			throw new AccessDeniedException(request.getBucket() + "/" + request.getKey());
+		}
 	}
 
 	/* (non-Javadoc)
@@ -1496,15 +1489,15 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	 */
 	public static InetAddress getBucketIp(String bucket) throws EucalyptusCloudException {
 	    try {		
-		if(BucketManagers.getInstance().exists(bucket, null)) {
-		    ServiceConfiguration[] osgs =  Iterables.toArray(Topology.lookupMany(ObjectStorage.class), ServiceConfiguration.class);
-		    if(osgs != null && osgs.length > 0) {			
-			return osgs[rand.nextInt(osgs.length - 1)].getInetAddress();
-		    }
-		}
-		throw new NoSuchElementException(bucket);
+	    	if(BucketManagers.getInstance().exists(bucket, null)) {
+	    		ServiceConfiguration[] osgs =  Iterables.toArray(Topology.lookupMany(ObjectStorage.class), ServiceConfiguration.class);
+	    		if(osgs != null && osgs.length > 0) {			
+	    			return osgs[rand.nextInt(osgs.length - 1)].getInetAddress();
+	    		}
+	    	}
+	    	throw new NoSuchElementException(bucket);
 	    } catch (Exception ex) {
-		throw new EucalyptusCloudException(ex);
+	    	throw new EucalyptusCloudException(ex);
 	    }	    	    
 	}
 
