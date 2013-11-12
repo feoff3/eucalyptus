@@ -65,8 +65,8 @@ public class AclUtils {
 		}
 		
 		try {
-			ObjectStorageProperties.S3_GROUP group = ObjectStorageProperties.S3_GROUP.valueOf(groupId);
-			return isUserMember(userId, group);
+			ObjectStorageProperties.S3_GROUP group = groupUriMap.get(groupId);
+			return group != null && isUserMember(userId, group);
 		} catch(IllegalArgumentException e) {
 			LOG.warn("Unknown group id requested for membership check: " + groupId);
 			return false;
@@ -91,6 +91,18 @@ public class AclUtils {
 		
 		if(ObjectStorageProperties.S3_GROUP.AUTHENTICATED_USERS_GROUP.equals(group)
 				&& !Strings.isNullOrEmpty(userId) && !userId.equals(Principals.nobodyUser().getUserId())) {
+			return true;
+		}
+		
+		//System only in the aws-exec-read group (zateam)
+		if(ObjectStorageProperties.S3_GROUP.AWS_EXEC_READ.equals(group) &&
+				Principals.systemUser().getUserId().equals(userId)) {
+			return true;
+		}
+		
+		//System only in logging
+		if(ObjectStorageProperties.S3_GROUP.LOGGING_GROUP.equals(group) &&
+				Principals.systemUser().getUserId().equals(userId)) {
 			return true;
 		}
 		

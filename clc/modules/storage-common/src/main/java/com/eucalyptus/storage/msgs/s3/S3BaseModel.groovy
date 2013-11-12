@@ -199,6 +199,16 @@ public class AccessControlPolicy extends EucalyptusData {
 	AccessControlPolicy(CanonicalUser owner, AccessControlList acl) {
 		this.owner = owner; this.accessControlList = acl;
 	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof AccessControlPolicy)) {
+			return false;
+		}
+		
+		AccessControlPolicy other = (AccessControlPolicy)o;
+		return other.owner == this.owner && other.accessControlList == this.accessControlList;
+	}
 }
 
 public class Status extends EucalyptusData {
@@ -216,6 +226,16 @@ public class CanonicalUser extends EucalyptusData {
 		this.ID = ID;
 		this.DisplayName = DisplayName;
 	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof CanonicalUser)) {
+			return false;
+		}
+		
+		CanonicalUser other = (CanonicalUser)o;
+		return other.ID == this.ID && other.DisplayName == this.DisplayName;
+	}
 }
 
 public class Group extends EucalyptusData {
@@ -225,6 +245,16 @@ public class Group extends EucalyptusData {
 
 	public Group(String uri) {
 		this.uri = uri;
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof Grantee)) {
+			return false;
+		}
+		
+		Group other = (Group)o;
+		return other.uri == this.uri;
 	}
 }
 
@@ -250,6 +280,16 @@ public class Grantee extends EucalyptusData {
 		this.emailAddress = emailAddress;
 		this.type = "AmazonCustomerByEmail";
 	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof Grantee)) {
+			return false;
+		}
+		
+		Grantee other = (Grantee)o;
+		return other.canonicalUser == this.canonicalUser && other.emailAddress == this.emailAddress && other.type == this.type && other.group == this.group;
+	}
 }
 
 public class Grant extends EucalyptusData {
@@ -262,10 +302,35 @@ public class Grant extends EucalyptusData {
 		this.grantee = grantee;
 		this.permission = permission;
 	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof Grant)) {
+			return false;
+		}
+		
+		Grant other = (Grant)o;
+		return other.grantee == this.grantee && other.permission == this.permission;
+	}
 }
 
 public class AccessControlList extends EucalyptusData {
 	ArrayList<Grant> grants = new ArrayList<Grant>();
+	
+	@Override
+	public boolean equals(Object o) {
+		if(o == null || !(o instanceof AccessControlList)) {
+			return false;
+		}
+		
+		AccessControlList other = (AccessControlList)o;
+		//Do an unordered comparison, sort clones of each first
+		List<Grant> myGrants = this.grants.clone();
+		Collections.sort(myGrants);
+		List<Grant> otherGrants = other.grants.clone();
+		Collections.sort(otherGrants);
+		return myGrants == otherGrants;
+	}
 }
 
 public class ListAllMyBucketsList extends EucalyptusData {
