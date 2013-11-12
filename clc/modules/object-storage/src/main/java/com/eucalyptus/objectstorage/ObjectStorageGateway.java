@@ -1005,20 +1005,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 			}			
 			try {
-				return BucketManagers.getInstance().setAcp(bucket, aclString,
-						new CallableWithRollback<SetRESTBucketAccessControlPolicyResponseType, Boolean>() {
-					
-					@Override
-					public SetRESTBucketAccessControlPolicyResponseType call() throws S3Exception, Exception {
-						return ospClient.setRESTBucketAccessControlPolicy(request);
-					}
-					
-					@Override
-					public Boolean rollback(SetRESTBucketAccessControlPolicyResponseType arg) throws S3Exception, Exception {
-						//TODO: could preserve the old ACP and restore it here for the backend
-						return true;
-					}
-				});
+				return BucketManagers.getInstance().setAcp(bucket, aclString, null);
 			} catch(Exception e) {
 				LOG.error("Transaction error updating bucket ACL for bucket " + request.getBucket(),e);
 				throw new InternalErrorException(request.getBucket() + "?acl");
@@ -1082,21 +1069,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				}
 				
 				//Get the listing from the back-end and copy results in.
-				return ObjectManagers.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), 
-						new CallableWithRollback<SetRESTObjectAccessControlPolicyResponseType, Boolean>() {
-					
-					@Override
-					public SetRESTObjectAccessControlPolicyResponseType call()
-							throws S3Exception, Exception {
-						return ospClient.setRESTObjectAccessControlPolicy(request);
-					}
-					
-					@Override
-					public Boolean rollback(SetRESTObjectAccessControlPolicyResponseType arg)
-									throws S3Exception, Exception {
-						return true;
-					}							
-				});
+				return ObjectManagers.getInstance().setAcp(objectEntity, request.getAccessControlPolicy(), null);
 			} catch(Exception e) {
 				LOG.error("Internal error during PUT object?acl for object " + request.getBucket() + "/" + request.getKey(), e);
 				throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
