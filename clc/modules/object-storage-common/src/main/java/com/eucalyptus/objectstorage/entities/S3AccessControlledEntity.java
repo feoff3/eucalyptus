@@ -211,10 +211,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			//Check groups first.
 			String groupName;
 			for(ObjectStorageProperties.S3_GROUP group : ObjectStorageProperties.S3_GROUP.values()) {
-				groupName = group.toString();
-				if(myAcl.containsKey(groupName) 
-						&& BitmapGrant.allows(permission, myAcl.get(groupName))
-						&& AclUtils.isUserMember(canonicalId, groupName)) {
+				if(can(permission, group) && AclUtils.isUserMemberOfGroup(canonicalId, group.toString())) {
 					//User is member of group and the group has permission
 					return true;
 				}
@@ -226,6 +223,22 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 			} else {
 				//fall through
 			}
+		} catch(Exception e) {
+			LOG.error("Error checking authorization",e);
+		}
+		return false;
+	}
+	
+	public boolean can(ObjectStorageProperties.Permission permission, ObjectStorageProperties.S3_GROUP group) {
+		try {
+			Map<String, Integer> myAcl = getDecodedAcl();
+			if(myAcl == null) {
+				LOG.error("Got null acl, cannot authorize " + permission.toString());
+				return false;
+			}
+			
+			String groupName = group.toString();
+			return (myAcl.containsKey(groupName) && BitmapGrant.allows(permission, myAcl.get(groupName)));
 		} catch(Exception e) {
 			LOG.error("Error checking authorization",e);
 		}

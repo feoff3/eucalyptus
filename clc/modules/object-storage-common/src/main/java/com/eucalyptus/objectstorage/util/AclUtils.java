@@ -59,7 +59,7 @@ public class AclUtils {
 	 * Arbitrary groups are not yet supported in ObjectStorage bucket policies/IAM policies.
 	 * userId should be a canonicalId
 	 */
-	public static boolean isUserMember(String userId, String groupId) {
+	public static boolean isUserMemberOfGroup(String userId, String groupId) {
 		if(Strings.isNullOrEmpty(groupId)) {
 			return false;
 		}

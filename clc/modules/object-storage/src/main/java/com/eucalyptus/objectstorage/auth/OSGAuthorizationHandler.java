@@ -232,18 +232,24 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 
 		/* IAM checks: Is the user allowed within the account? */
 		Boolean iamAllow = true; // the Permissions.isAuthorized() handles the default deny for each action.
-		//Evaluate each iam action required, all must be allowed
-		for(String action : requiredActions ) {
-			//Any deny overrides an allow
-			iamAllow = iamAllow && 
-					Permissions.isAuthorized(PolicySpec.VENDOR_S3,
-					resourceType, resourceId, resourceOwnerAccount , action, requestUser) 
-					&&  Permissions.canAllocate(PolicySpec.VENDOR_S3, 
-							resourceType, resourceId, action, requestUser, resourceAllocationSize);
-		}
 
-		//Must have both acl and iam allow (account & user)
-		return aclAllow && iamAllow;
+		if(aclAllow && isUserAnonymous(requestUser)) {
+			//Skip the IAM checks for anonymous access since they will always fail and aren't valid for anonymous users.
+			return true;
+		} else {
+			//Evaluate each iam action required, all must be allowed
+			for(String action : requiredActions ) {
+				//Any deny overrides an allow
+				//Note: explicitly set resourceOwnerAccount to null here, otherwise iam will reject even if the ACL checks
+				// were valid, let ACLs handle cross-account access.
+				iamAllow = iamAllow && 
+						Permissions.isAuthorized(PolicySpec.VENDOR_S3, resourceType, resourceId, null , action, requestUser) 
+						&&  Permissions.canAllocate(PolicySpec.VENDOR_S3, resourceType, resourceId, action, requestUser, resourceAllocationSize);
+			}
+			
+			//Must have both acl and iam allow (account & user)
+			return aclAllow && iamAllow;
+		}
 	}
 
 }
