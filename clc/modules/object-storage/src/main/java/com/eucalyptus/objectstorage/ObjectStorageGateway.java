@@ -320,112 +320,129 @@ public class ObjectStorageGateway implements ObjectStorageService {
 	}
 
 	/* PUT object */
-	@ServiceOperation (async = false)
+	/*@ServiceOperation (async = false)
 	public enum HandleFirstChunk implements Function<PutObjectType, Object> {
 		INSTANCE;
 			
 		@Override
-		public Object apply(final PutObjectType request) {
-			logRequest(request);
-			final ChannelBuffer b =  ChannelBuffers.dynamicBuffer();
-			if(!streamDataMap.containsKey(request.getCorrelationId())) {
-				byte[] firstChunk = request.getData();
-				b.writeBytes(firstChunk);
-				streamDataMap.put(request.getCorrelationId(), b);
-			} else {
-				//This should not happen. CorrelationIds should be unique for each request
-				LOG.error("CorrelationId lookup in data map found duplicate. Unexpected error");
-				return null;
+		public Object apply(final PutObjectType request) {*/
+	@Override
+	public PutObjectResponseType putObject(final PutObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
+			
+		Bucket bucket = null;
+
+		User requestUser = Contexts.lookup().getUser();
+		try {
+			//Get the bucket metadata
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);				
+		} catch(NoSuchElementException e) {
+			throw new NoSuchBucketException(request.getBucket());
+		} catch (Exception e) {
+			LOG.error(e);
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		long newBucketSize = bucket.getBucketSize() == null ? 0 : bucket.getBucketSize();
+		
+		//TODO: this should be done in binding.
+		if(Strings.isNullOrEmpty(request.getContentLength())) {
+			//Not known. Content-Length is required by S3-spec.
+			throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		long objectSize = -1;
+		try {					
+			objectSize = Long.parseLong(request.getContentLength());					
+			newBucketSize = bucket.getBucketSize() + objectSize;
+		} catch(Exception e) {
+			LOG.error("Could not parse content length into a long: " + request.getContentLength(), e);
+			throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
+		
+		//Generate a versionId if necessary based on versioning status of bucket
+		String versionId = null;
+		try {
+			versionId = BucketManagers.getInstance().getVersionId(bucket);
+		} catch (Exception e2) {
+			LOG.error("Error generating version Id string by bucket " + bucket.getBucketName(), e2);
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		try {
+			objectEntity.initializeForCreate(request.getBucket(), 
+					request.getKey(), 
+					versionId, 
+					request.getCorrelationId(),
+					objectSize,
+					requestUser);
+		} catch (Exception e) {
+			LOG.error("Error intializing entity for persiting object metadata for " + request.getBucket() + "/" + request.getKey());
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
+		}
+		
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, newBucketSize)) {
+			//Construct and set the ACP properly, post Auth check so no self-auth can occur even accidentally
+			AccessControlPolicy acp = new AccessControlPolicy();
+			acp.setAccessControlList(request.getAccessControlList());
+			try {
+				acp = AclUtils.processNewResourcePolicy(requestUser, acp, bucket.getOwnerCanonicalId());
+			} catch (Exception e) {
+				LOG.error("Error processing ACL for put object " + objectEntity.getResourceFullName(), e); 
+				throw new MalformedACLErrorException(objectEntity.getResourceFullName());
 			}
 			
-			Bucket bucket = null;
 			try {
-				User requestUser = Contexts.lookup().getUser();
-				try {
-					//Get the bucket metadata
-					bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);				
-				} catch(NoSuchElementException e) {
-					throw new NoSuchBucketException(request.getBucket());
-				} catch (Exception e) {
-					LOG.error(e);
-					throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
-				}
-
-				long newBucketSize = bucket.getBucketSize() == null ? 0 : bucket.getBucketSize();
-
-				//TODO: this should be done in binding.
-				if(Strings.isNullOrEmpty(request.getContentLength())) {
-					//Not known. Content-Length is required by S3-spec.
-					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
-				}
-				
-				long objectSize = -1;
-				try {					
-					objectSize = Long.parseLong(request.getContentLength());					
-					newBucketSize = bucket.getBucketSize() + objectSize;
-				} catch(Exception e) {
-					LOG.error("Could not parse content length into a long: " + request.getContentLength(), e);
-					throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
-				}
-
-				ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
-				
-				//Generate a versionId if necessary based on versioning status of bucket
-				String versionId = BucketManagers.getInstance().getVersionId(bucket);
-
-				objectEntity.initializeForCreate(request.getBucket(), 
-						request.getKey(), 
-						versionId, 
-						request.getCorrelationId(),
-						objectSize,
-						requestUser);
-								
-				if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, newBucketSize)) {
-					//Construct and set the ACP properly, post Auth check so no self-auth can occur even accidentally
-					AccessControlPolicy acp = new AccessControlPolicy();
-					acp.setAccessControlList(request.getAccessControlList());
-					acp = AclUtils.processNewResourcePolicy(requestUser, acp, bucket.getOwnerCanonicalId());
-					
-					objectEntity.setAcl(acp);
-					
-					final String fullObjectKey = objectEntity.getObjectUuid();
-					request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
-					
-					PutObjectResponseType response = ObjectManagers.getInstance().create(bucket, objectEntity,
-							new CallableWithRollback<PutObjectResponseType,Boolean>() {
-								@Override
-								public PutObjectResponseType call() throws S3Exception, Exception {
-									return ospClient.putObject(request, new ChannelBufferStreamingInputStream(b));
-								}
-								
-								@Override
-								public Boolean rollback(PutObjectResponseType arg) throws Exception {
-									DeleteObjectType deleteRequest = new DeleteObjectType();
-									deleteRequest.setBucket(request.getBucket());
-									deleteRequest.setKey(fullObjectKey);
-									DeleteObjectResponseType resp = ospClient.deleteObject(deleteRequest);
-									if(resp != null) {
-										return true;
-									} else {
-										return false;
-									}
-								}				
-							}
-						);					
-					return response;		
-				} else {
-					throw new AccessDeniedException(request.getBucket());			
-				}
-				
-			} catch(Exception ex) {
-				//Convert since Function() can't throw exceptions
-				//Should probably convert this to error response
-				throw Exceptions.toUndeclared(ex);
+				objectEntity.setAcl(acp);
+			} catch(Exception e) {
+				LOG.error("Error encountered setting object ACP for " + objectEntity.getResourceFullName() + " . Failing put operation",e);
+				throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
 			}
+			
+			final String fullObjectKey = objectEntity.getObjectUuid();
+			request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
+			
+			
+			try {
+				PutObjectResponseType response = ObjectManagers.getInstance().create(bucket, objectEntity,
+						new CallableWithRollback<PutObjectResponseType,Boolean>() {
+					@Override
+					public PutObjectResponseType call() throws S3Exception, Exception {
+						return ospClient.putObject(request, new ChannelBufferStreamingInputStream(request.getData()));
+					}
+					
+					@Override
+					public Boolean rollback(PutObjectResponseType arg) throws Exception {
+						DeleteObjectType deleteRequest = new DeleteObjectType();
+						deleteRequest.setBucket(request.getBucket());
+						deleteRequest.setKey(fullObjectKey);
+						DeleteObjectResponseType resp = ospClient.deleteObject(deleteRequest);
+						if(resp != null) {
+							return true;
+						} else {
+							return false;
+						}
+					}				
+				}
+						);
+				return response;
+			} catch (Exception e) {
+				if(e instanceof S3Exception) {
+					LOG.error("Got exception doing object PUT for " + objectEntity.getResourceFullName() + " with uuid: " + objectEntity.getObjectUuid(),e);
+					throw (S3Exception) e;
+				} else {
+					LOG.error("Got exception doing object PUT for " + objectEntity.getResourceFullName() + " with uuid: " + objectEntity.getObjectUuid(),e);
+					throw new InternalErrorException(objectEntity.getResourceFullName());
+				}					
+			}						
+		} else {
+			throw new AccessDeniedException(request.getBucket());			
 		}
 	}
 
-	@ServiceOperation (async = false)
+	//@ServiceOperation (async = false)
 	public enum HandleChunk implements Function<BaseDataChunk, Object> {
 		INSTANCE;
 		private static final int retryCount = 15;
@@ -459,7 +476,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			return null;
 		}	
 	}
-	
 	/**
 	 * A terse request logging function to log request entry at INFO level.
 	 * @param request

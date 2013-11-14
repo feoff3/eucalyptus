@@ -70,6 +70,7 @@ import org.jboss.netty.handler.codec.http.HttpRequest;
 import com.eucalyptus.component.annotation.ComponentPart;
 import com.eucalyptus.objectstorage.ObjectStorage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStorageOutboundStage;
+import com.eucalyptus.objectstorage.pipeline.stages.ObjectStoragePUTAggregatorStage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStoragePUTBindingStage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStoragePUTOutboundStage;
 import com.eucalyptus.objectstorage.pipeline.stages.ObjectStorageRESTBindingStage;
@@ -90,6 +91,7 @@ public class ObjectStoragePUTPipeline extends ObjectStorageRESTPipeline {
 	private static Logger LOG = Logger.getLogger( ObjectStoragePUTPipeline.class );
 	private final UnrollableStage auth = new ObjectStorageUserAuthenticationStage( );
 	private final UnrollableStage bind = new ObjectStoragePUTBindingStage( );
+	private final UnrollableStage aggr = new ObjectStoragePUTAggregatorStage( );
 	private final UnrollableStage out = new ObjectStoragePUTOutboundStage();
 	private final UnrollableStage exHandler = new ObjectStorageRESTExceptionStage( );
 	  
@@ -107,6 +109,7 @@ public class ObjectStoragePUTPipeline extends ObjectStorageRESTPipeline {
   public ChannelPipeline addHandlers( ChannelPipeline pipeline ) {
     auth.unrollStage( pipeline );
     bind.unrollStage( pipeline );
+    aggr.unrollStage( pipeline );
     out.unrollStage( pipeline );
     exHandler.unrollStage(pipeline);
     return pipeline;

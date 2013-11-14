@@ -189,12 +189,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			BaseMessage msg = (BaseMessage) this.bind( httpRequest );
 			httpRequest.setMessage( msg );
 
-			//Add the reference to the base message
-			if(msg instanceof ObjectStorageRequestType) {
-				//ObjectStorageRequestType tmp = (ObjectStorageRequestType)msg;
-				//tmp.setRawRequest((DefaultHttpMessage)httpRequest);
-			}
-
 			if(msg instanceof ObjectStorageDataGetRequestType) {
 				ObjectStorageDataGetRequestType getObject = (ObjectStorageDataGetRequestType) msg;
 				getObject.setChannel(ctx.getChannel());
@@ -208,8 +202,14 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						ctx.sendDownstream( newEvent );
 					}
 				}
+				
+				//handle the content.
+				ObjectStorageDataRequestType request = (ObjectStorageDataRequestType) msg;
+				request.setIsChunked(httpRequest.isChunked());
+				handleData(request, httpRequest.getContent());
 			}
 		} else if(event.getMessage() instanceof BaseDataChunk) {
+			//TODO: zhill - Can remove this later
 			if(correlationId != null) {
 				BaseDataChunk chunk = (BaseDataChunk) event.getMessage();
 				chunk.setCorrelationId(correlationId);
@@ -238,6 +238,18 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				httpResponse.addHeader( HttpHeaders.Names.CONTENT_TYPE, "application/xml" );
 				httpResponse.setContent( buffer );
 			}
+		}
+	}
+	
+	public void handleData(ObjectStorageDataRequestType dataRequest, ChannelBuffer content) {
+		//Ensure that the content is a dynamic channel buffer to accomodate future chunk writes if necessary
+		if(dataRequest.getIsChunked()) {
+			ChannelBuffer contentBuffer = ChannelBuffers.dynamicBuffer();
+			contentBuffer.writeBytes(content);
+			dataRequest.setData(contentBuffer);
+		} else {
+			//No wrapping necessary, not chunked
+			dataRequest.setData(content);
 		}
 	}
 
@@ -389,7 +401,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			throw new BindingException( errMsg.toString() );
 		}
 
-		LOG.debug(groovyMsg.toString());
+		LOG.trace(groovyMsg.toString());
 		try
 		{
 			Binding binding = BindingManager.getDefaultBinding( );
@@ -526,8 +538,13 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 					if(contentLengthString != null)
 						operationParams.put("ContentLength", (new Long(contentLength).toString()));
 					operationParams.put(ObjectStorageProperties.Headers.RandomKey.toString(), randomKey);					
+
 					//TODO: This is PostObject.
-					handleFirstChunk(httpRequest, (ChannelBuffer)formFields.get(ObjectStorageProperties.IGNORE_PREFIX + "FirstDataChunk"), contentLength);
+					//handleFirstChunk(httpRequest, (ChannelBuffer)formFields.get(ObjectStorageProperties.IGNORE_PREFIX + "FirstDataChunk"), contentLength);
+
+					//Set the message content to the first-data chunk if found. This is used later for processing the message like a PUT request
+					httpRequest.setContent((ChannelBuffer)formFields.get(ObjectStorageProperties.IGNORE_PREFIX + "FirstDataChunk"));
+					
 				} else if(ObjectStorageProperties.HTTPVerb.PUT.toString().equals(verb)) {  
 					if(params.containsKey(ObjectStorageProperties.BucketParameter.logging.toString())) {
 						//read logging params
@@ -628,15 +645,18 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 							operationParams.put("ContentMD5", contentMD5);
 						if(contentLengthString != null)
 							operationParams.put("ContentLength", (new Long(contentLength).toString()));
+
 						//Not used in this pipeline
 						//operationParams.put(ObjectStorageProperties.Headers.RandomKey.toString(), randomKey);
 						//putQueue = getWriteMessenger().interruptAllAndGetQueue(key, randomKey);
-						//handleFirstChunk(httpRequest, contentLength);
-						try {
+						//handleFirstChunk(httpRequest, contentLength);	
+						
+						//Not needed for binding anymore
+						/*try {
 							operationParams.put("Data", getFirstChunk(httpRequest, contentLength));
 						} catch (Exception ex) {
 							throw new BindingException("Unable to get data from PUT request for: " + key, ex);
-						}
+						}*/
 					}
 				} else if(verb.equals(ObjectStorageProperties.HTTPVerb.GET.toString())) {
 					if(!walrusInternalOperation) {
@@ -1278,46 +1298,4 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			throw ex;
 		}
 	}
-
-	protected void handleFirstChunk(MappingHttpRequest httpRequest, long dataLength) {
-	}
-
-	protected void handleFirstChunk(MappingHttpRequest httpRequest, ChannelBuffer firstChunk, long dataLength) {
-	}
-
-
-	public static synchronized ObjectStorageDataMessenger getWriteMessenger() {
-		if (putMessenger == null) {
-			putMessenger = new ObjectStorageDataMessenger();
-		}
-		return putMessenger;
-	}	
-
-	class Writer extends Thread {
-
-		protected ChannelBuffer firstBuffer;
-		protected long dataLength;
-		public Writer(ChannelBuffer firstBuffer, long dataLength) {
-			this.firstBuffer = firstBuffer;
-			this.dataLength = dataLength;
-		}
-
-		public void run() {
-			byte[] bytes = new byte[DATA_MESSAGE_SIZE];
-
-			try {
-				LOG.info("Starting upload");                
-
-				firstBuffer.markReaderIndex( );
-				byte[] read = new byte[firstBuffer.readableBytes( )];
-				firstBuffer.readBytes( read );
-				//putQueue.put(ObjectStorageDataMessage.EOF());
-
-			} catch (Exception ex) {
-				LOG.error(ex, ex);
-			}
-		}
-
-	}
-
 }

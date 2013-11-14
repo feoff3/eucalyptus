@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Date;
 
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
+import org.jboss.netty.buffer.ChannelBuffer
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.handler.codec.http.DefaultHttpMessage;
 
@@ -126,7 +127,9 @@ public class ObjectStorageRequestType extends BaseMessage {
 public class ObjectStorageDataRequestType extends ObjectStorageRequestType {
 	String randomKey;
 	Boolean isCompressed;
-
+	ChannelBuffer data;
+	boolean isChunked;
+	
 	def ObjectStorageDataRequestType() {
 	}
 
@@ -325,8 +328,7 @@ public class PutObjectType extends ObjectStorageDataRequestType {
 	String storageClass;
 	String contentType;
 	String contentDisposition;
-	String contentMD5;
-	byte[] data;
+	String contentMD5;	
 
 	def PutObjectType() {}
 }
