@@ -30,6 +30,7 @@ import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpMessage;
 
 import com.eucalyptus.http.MappingHttpRequest;
+import com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType;
 import com.eucalyptus.objectstorage.msgs.PutObjectType;
 import com.eucalyptus.records.Logs;
 
@@ -134,31 +135,31 @@ public class ObjectStoragePUTAggregator extends SimpleChannelUpstreamHandler imp
         if ( event.getMessage( ) instanceof MappingHttpRequest ) {
         	MappingHttpRequest httpRequest = ( MappingHttpRequest ) event.getMessage( );
         	
-        	if(httpRequest.getMessage() instanceof PutObjectType) {
-        		if(!httpRequest.isChunked()) {										
+        	if(httpRequest.getMessage() instanceof ObjectStorageDataRequestType) {
+        		if(!httpRequest.isChunked()) {				
         			// Not a chunked message - pass through.	                
         			ctx.sendUpstream(event);	        
         		} else {				
         			//Chunked request, and beginning, setup map etc.
-        			initializeNewPut(ctx, (PutObjectType)httpRequest.getMessage());
-        		}
-        	} else if(event.getMessage() instanceof BaseDataChunk) {
-        		//Add the chunk to the current streams channel buffer.
-        		BaseDataChunk chunk = (BaseDataChunk) event.getMessage();        	
-        		appendToCumulation(chunk.getContent(), ctx.getChannel());
-
-        		if (chunk.isLast()) {
-        			//Remove from the map
-            		Logs.extreme().debug("Removing data map due to last chunk processed event for channel: " + ctx.getChannel().getId());
-        			dataMap.remove(ctx.getChannel());
+        			initializeNewPut(ctx, (ObjectStorageDataRequestType)httpRequest.getMessage());
         		}
         	}
+        } else if(event.getMessage() instanceof BaseDataChunk) {
+        	//Add the chunk to the current streams channel buffer.
+        	BaseDataChunk chunk = (BaseDataChunk) event.getMessage();        	
+        	appendToCumulation(chunk.getContent(), ctx.getChannel());
+        	
+        	if (chunk.isLast()) {
+        		//Remove from the map
+        		Logs.extreme().debug("Removing data map due to last chunk processed event for channel: " + ctx.getChannel().getId());
+        		dataMap.remove(ctx.getChannel());
+        	}        
         }
         //Always pass it on
         ctx.sendUpstream(event);
     }
         
-    protected void initializeNewPut(ChannelHandlerContext ctx, PutObjectType request) throws IllegalStateException {
+    protected void initializeNewPut(ChannelHandlerContext ctx, ObjectStorageDataRequestType request) throws IllegalStateException {
     	Logs.extreme().debug("Adding entry to data map in PUT aggregator for channel: " + ctx.getChannel().getId());
     	ChannelBuffer foundBuffer = dataMap.putIfAbsent(ctx.getChannel(), request.getData());
     	if(foundBuffer != null) {
