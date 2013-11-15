@@ -22,6 +22,7 @@ package com.eucalyptus.objectstorage;
 
 import java.util.List;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
@@ -142,7 +143,7 @@ public interface ObjectManager {
 	 * @throws S3Exception
 	 * @throws TransactionException
 	 */
-	public abstract <T,F> void delete(Bucket bucket, ObjectEntity object,  CallableWithRollback<T, F> resourceModifier) throws Exception;
+	public abstract void delete(Bucket bucket, ObjectEntity objectToDelete, User requestUser) throws Exception;
 	
 	/**
 	 * Uses the provided supplier to get a versionId since that is dependent on the bucket state

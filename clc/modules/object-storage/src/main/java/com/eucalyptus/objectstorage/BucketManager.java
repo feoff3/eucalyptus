@@ -123,7 +123,7 @@ public interface BucketManager {
 	 * Does *NOT* enforce emptiness checks or any other policy on the bucket
 	 * @param bucketEntity
 	 */
-	public abstract <T> T delete(Bucket bucketEntity, 
+	public abstract <T> void delete(Bucket bucketEntity, 
 			CallableWithRollback<T,?> resourceModifier) throws Exception;
 	
 	/**

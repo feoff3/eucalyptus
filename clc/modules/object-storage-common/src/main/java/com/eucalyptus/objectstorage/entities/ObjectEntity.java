@@ -41,11 +41,13 @@ import org.hibernate.criterion.Restrictions;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.User;
+import com.eucalyptus.entities.Entities;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.VersionEntry;
+import com.google.common.base.Predicate;
 
 @Entity
 @OptimisticLocking(type = OptimisticLockType.NONE)
@@ -406,7 +408,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 			return Restrictions.isNull("deletedTimestamp");
 		}
 	}
-	
+		
 	/**
 	 * Return a ListEntry for this entity
 	 * @return
@@ -447,6 +449,5 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), displayName));
 		return e;
 	}
-	
 	//TODO: add delete marker support. Fix is to use super-type for versioning entry and sub-types for version vs deleteMarker
 }

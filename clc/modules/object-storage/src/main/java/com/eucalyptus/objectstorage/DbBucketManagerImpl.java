@@ -51,6 +51,7 @@ import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties.VersioningStatus;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
+import com.google.common.base.Predicate;
 
 public class DbBucketManagerImpl implements BucketManager {
 	private static final Logger LOG = Logger.getLogger(DbBucketManagerImpl.class);
@@ -217,31 +218,34 @@ public class DbBucketManagerImpl implements BucketManager {
 	}
 	
 	@Override
-	public <T> T delete(Bucket bucketEntity, 
-			CallableWithRollback<T,?> resourceModifier) throws S3Exception, TransactionException {
-		try {			
-			Transactions.delete(bucketEntity);
-		} catch(TransactionException e) {
-			LOG.error("Error deleting bucket in DB",e);
-			throw e;
-		} catch(NoSuchElementException e) {
-			//Ok, continue.			
-		}
-		
-		T result = null;
-		try {
-			result = resourceModifier.call();
-			return result;
-		} catch(Throwable e) {
-			LOG.error("Error in backend call for delete bucket: " + bucketEntity.getBucketName(), e);
-			try {
-				resourceModifier.rollback(result);
-			} catch(Throwable ex ) {
-				LOG.error("Error in rollback after failed delete call on bucket " + bucketEntity.getBucketName(),e);
+	public <T> void delete(Bucket bucketEntity, 
+			final CallableWithRollback<T,?> resourceModifier) throws Exception {
+	
+		//TODO: look at resolving state conflict where backend succeeds but db update fails
+		Predicate<Bucket> deleteSync = new Predicate<Bucket>() {
+			public boolean apply(Bucket bucket) {			
+				if(resourceModifier != null) {					
+					try {
+						resourceModifier.call();
+					} catch(Throwable e) {
+						LOG.error("Error in backend call for delete bucket: " + bucket.getBucketName(), e);
+						return false;
+					}
+				}
+				
+				try {
+					Transactions.delete(bucket);
+				} catch(TransactionException e) {
+					LOG.error("Error deleting bucket in DB",e);
+					return false;
+				} catch(NoSuchElementException e) {
+					//Ok, continue.
+				}
+				return true;
 			}
-			throw new InternalErrorException(e.getMessage());
-		}
+		};
 		
+		Entities.asTransaction(deleteSync).apply(bucketEntity);		
 	}
 
 	@Override

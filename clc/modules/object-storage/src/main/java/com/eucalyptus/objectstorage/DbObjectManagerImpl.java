@@ -29,6 +29,8 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
@@ -38,6 +40,7 @@ import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 
+import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.Entities;
 import com.eucalyptus.entities.TransactionException;
 import com.eucalyptus.entities.Transactions;
@@ -45,6 +48,8 @@ import com.eucalyptus.objectstorage.entities.Bucket;
 import com.eucalyptus.objectstorage.entities.ObjectEntity;
 import com.eucalyptus.objectstorage.exceptions.s3.InternalErrorException;
 import com.eucalyptus.objectstorage.exceptions.s3.S3Exception;
+import com.eucalyptus.objectstorage.msgs.DeleteObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.DeleteObjectType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
@@ -89,8 +94,8 @@ public class DbObjectManagerImpl implements ObjectManager {
 	@Override
 	public long count(Bucket bucket) throws Exception {
 		EntityTransaction db = Entities.get(ObjectEntity.class);
-		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null, null);
-		exampleObject.setDeleted(false);
+		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null,null);
+		
 		try {
 			return Entities.count(exampleObject);
 		} catch (Throwable e) {
@@ -330,56 +335,79 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public <T, F> void delete(Bucket bucket, ObjectEntity object, CallableWithRollback<T, F> resourceModifier) throws Exception {
-		T result = null;
-		// Set to 'deleting'
-		if (!object.getDeleted()) {
-			EntityTransaction db = Entities.get(ObjectEntity.class);
-			try {
-				object.markForDeletion();
-				Entities.mergeDirect(object);
-			} catch (final Throwable f) {
-				throw new InternalErrorException(object.getResourceFullName());
-			} finally {
-				if (db != null && db.isActive()) {
-					db.rollback();
-				}
+	public void delete(@Nonnull Bucket bucket, @Nonnull ObjectEntity objectToDelete, @Nonnull final User requestUser) throws Exception {
+
+		if(bucket.isVersioningDisabled()) {
+			//Do a synchrounous delete of all records and objects for this key (using uuid)
+			
+			if(!ObjectEntity.NULL_VERSION_STRING.equals(objectToDelete.getVersionId()) && objectToDelete.getVersionId() != null) {
+				throw new IllegalArgumentException("Cannot delete specific versionId on non-versioned bucket");				
 			}
-		}
-		if (resourceModifier != null) {
-			try {
-				result = resourceModifier.call();
-			} catch (S3Exception e) {
-				LOG.error("S3 Error calling modify resource in object delete", e);
-				try {
-					resourceModifier.rollback(result);
-				} catch (Exception ex) {
-					LOG.error("Error in rollback during error recovery of object delete", e);
-				}
+			
+			final ObjectStorageProviderClient osp;
+			try { 
+				osp = ObjectStorageProviders.getInstance();
+			} catch(NoSuchElementException e) {
+				LOG.error("No provider client configured. Cannot execute delete operation", e);
 				throw e;
-			} catch (Exception e) {
-				LOG.error("Error calling modify resource in object delete", e);
-				InternalErrorException intEx = new InternalErrorException(object.getBucketName() + "/"
-						+ object.getObjectKey()
-						+ (object.getVersionId() == null ? "" : "?versionId=" + object.getVersionId()));
-				intEx.initCause(e);
-				throw intEx;
 			}
-		}
+			
+			//Get the latest entry to get its size for decrementing the bucket size later.
+			final Long objectSize = objectToDelete.getSize();			
+			
+			ObjectEntity example = new ObjectEntity(bucket.getBucketName(), objectToDelete.getObjectKey(), ObjectEntity.NULL_VERSION_STRING);
+			final DeleteObjectType deleteReq = new DeleteObjectType();
+			deleteReq.setBucket(bucket.getBucketName());
+			deleteReq.setUser(requestUser);
+			try {
+				deleteReq.setAccessKeyID(requestUser.getKeys().get(0).getAccessKey());
+			} catch(final Throwable f) {
+				throw new Exception("Request user has no active access key to use for backend request");
+			}
+			
+			Predicate<ObjectEntity> deleteAllObjectNulls = new Predicate<ObjectEntity>() {
 
-		// Fully remove the record.
-		try {
-			Transactions.delete(object);
+				@Override
+				public boolean apply(ObjectEntity objectToDelete) {
+					List<ObjectEntity> objectRecords = null;
+					try {
+						objectRecords = Entities.query(objectToDelete);
+					} catch(final Throwable f) {
+						//Fail, safe because we haven't modified anything
+						return false;
+					}
+					
+					if(objectRecords == null) {
+						return true; //nothing to do
+					}
+					
+					for(ObjectEntity object : objectRecords) {
+						try {
+							deleteReq.setKey(object.getObjectUuid());
+							DeleteObjectResponseType response = osp.deleteObject(deleteReq);
+							Entities.delete(object);
+						} catch (Exception e) {								
+							LOG.error("Error calling backend in object delete: " + object.toString(), e);
+						}
+					}					
+					return true;
+				}
+			};
+						
+			//Do the update
+			Entities.asTransaction(deleteAllObjectNulls).apply(example);			
 
-			// Update bucket size
-			BucketManagers.getInstance().updateBucketSize(object.getBucketName(), -object.getSize());
-		} catch (NoSuchElementException e) {
-			// Ok, not found. Can't update what isn't there. May have been
-			// updated concurrently.
-		} catch (Exception e) {
-			LOG.error("Error looking up object:" + object.getBucketName() + "/" + object.getObjectKey()
-					+ (object.getVersionId() == null ? "" : "?versionId=" + object.getVersionId()));
-			throw e;
+			try {
+				// Update bucket size
+				BucketManagers.getInstance().updateBucketSize(bucket.getBucketName(), -(objectSize.longValue()));
+			} catch (NoSuchElementException e) {
+				// Ok, not found. Can't update what isn't there. May have been
+				// updated concurrently.
+			} catch (Exception e) {
+				LOG.warn("Error updating bucket size for removal of object:" + bucket.getBucketName() + "/" + objectToDelete.getObjectKey());
+			}							
+		} else {
+			throw new Exception("Versioning found not-disabled, versioned buckets not supported yet");
 		}
 	}
 

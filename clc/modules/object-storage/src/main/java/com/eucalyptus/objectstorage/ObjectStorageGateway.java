@@ -655,7 +655,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			//Bucket does not exist, so return success. This is per s3-spec.
 			DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
 			reply.setStatus(HttpResponseStatus.NO_CONTENT);
-			reply.setStatusMessage("No Content");
+			reply.setStatusMessage("NoContent");
 			return reply;
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
@@ -672,7 +672,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					throw new BucketNotEmptyException(bucket.getBucketName());
 				} else {
 					try {
-						return BucketManagers.getInstance().delete(bucket, new CallableWithRollback<DeleteBucketResponseType, Boolean>() {
+						BucketManagers.getInstance().delete(bucket, new CallableWithRollback<DeleteBucketResponseType, Boolean>() {
 							
 							@Override
 							public DeleteBucketResponseType call() throws Exception {
@@ -686,6 +686,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 								return true;
 							}					
 						});
+						DeleteBucketResponseType reply = (DeleteBucketResponseType) request.getReply();
+						reply.set_return(true);
+						reply.setStatus(HttpResponseStatus.NO_CONTENT);
+						reply.setStatusMessage("NoContent");
+						return reply;
+						
 					} catch(Exception e) {
 						LOG.error("Transaction error deleting bucket " + request.getBucket(),e);
 						throw new InternalErrorException(request.getBucket());
@@ -838,17 +844,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
 			//Get the listing from the back-end and copy results in.
 			try {
-				ObjectManagers.getInstance().delete(bucket, objectEntity,
-						new CallableWithRollback<DeleteObjectResponseType,Boolean>() {
-					public DeleteObjectResponseType call() throws S3Exception, Exception {
-						return ospClient.deleteObject(request);
-					}
-					
-					public Boolean rollback(DeleteObjectResponseType arg) throws S3Exception, Exception {
-						//Can't roll-back a delete
-						return true;
-					}
-				});
+				ObjectManagers.getInstance().delete(bucket, objectEntity, Contexts.lookup().getUser());
 				DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
 				reply.setStatus(HttpResponseStatus.NO_CONTENT);
 				reply.setStatusMessage("No Content");
