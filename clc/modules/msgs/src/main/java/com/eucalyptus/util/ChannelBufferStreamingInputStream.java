@@ -27,13 +27,26 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferInputStream;
+
+import com.eucalyptus.configurable.ConfigurableClass;
+import com.eucalyptus.configurable.ConfigurableField;
+import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderChangeListener;
 import com.eucalyptus.util.EucalyptusCloudException;
 
+@ConfigurableClass( root = "objectstorage", description = "Streaming upload channel configuration.")
 public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream {
 	private ChannelBuffer b;
 	private LinkedBlockingQueue<ChannelBuffer> buffers;
 	private int bytesRead;
 
+	//This field controls the size of the queue of channel buffers used for uploads.
+	//A large queue will require more memory and may possibly cause an OOM condition if
+	//enough heap space is not provided to the JVM.
+	//A smaller queue will limit the number of concurrent requests that can be handled
+	//but will be more suitable when memory is constrained.
+	@ConfigurableField( description = "Channel buffer queue size for uploads", displayName = "objectstorage.uploadqueuesize")
+	public static int QUEUE_SIZE = 100;
+	
 	@Override
 	public boolean markSupported() {
 		return super.markSupported();
@@ -74,7 +87,7 @@ public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream 
 	public synchronized int read(byte[] bytes, int off, int len) throws IOException {
 		if (len > 0) {
 			if (b == null) {
-			    return -1;
+				return -1;
 			}
 			if (off < 0) {
 				throw new IOException("Invalid offset: " + off);
@@ -153,18 +166,17 @@ public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream 
 
 	public ChannelBufferStreamingInputStream(ChannelBuffer buffer) {
 		super(buffer);
-		//TODO: should bound queue size
-		buffers = new LinkedBlockingQueue<ChannelBuffer>(1000);
+		buffers = new LinkedBlockingQueue<ChannelBuffer>(QUEUE_SIZE);
 		b = buffer;
 		bytesRead = 0;
 		try {
 			boolean success = false;
 			int retries = 0;
 			while ((!success) && (retries++ < 20)) {
-			    success = buffers.offer(buffer, 1, TimeUnit.SECONDS);
+				success = buffers.offer(buffer, 1, TimeUnit.SECONDS);
 			}
 			if (!success) {
-			    LOG.error("Timed out writing data to stream.");
+				LOG.error("Timed out writing data to stream.");
 			}
 		} catch (InterruptedException e) {
 			LOG.error(e, e);			
@@ -175,12 +187,17 @@ public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream 
 		boolean success = false;
 		int retries = 0;
 		while ((!success) && (retries++ < 20)) {
-		    success = buffers.offer(input, 1, TimeUnit.SECONDS);
+			success = buffers.offer(input, 1, TimeUnit.SECONDS);
 		}
 		if (!success) {
-		    LOG.error("Timed out writing data to stream.");
-		    throw new EucalyptusCloudException("Aborting upload, could not write to stream in time.");
+			LOG.error("Timed out writing data to stream.");
+			throw new EucalyptusCloudException("Aborting upload, could not process data in time. Either increase the upload queue size or retry the upload later.");
 		}
 	}
 
+	@Override
+	public void close() throws IOException {
+		LOG.trace("Closing Channel Stream: " + buffers.remainingCapacity() + " " + buffers.size());
+		super.close();
+	}
 }
