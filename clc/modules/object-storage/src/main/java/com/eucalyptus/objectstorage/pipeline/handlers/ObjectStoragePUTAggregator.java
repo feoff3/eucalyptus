@@ -181,7 +181,7 @@ public class ObjectStoragePUTAggregator extends SimpleChannelUpstreamHandler imp
 		//Write the content into the buffer.
 		try {
 			stream.putChunk(input);
-		} catch (InterruptedException ex) {
+		} catch (Exception ex) {
 			throw new IllegalStateException(ex);
 		}
 	}

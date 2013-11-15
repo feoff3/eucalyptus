@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferInputStream;
-
+import com.eucalyptus.util.EucalyptusCloudException;
 
 public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream {
 	private ChannelBuffer b;
@@ -154,18 +154,33 @@ public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream 
 	public ChannelBufferStreamingInputStream(ChannelBuffer buffer) {
 		super(buffer);
 		//TODO: should bound queue size
-		buffers = new LinkedBlockingQueue<ChannelBuffer>();
+		buffers = new LinkedBlockingQueue<ChannelBuffer>(1000);
 		b = buffer;
 		bytesRead = 0;
 		try {
-			buffers.put(buffer);
+			boolean success = false;
+			int retries = 0;
+			while ((!success) && (retries++ < 20)) {
+			    success = buffers.offer(buffer, 1, TimeUnit.SECONDS);
+			}
+			if (!success) {
+			    LOG.error("Timed out writing data to stream.");
+			}
 		} catch (InterruptedException e) {
 			LOG.error(e, e);			
 		}
 	}
 
-	public void putChunk(ChannelBuffer input) throws InterruptedException {
-		buffers.put(input);
+	public void putChunk(ChannelBuffer input) throws InterruptedException, EucalyptusCloudException {
+		boolean success = false;
+		int retries = 0;
+		while ((!success) && (retries++ < 20)) {
+		    success = buffers.offer(input, 1, TimeUnit.SECONDS);
+		}
+		if (!success) {
+		    LOG.error("Timed out writing data to stream.");
+		    throw new EucalyptusCloudException("Aborting upload, could not write to stream in time.");
+		}
 	}
 
 }
