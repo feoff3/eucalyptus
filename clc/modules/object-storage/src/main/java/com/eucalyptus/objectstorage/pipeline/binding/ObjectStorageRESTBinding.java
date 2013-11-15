@@ -134,6 +134,7 @@ import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
 import com.eucalyptus.objectstorage.pipeline.handlers.ObjectStorageAuthenticationHandler;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
+import com.eucalyptus.util.ChannelBufferStreamingInputStream;
 import com.eucalyptus.util.LogUtil;
 import com.eucalyptus.util.XMLParser;
 import com.eucalyptus.objectstorage.exceptions.s3.NotImplementedException;
@@ -202,7 +203,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						ctx.sendDownstream( newEvent );
 					}
 				}
-				
+
 				//handle the content.
 				ObjectStorageDataRequestType request = (ObjectStorageDataRequestType) msg;
 				request.setIsChunked(httpRequest.isChunked());
@@ -240,17 +241,10 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			}
 		}
 	}
-	
+
 	public void handleData(ObjectStorageDataRequestType dataRequest, ChannelBuffer content) {
-		//Ensure that the content is a dynamic channel buffer to accomodate future chunk writes if necessary
-		if(dataRequest.getIsChunked()) {
-			ChannelBuffer contentBuffer = ChannelBuffers.dynamicBuffer();
-			contentBuffer.writeBytes(content);
-			dataRequest.setData(contentBuffer);
-		} else {
-			//No wrapping necessary, not chunked
-			dataRequest.setData(content);
-		}
+		ChannelBufferStreamingInputStream stream = new ChannelBufferStreamingInputStream(content);
+		dataRequest.setData(stream);		
 	}
 
 	protected static Map<String, String> populateOperationMap() {
@@ -330,7 +324,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 		opsMap.put(BUCKET + ObjectStorageProperties.HTTPVerb.DELETE.toString() + ObjectStorageProperties.BucketParameter.website.toString(), "DELETE Bucket website");
 		// Multipart uploads
 		opsMap.put(BUCKET + ObjectStorageProperties.HTTPVerb.GET.toString() + ObjectStorageProperties.BucketParameter.uploads.toString(), "List Multipart Uploads");
-		
+
 		// Object operations
 		// Multipart Uploads
 		opsMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.GET.toString() + ObjectStorageProperties.ObjectParameter.uploadId.toString().toLowerCase(), "List Parts");
@@ -341,7 +335,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 		opsMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.POST.toString() + ObjectStorageProperties.ObjectParameter.uploads.toString(), "Initiate Multipart Upload");
 		opsMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.POST.toString() + ObjectStorageProperties.ObjectParameter.uploadId.toString().toLowerCase(), "Complete Multipart Upload");
 		opsMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.DELETE.toString() + ObjectStorageProperties.ObjectParameter.uploadId.toString().toLowerCase(), "Abort Multipart Upload");
-		
+
 		return opsMap;
 	}
 
@@ -544,7 +538,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 
 					//Set the message content to the first-data chunk if found. This is used later for processing the message like a PUT request
 					httpRequest.setContent((ChannelBuffer)formFields.get(ObjectStorageProperties.IGNORE_PREFIX + "FirstDataChunk"));
-					
+
 				} else if(ObjectStorageProperties.HTTPVerb.PUT.toString().equals(verb)) {  
 					if(params.containsKey(ObjectStorageProperties.BucketParameter.logging.toString())) {
 						//read logging params
@@ -650,7 +644,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						//operationParams.put(ObjectStorageProperties.Headers.RandomKey.toString(), randomKey);
 						//putQueue = getWriteMessenger().interruptAllAndGetQueue(key, randomKey);
 						//handleFirstChunk(httpRequest, contentLength);	
-						
+
 						//Not needed for binding anymore
 						/*try {
 							operationParams.put("Data", getFirstChunk(httpRequest, contentLength));
@@ -784,7 +778,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				operationKey += keyString.toLowerCase();
 				addMore = false;
 			}*/
-						
+
 
 			paramsToRemove.add(key);
 		}
@@ -820,7 +814,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				throw e;				
 			}
 		}
-		
+
 		if("CreateBucket".equals(operationName)) {
 			String locationConstraint = getLocationConstraint(httpRequest);
 			if(locationConstraint != null)
