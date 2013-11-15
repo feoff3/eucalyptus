@@ -72,7 +72,10 @@ public class ChannelBufferStreamingInputStream extends ChannelBufferInputStream 
 
 	@Override
 	public synchronized int read(byte[] bytes, int off, int len) throws IOException {
-		if (len > 0 && (b != null)) {
+		if (len > 0) {
+			if (b == null) {
+			    return -1;
+			}
 			if (off < 0) {
 				throw new IOException("Invalid offset: " + off);
 			}
