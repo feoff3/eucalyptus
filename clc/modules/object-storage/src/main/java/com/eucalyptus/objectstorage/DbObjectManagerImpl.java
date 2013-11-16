@@ -93,6 +93,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 	@Override
 	public long count(Bucket bucket) throws Exception {
+		/*
+		 * Returns all entries, pending delete or not.
+		 */
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null,null);
 		
@@ -214,42 +217,77 @@ public class DbObjectManagerImpl implements ObjectManager {
 		
 		final Predicate<ObjectEntity> repairPredicate = new Predicate<ObjectEntity>() {
 			public boolean apply(ObjectEntity example) {
-				try {
-					Criteria search = Entities.createCriteria(ObjectEntity.class);
-					List<ObjectEntity> results = search.add(Example.create(example))
-							.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
-							.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
-							.addOrder(Order.desc("objectModifiedTimestamp")).list();
-					
-					ObjectEntity lastViewed = null;
-					if (results != null && results.size() > 0) {
-						try {
-							results.get(0).makeLatest();
-
-							// Set all but the first element as not latest
-							for (ObjectEntity obj : results.subList(1, results.size())) {
-								obj.makeNotLatest();
+				
+				if(bucket.isVersioningDisabled()) {
+					//Remove all but latest entry
+					try {
+						Criteria search = Entities.createCriteria(ObjectEntity.class);
+						List<ObjectEntity> results = search.add(Example.create(example))
+								.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+								.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+								.addOrder(Order.desc("objectModifiedTimestamp")).list();
+						
+						if (results != null && results.size() > 0) {
+							try {							
+								results.get(0).makeLatest();
 								
-								if (obj.isNullVersioned()) {								
-									if(bucket.isVersioningDisabled() || 
-											(lastViewed != null && lastViewed.isNullVersioned())) {
-										obj.markForDeletion();
-									}
-									lastViewed = obj;
-								} else {
-									lastViewed = null;
+								// Set all but the first element as not latest
+								for (ObjectEntity obj : results.subList(1, results.size())) {
+									LOG.trace("Marking object "+ obj.getBucketName() + "/"+ obj.getObjectUuid() + " for deletion because it is not latest.");
+									obj.makeNotLatest();							
+									obj.markForDeletion();
 								}
+							} catch (IndexOutOfBoundsException e) {
+								// Either 0 or 1 result, nothing to do
 							}
-						} catch (IndexOutOfBoundsException e) {
-							// Either 0 or 1 result, nothing to do
 						}
+					} catch (NoSuchElementException e) {
+						// Nothing to do.
+					} catch (Exception e) {
+						LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/"
+								+ example.getObjectKey());
+						return false;
+					}					
+				} else {
+					//Versioning to consider
+					try {
+						Criteria search = Entities.createCriteria(ObjectEntity.class);
+						List<ObjectEntity> results = search.add(Example.create(example))
+								.add(ObjectEntity.QueryHelpers.getNotDeletingRestriction())
+								.add(ObjectEntity.QueryHelpers.getNotPendingRestriction())
+								.addOrder(Order.desc("objectModifiedTimestamp")).list();
+						
+						ObjectEntity lastViewed = null;
+						if (results != null && results.size() > 0) {
+							try {
+								results.get(0).makeLatest();
+								
+								// Set all but the first element as not latest
+								for (ObjectEntity obj : results.subList(1, results.size())) {
+									LOG.trace("Marking object "+ obj.getBucketName() + "/"+ obj.getObjectUuid() + " as no longer latest version");
+									obj.makeNotLatest();
+									
+									if (obj.isNullVersioned()) {
+										if(lastViewed != null && lastViewed.isNullVersioned()) {
+											LOG.trace("Marking object "+ obj.getBucketName() + "/"+ obj.getObjectUuid() + " for deletion because it is not latest.");
+											obj.markForDeletion();
+										}
+										lastViewed = obj;
+									} else {
+										lastViewed = null;
+									}
+								}
+							} catch (IndexOutOfBoundsException e) {
+								// Either 0 or 1 result, nothing to do
+							}
+						}
+					} catch (NoSuchElementException e) {
+						// Nothing to do.
+					} catch (Exception e) {
+						LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/"
+								+ example.getObjectKey());
+						return false;
 					}
-				} catch (NoSuchElementException e) {
-					// Nothing to do.
-				} catch (Exception e) {
-					LOG.error("Error consolidationg Object records for " + example.getBucketName() + "/"
-							+ example.getObjectKey());
-					return false;
 				}
 				return true;
 			}
@@ -338,7 +376,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	public void delete(@Nonnull Bucket bucket, @Nonnull ObjectEntity objectToDelete, @Nonnull final User requestUser) throws Exception {
 
 		if(bucket.isVersioningDisabled()) {
-			//Do a synchrounous delete of all records and objects for this key (using uuid)
+			//Do a synchronous delete of all records and objects for this key (using uuid)
 			
 			if(!ObjectEntity.NULL_VERSION_STRING.equals(objectToDelete.getVersionId()) && objectToDelete.getVersionId() != null) {
 				throw new IllegalArgumentException("Cannot delete specific versionId on non-versioned bucket");				
@@ -362,6 +400,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			try {
 				deleteReq.setAccessKeyID(requestUser.getKeys().get(0).getAccessKey());
 			} catch(final Throwable f) {
+				LOG.error("Error getting access key for user: " + requestUser.getUserId());
 				throw new Exception("Request user has no active access key to use for backend request");
 			}
 			

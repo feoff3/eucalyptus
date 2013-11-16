@@ -71,7 +71,7 @@ public class BucketCleanerTask implements Runnable {
 		PaginatedResult<ObjectEntity> result = null;
 		do {
 			try {
-			result = ObjectManagers.getInstance().listPaginated(b, chunkSize, null, null, nextKey);
+				result = ObjectManagers.getInstance().listPaginated(b, chunkSize, null, null, nextKey);
 			} catch(final Throwable f) {
 				LOG.error("Could not get object listing for bucket " + b.getBucketName() + " with next marker: " + nextKey);
 				nextKey = null;

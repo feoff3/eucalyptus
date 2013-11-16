@@ -214,7 +214,7 @@ public class DbBucketManagerImpl implements BucketManager {
 			throw ex;
 		}
 		
-		return result;			
+		return result;
 	}
 	
 	@Override
@@ -223,12 +223,12 @@ public class DbBucketManagerImpl implements BucketManager {
 	
 		//TODO: look at resolving state conflict where backend succeeds but db update fails
 		Predicate<Bucket> deleteSync = new Predicate<Bucket>() {
-			public boolean apply(Bucket bucket) {			
+			public boolean apply(Bucket bucket) {				
 				if(resourceModifier != null) {					
 					try {
 						resourceModifier.call();
-					} catch(Throwable e) {
-						LOG.error("Error in backend call for delete bucket: " + bucket.getBucketName(), e);
+					} catch(final Throwable f) {
+						LOG.error("Error in backend call for delete bucket: " + bucket.getBucketName(), f);
 						return false;
 					}
 				}

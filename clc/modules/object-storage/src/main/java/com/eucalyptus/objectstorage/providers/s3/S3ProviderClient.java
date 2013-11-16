@@ -390,7 +390,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			com.amazonaws.services.s3.model.AccessControlList responseList = s3Client.getBucketAcl(request.getBucket());
-			reply.setBucket(request.getBucket());			
+			reply.setBucket(request.getBucket());
 		} catch(AmazonServiceException ex) {
 			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
@@ -449,8 +449,14 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
 			s3Client.deleteBucket(request.getBucket());
 		} catch(AmazonServiceException ex) {
-			LOG.error("Got service error from backend: " + ex.getMessage(), ex);
-			throw new EucalyptusCloudException(ex);
+			if(ex.getStatusCode() == 404) {
+				//Bucket doesn't exist or is already deleted, return ok, no content now				
+				reply.setStatus(HttpResponseStatus.NO_CONTENT);
+				reply.setStatusMessage("NoContent");
+			} else {
+				LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+				throw new EucalyptusCloudException(ex);			
+			}			
 		} catch(AmazonClientException ex) {
 			LOG.error("Got client error from internal Amazon Client: " + ex.getMessage(), ex);
 			throw new EucalyptusCloudException(ex);
@@ -545,12 +551,23 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
 			
-			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
-			s3Client.deleteObject(request.getBucket(), request.getKey());
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
 			reply.setStatus(HttpResponseStatus.NO_CONTENT);
 			reply.setStatusMessage("NO CONTENT");
-			reply.set_return(true);
+			
+			try {	
+				AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
+				s3Client.deleteObject(request.getBucket(), request.getKey());				
+			} catch(AmazonServiceException ex) {
+				if(ex.getStatusCode() == 404) {
+					//Bucket doesn't exist or is already deleted, return ok, no content now				
+					reply.setStatus(HttpResponseStatus.NO_CONTENT);
+					reply.setStatusMessage("NoContent");
+				} else {
+					LOG.error("Got service error from backend: " + ex.getMessage(), ex);
+					throw new EucalyptusCloudException(ex);	
+				}
+			}
 			return reply;
 		} catch(Exception e) {
 			LOG.error("Unable to delete object", e);

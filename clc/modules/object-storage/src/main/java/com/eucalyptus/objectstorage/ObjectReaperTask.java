@@ -87,7 +87,7 @@ public class ObjectReaperTask implements Runnable {
 						}
 					} catch(EucalyptusCloudException ex) {
 						//Failed. Keep record so we can retry later
-						LOG.trace("Error in response from backend on deletion request for object on backend: " + deleteRequest.getBucket() + "/" + deleteRequest.getKey());
+						LOG.trace("Error in response from backend on deletion request for object on backend: " + deleteRequest.getBucket() + "/" + deleteRequest.getKey());						
 					}
 				} catch(final Throwable f) {
 					LOG.error("Error during object reaper cleanup for object: " + 

@@ -65,9 +65,8 @@ public class OSGAuthorizationHandler implements RequestAuthorizationHandler {
 	/**
 	 * Evaluates the authorization for the operation requested, evaluates IAM, ACL, and bucket policy (bucket policy not yet supported).
 	 * @param request
-	 * @param optionalResourceId optional (can be null) explicit resourceId to check. If null, the request is used to get the resource.
-	 * @param optionalOwnerId optional (can be null) owner Id for the resource being evaluated.
-	 * @param optionalResourceAcl option acl for the requested resource
+	 * @param bucketResourceEntity
+	 * @param objectResourceEntity
 	 * @param resourceAllocationSize the size for the quota check(s) if applicable
 	 * @return
 	 */
