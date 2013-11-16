@@ -122,15 +122,6 @@ public enum ServiceHackeryHandler implements ChannelUpstreamHandler, ChannelDown
         } else {
         	ctx.sendDownstream(msge);        	
         }        
-        /*
-         * if ( reply instanceof ObjectStorageDataGetResponseType //TODO:GRZE:FIXME:FIXME:FIXME:WTF
-             && !( reply instanceof GetObjectResponseType && ( ( GetObjectResponseType ) reply ).getBase64Data( ) != null ) ) {
-        	//for walrus data responses, but not those that have data in them, cancel the future that would close the channel.
-          e.getFuture( ).cancel( );
-          return;
-        } else {
-          ctx.sendDownstream( msge );
-        }*/
       } else if ( msge.getMessage( ) instanceof BaseMessageSupplier ) {// Handle single request-response MEP
         ctx.sendDownstream( msge );
       } else if ( msge.getMessage( ) instanceof Throwable ) {

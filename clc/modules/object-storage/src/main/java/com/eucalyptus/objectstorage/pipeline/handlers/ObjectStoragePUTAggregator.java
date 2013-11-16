@@ -137,10 +137,7 @@ public class ObjectStoragePUTAggregator extends SimpleChannelUpstreamHandler imp
 			MappingHttpRequest httpRequest = ( MappingHttpRequest ) event.getMessage( );
 
 			if(httpRequest.getMessage() instanceof ObjectStorageDataRequestType) {
-				if(!httpRequest.isChunked()) {				
-					// Not a chunked message - pass through.	                
-					ctx.sendUpstream(event);	        
-				} else {				
+				if(httpRequest.isChunked()) {
 					//Chunked request, and beginning, setup map etc.
 					initializeNewPut(ctx, (ObjectStorageDataRequestType)httpRequest.getMessage());
 				}
