@@ -74,11 +74,9 @@ import org.jboss.netty.channel.ChannelUpstreamHandler;
 import org.jboss.netty.channel.DownstreamMessageEvent;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.jboss.netty.handler.timeout.IdleStateEvent;
-
 import com.eucalyptus.component.ServiceOperations;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
@@ -91,12 +89,8 @@ import com.eucalyptus.records.EventClass;
 import com.eucalyptus.records.EventRecord;
 import com.eucalyptus.records.EventType;
 import com.eucalyptus.records.Logs;
-import com.eucalyptus.util.RESTException;
-
-import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 import edu.ucsb.eucalyptus.msgs.BaseMessageSupplier;
-import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
 import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
 
 public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDownstreamHandler {
@@ -182,7 +176,6 @@ public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDow
   public void handleUpstream( final ChannelHandlerContext ctx, final ChannelEvent e ) throws Exception {
     final MappingHttpMessage request = MappingHttpMessage.extractMessage( e );
     final BaseMessage msg = BaseMessage.extractMessage( e );
-    final BaseDataChunk chunk = BaseDataChunk.extractChunk(e);
     if ( Logs.isExtrrreeeme( ) ) LOG.trace( this.getClass( ).getSimpleName( ) + "[incoming]:" + ( msg != null
       ? msg.getClass( ).getSimpleName( )
       : "" ) + " " + e );
@@ -208,12 +201,8 @@ public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDow
       e.getFuture( ).addListener( ChannelFutureListener.CLOSE );
       ctx.sendUpstream( e );
     } else if ( request != null && msg != null ) {
-      this.messageReceived( ctx, msg, e );
+      this.messageReceived( ctx, msg );
       ctx.sendUpstream( e );
-    } else if( chunk != null && (chunk.getCorrelationId() != null)) {
-    	//Handle HTTP chunk types
-    	this.dispatchChunk(ctx, chunk);
-    	ctx.sendUpstream( e );
     } else if ( e instanceof ExceptionEvent ) {
       this.exceptionCaught( ctx, ( ExceptionEvent ) e );
       ctx.sendUpstream( e );
@@ -222,26 +211,11 @@ public class ServiceContextHandler implements ChannelUpstreamHandler, ChannelDow
     }
   }
   
-  private void dispatchChunk( final ChannelHandlerContext ctx, final BaseDataChunk chunk ) throws ServiceDispatchException {
-	    this.startTime.set( ctx.getChannel( ), System.currentTimeMillis( ) );
-	    //EventRecord.here( ServiceContextHandler.class, EventType.MSG_RECEIVED, msg.getClass( ).getSimpleName( ) ).trace( );
-	    ServiceOperations.dispatchChunk( chunk );
-  }
-  
-  private void messageReceived( final ChannelHandlerContext ctx, final BaseMessage msg, ChannelEvent channelEvent) throws ServiceDispatchException {
+  private void messageReceived( final ChannelHandlerContext ctx, final BaseMessage msg ) throws ServiceDispatchException {
     this.startTime.set( ctx.getChannel( ), System.currentTimeMillis( ) );
     this.messageType.set( ctx.getChannel( ), msg );
     EventRecord.here( ServiceContextHandler.class, EventType.MSG_RECEIVED, msg.getClass( ).getSimpleName( ) ).trace( );
-    try {
-      ServiceOperations.dispatch( msg );
-    } catch (Exception e) {
-      if(e.getCause() != null) {
-    	  if(e.getCause() instanceof RESTException) {
-    		  RESTException exception = (RESTException) e.getCause();
-              Contexts.response( new ExceptionResponseType( msg.getReply(), exception.getMessage( ), exception.getStatus(), exception )  );
-    	  }
-      }
-    }
+    ServiceOperations.dispatch( msg );
   }
   
   private void channelClosed( ChannelHandlerContext ctx, ChannelStateEvent evt ) {

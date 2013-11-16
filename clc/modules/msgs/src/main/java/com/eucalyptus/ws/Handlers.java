@@ -109,7 +109,6 @@ import com.eucalyptus.component.ComponentId;
 import com.eucalyptus.component.ComponentIds;
 import com.eucalyptus.component.ComponentMessages;
 import com.eucalyptus.component.Components;
-import com.eucalyptus.component.ServiceConfigurations;
 import com.eucalyptus.component.ServiceOperations;
 import com.eucalyptus.component.ServiceUris;
 import com.eucalyptus.component.Topology;
@@ -142,7 +141,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 
@@ -369,8 +367,8 @@ public class Handlers {
             final Class<? extends ComponentId> compClass = ComponentMessages.lookup( msg );
             ComponentId compId = ComponentIds.lookup( compClass );
             if ( compId.isAlwaysLocal( ) || Topology.isEnabledLocally( compClass ) ) {
-            	ctx.sendUpstream( e );
-            }else {
+              ctx.sendUpstream( e );
+            } else {
               Handlers.sendRedirect( ctx, e, compClass, request );
             }
           } catch ( final NoSuchElementException ex ) {

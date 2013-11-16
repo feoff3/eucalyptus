@@ -145,9 +145,9 @@ public class ObjectStoragePUTAggregator extends SimpleChannelUpstreamHandler imp
 					initializeNewPut(ctx, (ObjectStorageDataRequestType)httpRequest.getMessage());
 				}
 			}
-		} else if(event.getMessage() instanceof BaseDataChunk) {
+		} else if(event.getMessage() instanceof HttpChunk) {
 			//Add the chunk to the current streams channel buffer.
-			BaseDataChunk chunk = (BaseDataChunk) event.getMessage();        	
+			HttpChunk chunk = (HttpChunk) event.getMessage();
 			appendChunk(chunk.getContent(), ctx.getChannel());
 
 			if (chunk.isLast()) {

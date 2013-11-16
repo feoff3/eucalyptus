@@ -65,14 +65,18 @@ package com.eucalyptus.component;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-
 import org.apache.log4j.Logger;
-
+import org.mule.util.queue.QueueConfiguration;
+import com.eucalyptus.bootstrap.Bootstrap;
+import com.eucalyptus.bootstrap.Bootstrapper;
+import com.eucalyptus.bootstrap.Provides;
+import com.eucalyptus.bootstrap.RunDuring;
 import com.eucalyptus.bootstrap.ServiceJarDiscovery;
 import com.eucalyptus.component.annotation.ServiceOperation;
 import com.eucalyptus.context.Context;
 import com.eucalyptus.context.Contexts;
 import com.eucalyptus.context.ServiceContext;
+import com.eucalyptus.context.ServiceDispatchException;
 import com.eucalyptus.empyrean.Empyrean;
 import com.eucalyptus.records.Logs;
 import com.eucalyptus.system.Ats;
@@ -82,9 +86,9 @@ import com.eucalyptus.util.Timers;
 import com.eucalyptus.ws.StackConfiguration;
 import com.eucalyptus.ws.util.RequestQueue;
 import com.google.common.base.Function;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.Maps;
-
-import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 
 public class ServiceOperations {
@@ -100,9 +104,6 @@ public class ServiceOperations {
     return serviceOperations.containsKey( msg.getClass( ) ) ? Ats.from( serviceOperations.get( msg.getClass( ) ) ).get( ServiceOperation.class ).user( ) : false;
   }
 
-  public static boolean isAsyncOperation( final BaseMessage msg ) {
-	return serviceOperations.containsKey( msg.getClass( ) ) ? Ats.from( serviceOperations.get( msg.getClass( ) ) ).get( ServiceOperation.class ).async( ) : true;
-  }
   
   public static class ServiceOperationDiscovery extends ServiceJarDiscovery {
     
@@ -136,55 +137,8 @@ public class ServiceOperations {
     
   }
   
-  /**
-   * Dispatches chunks to the proper chunk handler in the service operation map.
-   * There is no output/response for chunk delivery.
-   * @param request
-   */
   @SuppressWarnings( "unchecked" )
-  public static <I extends BaseDataChunk> void dispatchChunk( final I request ) {
-	  if ( !serviceOperations.containsKey( request.getClass( ) ) || !StackConfiguration.OOB_INTERNAL_OPERATIONS ) {
-		  try {
-			  ServiceContext.dispatch( RequestQueue.ENDPOINT, request );
-		  } catch ( Exception ex ) {
-			  Contexts.responseError( request.getCorrelationId( ), ex );
-		  }
-	  } else {
-		  try {
-			  final Context ctx = Contexts.lookup( request.getCorrelationId( ) );
-			  //Generic object here, since no response expected
-			  final Function<I, Object> op = ( Function<I, Object> ) serviceOperations.get( request.getClass( ) );
-			  Timers.loggingWrapper( new Callable( ) {
-				  
-				  @Override
-				  public Object call( ) throws Exception {
-					  Contexts.threadLocal( ctx );
-					  try {
-						  op.apply( request );
-					  } catch ( final Exception ex ) {
-						  Logs.extreme( ).error( ex, ex );
-					      Contexts.responseError( request.getCorrelationId( ), ex );
-					  } finally {
-						  Contexts.removeThreadLocal( );
-					  }
-					  return null;
-				  }
-				  
-				  @Override
-				  public String toString( ) {
-					  return super.toString( );
-				  }
-				  
-			  } ).call( );
-		  } catch ( final Exception ex ) {
-			  Logs.extreme( ).error( ex, ex );
-		        Contexts.responseError( request.getCorrelationId( ), ex );
-		  }
-	  }
-  }
-  
-  @SuppressWarnings( "unchecked" )
-  public static <I extends BaseMessage, O extends BaseMessage> void dispatch( final I request ) throws Exception {
+  public static <I extends BaseMessage, O extends BaseMessage> void dispatch( final I request ) {
     if ( !serviceOperations.containsKey( request.getClass( ) ) || !StackConfiguration.OOB_INTERNAL_OPERATIONS ) {
       try {
         ServiceContext.dispatch( RequestQueue.ENDPOINT, request );
@@ -199,7 +153,7 @@ public class ServiceOperations {
           
           @Override
           public Object call( ) throws Exception {
-            if ( StackConfiguration.ASYNC_INTERNAL_OPERATIONS && ServiceOperations.isAsyncOperation(request) ) {
+            if ( StackConfiguration.ASYNC_INTERNAL_OPERATIONS ) {
               Threads.enqueue( Empyrean.class, ServiceOperations.class, new Callable<Boolean>( ) {
                 
                 @Override
@@ -222,7 +176,7 @@ public class ServiceOperations {
         } ).call( );
       } catch ( final Exception ex ) {
         Logs.extreme( ).error( ex, ex );
-        throw ex;
+        Contexts.responseError( request.getCorrelationId( ), ex );
       }
     }
   }
@@ -234,7 +188,7 @@ public class ServiceOperations {
       Contexts.response( reply );
     } catch ( final Exception ex ) {
       Logs.extreme( ).error( ex, ex );
-      throw ex;
+      Contexts.responseError( request.getCorrelationId( ), ex );
     } finally {
       Contexts.removeThreadLocal( );
     }

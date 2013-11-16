@@ -28,14 +28,12 @@ import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.auth.Accounts;
@@ -45,7 +43,6 @@ import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.component.ComponentIds;
 import com.eucalyptus.component.ServiceConfiguration;
 import com.eucalyptus.component.Topology;
-import com.eucalyptus.component.annotation.ServiceOperation;
 import com.eucalyptus.component.id.Eucalyptus;
 import com.eucalyptus.configurable.ConfigurableClass;
 import com.eucalyptus.configurable.ConfigurableProperty;
@@ -124,24 +121,19 @@ import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationRespons
 import com.eucalyptus.objectstorage.msgs.UpdateObjectStorageConfigurationType;
 import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
-import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.storage.msgs.s3.BucketListEntry;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.Grant;
-import com.eucalyptus.storage.msgs.s3.Grantee;
 import com.eucalyptus.storage.msgs.s3.ListAllMyBucketsList;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
 import com.eucalyptus.storage.msgs.s3.PrefixEntry;
 import com.eucalyptus.storage.msgs.s3.TargetGrants;
 import com.eucalyptus.util.EucalyptusCloudException;
-import com.eucalyptus.util.Exceptions;
-import com.google.common.base.Function;
 import com.google.common.base.Strings;
 import com.google.gwt.thirdparty.guava.common.collect.Iterables;
 
-import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.ComponentProperty;
 import edu.ucsb.eucalyptus.util.SystemUtil;
 

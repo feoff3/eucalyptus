@@ -30,7 +30,6 @@ import org.jboss.netty.buffer.ChannelBufferInputStream;
 
 import com.eucalyptus.configurable.ConfigurableClass;
 import com.eucalyptus.configurable.ConfigurableField;
-import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderChangeListener;
 import com.eucalyptus.util.EucalyptusCloudException;
 
 @ConfigurableClass( root = "objectstorage", description = "Streaming upload channel configuration.")

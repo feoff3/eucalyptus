@@ -122,7 +122,7 @@ public interface ObjectStorageService {
 			SetRESTObjectAccessControlPolicyType request)
 			throws EucalyptusCloudException;
 
-	public PutObjectResponseType putObject(PutObjectType request) throws EucalyptusCloudException;
+	public abstract PutObjectResponseType putObject(PutObjectType request) throws EucalyptusCloudException;
 	
 	public abstract GetObjectResponseType getObject(GetObjectType request)
 			throws EucalyptusCloudException;

@@ -209,12 +209,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				request.setIsChunked(httpRequest.isChunked());
 				handleData(request, httpRequest.getContent());
 			}
-		} else if(event.getMessage() instanceof BaseDataChunk) {
-			//TODO: zhill - Can remove this later
-			if(correlationId != null) {
-				BaseDataChunk chunk = (BaseDataChunk) event.getMessage();
-				chunk.setCorrelationId(correlationId);
-			}
 		}
 	}
 

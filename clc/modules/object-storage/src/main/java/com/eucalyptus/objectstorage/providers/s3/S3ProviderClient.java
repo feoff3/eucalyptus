@@ -76,7 +76,6 @@ import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.AuthException;
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.context.Contexts;
-import com.eucalyptus.objectstorage.ObjectStorageGateway;
 import com.eucalyptus.objectstorage.ObjectStorageProviderClient;
 import com.eucalyptus.objectstorage.ObjectStorageProviders.ObjectStorageProviderClientProperty;
 import com.eucalyptus.objectstorage.msgs.CopyObjectResponseType;

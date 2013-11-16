@@ -32,9 +32,4 @@ public @interface ServiceOperation {
    * Operation is invokable by a user.
    */
   boolean user( ) default false;
-  
-  /*
-   * Should this operation run asynchronously (in the context of I/O)
-   */
-  boolean async( ) default true;
 }

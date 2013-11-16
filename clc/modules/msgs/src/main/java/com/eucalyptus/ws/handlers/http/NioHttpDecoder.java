@@ -111,8 +111,6 @@ import com.eucalyptus.http.MappingHttpRequest;
 import com.eucalyptus.records.Logs;
 import com.eucalyptus.ws.StackConfiguration;
 
-import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
-
 public class NioHttpDecoder extends ReplayingDecoder<NioHttpDecoder.State> {
 
   private final int              maxInitialLineLength;
@@ -222,7 +220,7 @@ public class NioHttpDecoder extends ReplayingDecoder<NioHttpDecoder.State> {
       case READ_VARIABLE_LENGTH_CONTENT_AS_CHUNKS: {
         // Keep reading data as a chunk until the end of connection is reached.
         int chunkSize = Math.min( maxChunkSize, buffer.readableBytes( ) );
-        HttpChunk chunk = new BaseDataChunk( buffer.readBytes( chunkSize ) );
+        HttpChunk chunk = new DefaultHttpChunk( buffer.readBytes( chunkSize ) );
 
         if ( !buffer.readable( ) ) {
           // Reached to the end of the connection.
@@ -243,11 +241,11 @@ public class NioHttpDecoder extends ReplayingDecoder<NioHttpDecoder.State> {
         long chunkSize = this.chunkSize;
         HttpChunk chunk;
         if ( chunkSize > maxChunkSize ) {
-          chunk = new BaseDataChunk( buffer.readBytes( maxChunkSize ) );
+          chunk = new DefaultHttpChunk( buffer.readBytes( maxChunkSize ) );
           chunkSize -= maxChunkSize;
         } else {
           assert chunkSize <= Integer.MAX_VALUE;
-          chunk = new BaseDataChunk( buffer.readBytes( ( int ) chunkSize ) );
+          chunk = new DefaultHttpChunk( buffer.readBytes( ( int ) chunkSize ) );
           chunkSize = 0;
         }
         this.chunkSize = chunkSize;
@@ -283,7 +281,7 @@ public class NioHttpDecoder extends ReplayingDecoder<NioHttpDecoder.State> {
       }
       case READ_CHUNKED_CONTENT: {
         assert chunkSize <= Integer.MAX_VALUE;
-        HttpChunk chunk = new BaseDataChunk( buffer.readBytes( ( int ) chunkSize ) );
+        HttpChunk chunk = new DefaultHttpChunk( buffer.readBytes( ( int ) chunkSize ) );
         checkpoint( State.READ_CHUNK_DELIMITER );
         return chunk;
       }
@@ -291,11 +289,11 @@ public class NioHttpDecoder extends ReplayingDecoder<NioHttpDecoder.State> {
         long chunkSize = this.chunkSize;
         HttpChunk chunk;
         if ( chunkSize > maxChunkSize ) {
-          chunk = new BaseDataChunk( buffer.readBytes( maxChunkSize ) );
+          chunk = new DefaultHttpChunk( buffer.readBytes( maxChunkSize ) );
           chunkSize -= maxChunkSize;
         } else {
           assert chunkSize <= Integer.MAX_VALUE;
-          chunk = new BaseDataChunk( buffer.readBytes( ( int ) chunkSize ) );
+          chunk = new DefaultHttpChunk( buffer.readBytes( ( int ) chunkSize ) );
           chunkSize = 0;
         }
         this.chunkSize = chunkSize;
