@@ -374,7 +374,6 @@ public class DbObjectManagerImpl implements ObjectManager {
 
 	@Override
 	public void delete(@Nonnull Bucket bucket, @Nonnull ObjectEntity objectToDelete, @Nonnull final User requestUser) throws Exception {
-
 		if(bucket.isVersioningDisabled()) {
 			//Do a synchronous delete of all records and objects for this key (using uuid)
 			
@@ -391,7 +390,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 			}
 			
 			//Get the latest entry to get its size for decrementing the bucket size later.
-			final Long objectSize = objectToDelete.getSize();			
+			final Long objectSize = objectToDelete.getSize();	
 			
 			ObjectEntity example = new ObjectEntity(bucket.getBucketName(), objectToDelete.getObjectKey(), ObjectEntity.NULL_VERSION_STRING);
 			final DeleteObjectType deleteReq = new DeleteObjectType();

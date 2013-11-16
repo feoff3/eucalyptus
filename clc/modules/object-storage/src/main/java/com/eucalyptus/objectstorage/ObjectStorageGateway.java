@@ -319,13 +319,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		return reply;
 	}
 
-	/* PUT object */
-	/*@ServiceOperation (async = false)
-	public enum HandleFirstChunk implements Function<PutObjectType, Object> {
-		INSTANCE;
-			
-		@Override
-		public Object apply(final PutObjectType request) {*/
 	@Override
 	public PutObjectResponseType putObject(final PutObjectType request) throws EucalyptusCloudException {
 		logRequest(request);
@@ -360,8 +353,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			throw new MissingContentLengthException(request.getBucket() + "/" + request.getKey());
 		}
 		
-		ObjectEntity objectEntity = new ObjectEntity(request.getBucket(), request.getKey(), null);
-		
 		//Generate a versionId if necessary based on versioning status of bucket
 		String versionId = null;
 		try {
@@ -370,10 +361,11 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			LOG.error("Error generating version Id string by bucket " + bucket.getBucketName(), e2);
 			throw new InternalErrorException(request.getBucket() + "/" + request.getKey());
 		}
-		
+
+		ObjectEntity objectEntity = new ObjectEntity();
 		try {
 			objectEntity.initializeForCreate(request.getBucket(), 
-					request.getKey(), 
+					request.getKey(),
 					versionId, 
 					request.getCorrelationId(),
 					objectSize,
@@ -403,7 +395,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			
 			final String fullObjectKey = objectEntity.getObjectUuid();
 			request.setKey(fullObjectKey); //Ensure the backend uses the new full object name
-			
 			
 			try {
 				PutObjectResponseType response = ObjectManagers.getInstance().create(bucket, objectEntity,
@@ -442,40 +433,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}
 	}
 
-	//@ServiceOperation (async = false)
-	public enum HandleChunk implements Function<BaseDataChunk, Object> {
-		INSTANCE;
-		private static final int retryCount = 15;
-		@Override
-		public Object apply(BaseDataChunk chunk) {
-			/*
-			 * This works because chunks are delivered in-order through netty.
-			 */
-			String id = chunk.getCorrelationId();
-			LOG.debug("Processing data chunk with id: " + id + " Last? " + chunk.isLast());
-			try {
-				ChannelBuffer writeBuffer = streamDataMap.get(id);
-				//TODO: HACK! This should be handoff through a monitor.
-				//This is required because there is a race between the first chunk
-				//and the first data-only chunk.
-				//Hacking around it to make progress on other ops, should revisit -ns
-				
-				//Proper solution is probably to aggregate the chunks to a ChannelBuffer in the Netty code, similar to HttpChunkAggregator
-				// but passing the message along with reference to the ChannelBuffer rather than this map-based solution.
-				for (int i=0; i < retryCount; ++i) {
-					if (writeBuffer == null) {
-						LOG.info("Stream Data Map is empty, retrying: " + (i + 1) + " of " + retryCount);
-						Thread.sleep(100);
-						writeBuffer = streamDataMap.get(id);
-					}
-				}
-				writeBuffer.writeBytes(chunk.getContent());
-			} catch (Exception e) {
-				LOG.error(e, e);
-			}
-			return null;
-		}	
-	}
 	/**
 	 * A terse request logging function to log request entry at INFO level.
 	 * @param request
