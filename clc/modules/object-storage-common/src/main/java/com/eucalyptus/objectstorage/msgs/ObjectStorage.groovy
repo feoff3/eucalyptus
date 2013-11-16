@@ -61,6 +61,8 @@ import edu.ucsb.eucalyptus.msgs.ComponentProperty;
 import edu.ucsb.eucalyptus.msgs.EucalyptusData;
 import edu.ucsb.eucalyptus.msgs.StatEventRecord;
 
+import com.eucalyptus.util.ChannelBufferStreamingInputStream;
+
 public class ObjectStorageResponseType extends ObjectStorageRequestType {
 	HttpResponseStatus status; //Most should be 200-ok, but for deletes etc it may be 204-No Content
 	
@@ -127,7 +129,7 @@ public class ObjectStorageRequestType extends BaseMessage {
 public class ObjectStorageDataRequestType extends ObjectStorageRequestType {
 	String randomKey;
 	Boolean isCompressed;
-	ChannelBuffer data;
+	ChannelBufferStreamingInputStream data;
 	boolean isChunked;
 	
 	def ObjectStorageDataRequestType() {
