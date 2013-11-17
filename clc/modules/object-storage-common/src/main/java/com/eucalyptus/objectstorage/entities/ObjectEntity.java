@@ -179,7 +179,6 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     public void markForDeletion() {
     	this.makeNotLatest();
     	this.setDeletedTimestamp(new Date());
-    	this.setVersionId(null);
     }
         
     public void finalizeCreation(@Nullable String versionId, @Nullable Date lastModified, @Nonnull String etag) throws Exception {
