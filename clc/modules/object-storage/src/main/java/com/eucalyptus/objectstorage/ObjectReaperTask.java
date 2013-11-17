@@ -31,7 +31,7 @@ public class ObjectReaperTask implements Runnable {
 	public void run() {
 		long startTime = System.currentTimeMillis();
 		try {
-			LOG.trace("Initiating object reaper task");
+			LOG.debug("Initiating object-storage object reaper task");
 			List<ObjectEntity> entitiesToClean = ObjectManagers.getInstance().getFailedOrDeleted();
 			DeleteObjectType deleteRequest = null;
 			DeleteObjectResponseType deleteResponse = null;
@@ -100,7 +100,7 @@ public class ObjectReaperTask implements Runnable {
 		} finally {
 			try {
 				long endTime = System.currentTimeMillis();
-				LOG.trace("Object reaper execution task took " + Long.toString(endTime - startTime) + "ms to complete");
+				LOG.debug("Object reaper execution task took " + Long.toString(endTime - startTime) + "ms to complete");
 			} catch( final Throwable f) {
 				//Do nothing, but don't allow exceptions out
 			}

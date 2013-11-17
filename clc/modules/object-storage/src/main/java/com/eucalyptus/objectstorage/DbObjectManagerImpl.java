@@ -39,6 +39,7 @@ import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
+import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 import com.eucalyptus.auth.principal.User;
 import com.eucalyptus.entities.Entities;
@@ -53,6 +54,7 @@ import com.eucalyptus.objectstorage.msgs.DeleteObjectType;
 import com.eucalyptus.objectstorage.msgs.PutObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyResponseType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.records.Logs;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
@@ -403,13 +405,43 @@ public class DbObjectManagerImpl implements ObjectManager {
 				throw new Exception("Request user has no active access key to use for backend request");
 			}
 			
+			Predicate<ObjectEntity> markObjectNulls = new Predicate<ObjectEntity>() {
+
+				@Override
+				public boolean apply(ObjectEntity objectExample) {
+					List<ObjectEntity> objectRecords = null;
+					try {
+						objectRecords = Entities.query(objectExample);
+					} catch(final Throwable f) {
+						//Fail, safe because we haven't modified anything
+						return false;
+					}
+					
+					if(objectRecords == null) {
+						return true; //nothing to do
+					}
+					
+					for(ObjectEntity object : objectRecords) {
+						try {
+							object.markForDeletion();
+						} catch (Exception e) {								
+							LOG.error("Error calling backend in object delete: " + object.toString(), e);
+						}
+					}					
+					return true;
+				}
+			};
+						
+			//Do the update to mark for deletion (in case of failure ensure gc
+			Entities.asTransaction(markObjectNulls).apply(example);			
+
 			Predicate<ObjectEntity> deleteAllObjectNulls = new Predicate<ObjectEntity>() {
 
 				@Override
-				public boolean apply(ObjectEntity objectToDelete) {
+				public boolean apply(ObjectEntity objectExample) {
 					List<ObjectEntity> objectRecords = null;
 					try {
-						objectRecords = Entities.query(objectToDelete);
+						objectRecords = Entities.query(objectExample);
 					} catch(final Throwable f) {
 						//Fail, safe because we haven't modified anything
 						return false;
@@ -422,10 +454,22 @@ public class DbObjectManagerImpl implements ObjectManager {
 					for(ObjectEntity object : objectRecords) {
 						try {
 							deleteReq.setKey(object.getObjectUuid());
+							Logs.extreme().debug("Removing backend object for s3 object " + deleteReq.getBucket() + "/" + deleteReq.getKey());
 							DeleteObjectResponseType response = osp.deleteObject(deleteReq);
-							Entities.delete(object);
+							
+							if(HttpResponseStatus.NO_CONTENT.equals(response.getStatus()) ||
+									HttpResponseStatus.NOT_FOUND.equals(response.getStatus()) ||
+									HttpResponseStatus.OK.equals(response.getStatus())) {
+								Logs.extreme().debug("Removing entity for s3 object " + object.getBucketName() + "/" + object.getObjectUuid());
+								Entities.delete(object);
+							} else {
+								object.markForDeletion(); //ensure it gets cleaned up later
+								LOG.error("Error removing backend object for s3 object " + object.getBucketName() + "/" + object.getObjectUuid() + 
+										" got response " + response.getStatus().toString() + " - " + response.getStatusMessage());
+							}
 						} catch (Exception e) {								
 							LOG.error("Error calling backend in object delete: " + object.toString(), e);
+							object.markForDeletion();
 						}
 					}					
 					return true;
