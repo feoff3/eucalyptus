@@ -56,6 +56,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.records.Logs;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
+import com.eucalyptus.util.EucalyptusCloudException;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 
@@ -231,7 +232,11 @@ public class DbObjectManagerImpl implements ObjectManager {
 						
 						if (results != null && results.size() > 0) {
 							try {							
-								results.get(0).makeLatest();
+								if(results.get(0).getIsLatest()) {
+									//Ensure set, but never transition from not-latest to latest. This just
+									// makes sure all fields in the entity are set properly
+									results.get(0).makeLatest();
+								}
 								
 								// Set all but the first element as not latest
 								for (ObjectEntity obj : results.subList(1, results.size())) {
@@ -412,28 +417,30 @@ public class DbObjectManagerImpl implements ObjectManager {
 					List<ObjectEntity> objectRecords = null;
 					try {
 						objectRecords = Entities.query(objectExample);
+						
+						if(objectRecords != null) {
+							for(ObjectEntity object : objectRecords) {
+								try {
+									object.markForDeletion();
+								} catch (Exception e) {
+									LOG.error("Error calling backend in object delete: " + object.toString(), e);
+								}
+							}
+						}
+					} catch(NoSuchElementException e) {
+						//Nothing to do. fall through
 					} catch(final Throwable f) {
 						//Fail, safe because we haven't modified anything
 						return false;
-					}
-					
-					if(objectRecords == null) {
-						return true; //nothing to do
-					}
-					
-					for(ObjectEntity object : objectRecords) {
-						try {
-							object.markForDeletion();
-						} catch (Exception e) {								
-							LOG.error("Error calling backend in object delete: " + object.toString(), e);
-						}
-					}					
+					}									
 					return true;
 				}
 			};
 						
 			//Do the update to mark for deletion (in case of failure ensure gc
-			Entities.asTransaction(markObjectNulls).apply(example);			
+			if(!Entities.asTransaction(markObjectNulls).apply(example)) {
+				throw new EucalyptusCloudException("Failed to mark records for deletion");
+			}
 
 			Predicate<ObjectEntity> deleteAllObjectNulls = new Predicate<ObjectEntity>() {
 
@@ -442,42 +449,45 @@ public class DbObjectManagerImpl implements ObjectManager {
 					List<ObjectEntity> objectRecords = null;
 					try {
 						objectRecords = Entities.query(objectExample);
+						
+						if(objectRecords != null) {
+							for(ObjectEntity object : objectRecords) {
+								try {
+									deleteReq.setKey(object.getObjectUuid());
+									Logs.extreme().debug("Removing backend object for s3 object " + deleteReq.getBucket() + "/" + deleteReq.getKey());
+									DeleteObjectResponseType response = osp.deleteObject(deleteReq);
+									
+									if(HttpResponseStatus.NO_CONTENT.equals(response.getStatus()) ||
+											HttpResponseStatus.NOT_FOUND.equals(response.getStatus()) ||
+											HttpResponseStatus.OK.equals(response.getStatus())) {
+										Logs.extreme().debug("Removing entity for s3 object " + object.getBucketName() + "/" + object.getObjectUuid());
+										Entities.delete(object);
+									} else {
+										object.markForDeletion(); //ensure it gets cleaned up later
+										LOG.error("Error removing backend object for s3 object " + object.getBucketName() + "/" + object.getObjectUuid() + 
+												" got response " + response.getStatus().toString() + " - " + response.getStatusMessage());
+									}
+								} catch (Exception e) {								
+									LOG.error("Error calling backend in object delete: " + object.toString(), e);
+									object.markForDeletion();
+								}
+							}
+						}
+					} catch(NoSuchElementException e) {
+						//Nothing to do
 					} catch(final Throwable f) {
 						//Fail, safe because we haven't modified anything
 						return false;
 					}
 					
-					if(objectRecords == null) {
-						return true; //nothing to do
-					}
-					
-					for(ObjectEntity object : objectRecords) {
-						try {
-							deleteReq.setKey(object.getObjectUuid());
-							Logs.extreme().debug("Removing backend object for s3 object " + deleteReq.getBucket() + "/" + deleteReq.getKey());
-							DeleteObjectResponseType response = osp.deleteObject(deleteReq);
-							
-							if(HttpResponseStatus.NO_CONTENT.equals(response.getStatus()) ||
-									HttpResponseStatus.NOT_FOUND.equals(response.getStatus()) ||
-									HttpResponseStatus.OK.equals(response.getStatus())) {
-								Logs.extreme().debug("Removing entity for s3 object " + object.getBucketName() + "/" + object.getObjectUuid());
-								Entities.delete(object);
-							} else {
-								object.markForDeletion(); //ensure it gets cleaned up later
-								LOG.error("Error removing backend object for s3 object " + object.getBucketName() + "/" + object.getObjectUuid() + 
-										" got response " + response.getStatus().toString() + " - " + response.getStatusMessage());
-							}
-						} catch (Exception e) {								
-							LOG.error("Error calling backend in object delete: " + object.toString(), e);
-							object.markForDeletion();
-						}
-					}					
 					return true;
 				}
 			};
-						
+			
 			//Do the update
-			Entities.asTransaction(deleteAllObjectNulls).apply(example);			
+			if(!Entities.asTransaction(deleteAllObjectNulls).apply(example)) {
+				LOG.error("Error deleting objects from backend. Transaction with delete failed");
+			}
 
 			try {
 				// Update bucket size
