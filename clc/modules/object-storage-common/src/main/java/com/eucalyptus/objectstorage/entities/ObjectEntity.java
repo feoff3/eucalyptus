@@ -41,13 +41,11 @@ import org.hibernate.criterion.Restrictions;
 
 import com.eucalyptus.auth.Accounts;
 import com.eucalyptus.auth.principal.User;
-import com.eucalyptus.entities.Entities;
 import com.eucalyptus.objectstorage.util.OSGUtil;
 import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.msgs.s3.CanonicalUser;
 import com.eucalyptus.storage.msgs.s3.ListEntry;
 import com.eucalyptus.storage.msgs.s3.VersionEntry;
-import com.google.common.base.Predicate;
 
 @Entity
 @OptimisticLocking(type = OptimisticLockType.NONE)
@@ -76,8 +74,8 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     @Column(name="storage_class")
     private String storageClass;
 
-    @Column(name="is_deleted")
-    private Boolean deleted; //Indicates this is a delete marker 
+    @Column(name="is_delete_marker")
+    private Boolean isDeleteMarker; //Indicates this is a delete marker 
             
     @Column(name="object_last_modified") //Distinct from the record modification date, tracks the backend response
     private Date objectModifiedTimestamp;
@@ -188,7 +186,13 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     	} else {
     		this.setObjectModifiedTimestamp(new Date());
     	}
-    	this.setVersionId(versionId);
+    	if(versionId != null) {
+    		this.setVersionId(versionId);
+    	} else {
+    		if(this.getVersionId() == null) {
+    			this.setVersionId(NULL_VERSION_STRING);
+    		}
+    	}
     	this.makeLatest();    	
     }
     
@@ -259,11 +263,11 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
     }
     
     public Boolean getDeleted() {
-		return deleted;
+		return isDeleteMarker;
 	}
 
 	public void setDeleted(Boolean deleted) {
-		this.deleted = deleted;
+		this.isDeleteMarker = deleted;
 	}
 
 	public String getVersionId() {

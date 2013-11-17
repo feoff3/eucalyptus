@@ -35,6 +35,7 @@ import javax.persistence.EntityTransaction;
 
 import org.apache.log4j.Logger;
 import org.hibernate.Criteria;
+import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Example;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
@@ -95,7 +96,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 	}
 
 	@Override
-	public long count(Bucket bucket) throws Exception {
+	public long countRawEntities(Bucket bucket) throws Exception {
 		/*
 		 * Returns all entries, pending delete or not.
 		 */
@@ -400,16 +401,6 @@ public class DbObjectManagerImpl implements ObjectManager {
 			final Long objectSize = objectToDelete.getSize();	
 			
 			ObjectEntity example = new ObjectEntity(bucket.getBucketName(), objectToDelete.getObjectKey(), ObjectEntity.NULL_VERSION_STRING);
-			final DeleteObjectType deleteReq = new DeleteObjectType();
-			deleteReq.setBucket(bucket.getBucketName());
-			deleteReq.setUser(requestUser);
-			try {
-				deleteReq.setAccessKeyID(requestUser.getKeys().get(0).getAccessKey());
-			} catch(final Throwable f) {
-				LOG.error("Error getting access key for user: " + requestUser.getUserId());
-				throw new Exception("Request user has no active access key to use for backend request");
-			}
-			
 			Predicate<ObjectEntity> markObjectNulls = new Predicate<ObjectEntity>() {
 
 				@Override
@@ -441,52 +432,49 @@ public class DbObjectManagerImpl implements ObjectManager {
 			if(!Entities.asTransaction(markObjectNulls).apply(example)) {
 				throw new EucalyptusCloudException("Failed to mark records for deletion");
 			}
-
-			Predicate<ObjectEntity> deleteAllObjectNulls = new Predicate<ObjectEntity>() {
+			
+			final DeleteObjectType deleteReq = new DeleteObjectType();
+			deleteReq.setBucket(bucket.getBucketName());
+			deleteReq.setUser(requestUser);
+			try {
+				deleteReq.setAccessKeyID(requestUser.getKeys().get(0).getAccessKey());
+			} catch(final Throwable f) {
+				LOG.error("Error getting access key for user: " + requestUser.getUserId());
+				throw new Exception("Request user has no active access key to use for backend request");
+			}
+			Predicate<ObjectEntity> deleteObjectExact = new Predicate<ObjectEntity>() {
 
 				@Override
-				public boolean apply(ObjectEntity objectExample) {
-					List<ObjectEntity> objectRecords = null;
+				public boolean apply(ObjectEntity object) {
 					try {
-						objectRecords = Entities.query(objectExample);
+						deleteReq.setKey(object.getObjectUuid());
+						Logs.extreme().debug("Removing backend object for s3 object " + deleteReq.getBucket() + "/" + deleteReq.getKey());
+						DeleteObjectResponseType response = osp.deleteObject(deleteReq);
 						
-						if(objectRecords != null) {
-							for(ObjectEntity object : objectRecords) {
-								try {
-									deleteReq.setKey(object.getObjectUuid());
-									Logs.extreme().debug("Removing backend object for s3 object " + deleteReq.getBucket() + "/" + deleteReq.getKey());
-									DeleteObjectResponseType response = osp.deleteObject(deleteReq);
-									
-									if(HttpResponseStatus.NO_CONTENT.equals(response.getStatus()) ||
-											HttpResponseStatus.NOT_FOUND.equals(response.getStatus()) ||
-											HttpResponseStatus.OK.equals(response.getStatus())) {
-										Logs.extreme().debug("Removing entity for s3 object " + object.getBucketName() + "/" + object.getObjectUuid());
-										Entities.delete(object);
-									} else {
-										object.markForDeletion(); //ensure it gets cleaned up later
-										LOG.error("Error removing backend object for s3 object " + object.getBucketName() + "/" + object.getObjectUuid() + 
-												" got response " + response.getStatus().toString() + " - " + response.getStatusMessage());
-									}
-								} catch (Exception e) {								
-									LOG.error("Error calling backend in object delete: " + object.toString(), e);
-									object.markForDeletion();
-								}
-							}
+						if(HttpResponseStatus.NO_CONTENT.equals(response.getStatus()) ||
+								HttpResponseStatus.NOT_FOUND.equals(response.getStatus()) ||
+								HttpResponseStatus.OK.equals(response.getStatus())) {
+							Logs.extreme().debug("Removing entity for s3 object " + object.getBucketName() + "/" + object.getObjectUuid());
+							return true;
+						} else {
+							LOG.error("Error removing backend object for s3 object " + object.getBucketName() + "/" + object.getObjectUuid() + 
+									" got response " + response.getStatus().toString() + " - " + response.getStatusMessage());
 						}
-					} catch(NoSuchElementException e) {
-						//Nothing to do
-					} catch(final Throwable f) {
-						//Fail, safe because we haven't modified anything
-						return false;
-					}
-					
-					return true;
+					} catch (Exception e) {
+						LOG.error("Error calling backend in object delete: " + object.toString(), e);							
+					}									
+					return false;
 				}
 			};
 			
-			//Do the update
-			if(!Entities.asTransaction(deleteAllObjectNulls).apply(example)) {
-				LOG.error("Error deleting objects from backend. Transaction with delete failed");
+			//Do the update, delete each record
+			try {				
+				if(!Transactions.deleteAll(example, deleteObjectExact)) {
+					LOG.warn("Some objects not cleaned during delete operation, will remove asyncrounously later");
+				}
+			} catch(final Throwable f) {
+				LOG.error("Error doing backend object deletion transaction", f);
+				//ok, this will be finished asynchronously
 			}
 
 			try {
@@ -500,6 +488,11 @@ public class DbObjectManagerImpl implements ObjectManager {
 			}							
 		} else {
 			throw new Exception("Versioning found not-disabled, versioned buckets not supported yet");
+			
+			/*
+			 * Will place a delete-marker at the top of the stack (e.g. isLatest = true)
+			 *  
+			 */
 		}
 	}
 
@@ -542,10 +535,9 @@ public class DbObjectManagerImpl implements ObjectManager {
 				} else {
 					throw new Exception("Backend returned null result");
 				}
-			} else {
+			} else {				
 				// No Callable, so no result, just save the entity as given.
-				savedEntity.setLastUpdateTimestamp(new Date());
-				savedEntity.seteTag("");
+				savedEntity.finalizeCreation(null, new Date(), "");
 			}
 
 			// Update metadata post-call
@@ -825,5 +817,22 @@ public class DbObjectManagerImpl implements ObjectManager {
 			db.rollback();
 		}
 	}
-
+	
+	@Override
+	public long countValid(Bucket bucket) throws Exception {
+		/*
+		 * Returns all entries, pending delete or not.
+		 */
+		EntityTransaction db = Entities.get(ObjectEntity.class);
+		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null,null);		
+		Criterion crit = Restrictions.and(ObjectEntity.QueryHelpers.getNotDeletingRestriction(), ObjectEntity.QueryHelpers.getNotPendingRestriction());		
+		try {
+			return Entities.count(exampleObject, crit, null);
+		} catch (Throwable e) {
+			LOG.error("Error getting object count for bucket " + bucket.getBucketName(), e);
+			throw new Exception(e);
+		} finally {
+			db.rollback();
+		}		
+	}
 }

@@ -183,4 +183,11 @@ public interface BucketManager {
 	 * @throws Exception
 	 */
 	public boolean checkBucketName(String bucketName) throws Exception;
+
+	/**
+	 * Is the bucket logically empty (no valid objects/versions in the bucket
+	 * @param bucket
+	 * @return
+	 */
+	public abstract boolean isEmpty(Bucket bucket) throws Exception;
 }

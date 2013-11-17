@@ -608,25 +608,16 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			return reply;
 		} else {
 			if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
-				long objectCount = 0;
 				try {
-					objectCount = ObjectManagers.getInstance().count(bucket);
-				} catch(Exception e) {
-					//Bail if we can't confirm bucket is empty.
-					LOG.error("Error fetching object count for bucket " + bucket.getBucketName());
-					throw new InternalErrorException(bucket.getBucketName());
-				}
-
-				if(objectCount > 0) {
-					throw new BucketNotEmptyException(bucket.getBucketName());
-				} else {
-					try {
+					if(!BucketManagers.getInstance().isEmpty(bucket)) {
+						throw new BucketNotEmptyException(bucket.getBucketName());
+					} else {
 						BucketManagers.getInstance().delete(bucket, new CallableWithRollback<DeleteBucketResponseType, Boolean>() {
 							@Override
 							public DeleteBucketResponseType call() throws Exception {
 								return ospClient.deleteBucket(request);
 							}
-
+							
 							@Override
 							public Boolean rollback(DeleteBucketResponseType arg)
 									throws Exception {
@@ -639,11 +630,12 @@ public class ObjectStorageGateway implements ObjectStorageService {
 						reply.setStatus(HttpResponseStatus.NO_CONTENT);
 						reply.setStatusMessage("NoContent");
 						return reply;
-						
-					} catch(Exception e) {
-						LOG.error("Transaction error deleting bucket " + request.getBucket(),e);
-						throw new InternalErrorException(request.getBucket());
 					}
+				} catch(S3Exception s3ex) {
+					throw s3ex;
+				} catch(Exception e) {
+					LOG.error("Transaction error deleting bucket " + request.getBucket(),e);
+					throw new InternalErrorException(request.getBucket());
 				}				
 			} else {
 				throw new AccessDeniedException(request.getBucket());			

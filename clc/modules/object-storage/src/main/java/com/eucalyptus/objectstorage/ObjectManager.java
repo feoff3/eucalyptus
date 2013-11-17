@@ -86,7 +86,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws TransactionException
 	 */
-	public long count(Bucket bucket) throws Exception;
+	public abstract long countRawEntities(Bucket bucket) throws Exception;
 
 	/**
 	 * Does specified object exist
@@ -164,7 +164,7 @@ public interface ObjectManager {
 	 * @return
 	 * @throws Exception
 	 */
-	public List<ObjectEntity> getFailedOrDeleted() throws Exception;
+	public abstract List<ObjectEntity> getFailedOrDeleted() throws Exception;
 	
 	/**
 	 * Fix an object history if needed. Scans the sorted object records and marks
@@ -175,5 +175,12 @@ public interface ObjectManager {
 	 * @param objectKey
 	 * @throws Exception
 	 */
-	public void doFullRepair(Bucket bucket, String objectKey) throws Exception;
+	public abstract void doFullRepair(Bucket bucket, String objectKey) throws Exception;
+	
+	/**
+	 * Returns a count of "valid" objects in the bucket. Valid means visible to user, not-deleting, and not-pending/failed.
+	 * @param bucket
+	 * @return
+	 */
+	public abstract long countValid(Bucket bucket) throws Exception ;
 }

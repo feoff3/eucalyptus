@@ -506,4 +506,9 @@ public class DbBucketManagerImpl implements BucketManager {
 		
 		Entities.asTransaction(incrementSize).apply(bucketName);
 	}
+
+	@Override
+	public boolean isEmpty(Bucket bucket) throws Exception {
+		return (ObjectManagers.getInstance().countValid(bucket) == 0);
+	}
 }
