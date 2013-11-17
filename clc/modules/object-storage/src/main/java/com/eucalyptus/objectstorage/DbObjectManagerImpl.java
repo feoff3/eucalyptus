@@ -23,6 +23,7 @@ package com.eucalyptus.objectstorage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -60,6 +61,7 @@ import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
 import com.eucalyptus.util.EucalyptusCloudException;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
+import com.google.gwt.thirdparty.guava.common.collect.Maps;
 
 /**
  * Database backed implementation of ObjectManager
@@ -824,10 +826,10 @@ public class DbObjectManagerImpl implements ObjectManager {
 		 * Returns all entries, pending delete or not.
 		 */
 		EntityTransaction db = Entities.get(ObjectEntity.class);
-		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null,null);		
+		ObjectEntity exampleObject = new ObjectEntity(bucket.getBucketName(), null,null);
 		Criterion crit = Restrictions.and(ObjectEntity.QueryHelpers.getNotDeletingRestriction(), ObjectEntity.QueryHelpers.getNotPendingRestriction());		
 		try {
-			return Entities.count(exampleObject, crit, null);
+			return Entities.count(exampleObject, crit, new HashMap<String,String>());
 		} catch (Throwable e) {
 			LOG.error("Error getting object count for bucket " + bucket.getBucketName(), e);
 			throw new Exception(e);
