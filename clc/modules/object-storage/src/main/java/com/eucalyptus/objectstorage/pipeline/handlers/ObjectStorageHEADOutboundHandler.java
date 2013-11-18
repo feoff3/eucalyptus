@@ -62,13 +62,18 @@
 
 package com.eucalyptus.objectstorage.pipeline.handlers;
 
+import java.util.Date;
+
 import org.apache.log4j.Logger;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
 import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.handler.codec.http.HttpHeaders;
+
 import com.eucalyptus.http.MappingHttpResponse;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType;
 import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.ws.handlers.MessageStackHandler;
 
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
@@ -84,6 +89,9 @@ public class ObjectStorageHEADOutboundHandler extends MessageStackHandler {
 		if ( event.getMessage( ) instanceof MappingHttpResponse ) {
 			MappingHttpResponse httpResponse = ( MappingHttpResponse ) event.getMessage( );
 			BaseMessage msg = (BaseMessage) httpResponse.getMessage( );
+			httpResponse.setHeader("Date", OSGUtil.dateToHeaderFormattedString(new Date()));
+			httpResponse.setHeader("x-amz-request-id", msg.getCorrelationId());
+
 
 			if(msg instanceof EucalyptusErrorMessageType) {      
 				EucalyptusErrorMessageType errorMessage = (EucalyptusErrorMessageType) msg;

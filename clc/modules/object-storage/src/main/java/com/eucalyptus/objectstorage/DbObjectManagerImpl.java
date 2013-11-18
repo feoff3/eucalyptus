@@ -526,7 +526,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 					if (result.getLastModified() != null) {
 						updatedDate = OSGUtil.dateFromHeaderFormattedString(result.getLastModified());
 						if (updatedDate == null) {
-							updatedDate = OSGUtil.dateFromRFC822FormattedString(result.getLastModified());
+							updatedDate = OSGUtil.dateFromListingFormattedString(result.getLastModified());
 						}
 					} else {
 						updatedDate = new Date();

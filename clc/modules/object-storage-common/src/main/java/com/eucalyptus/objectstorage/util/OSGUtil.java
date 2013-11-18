@@ -122,11 +122,11 @@ public class OSGUtil {
 	}
 	
 	/**
-	 * Helper to do the ISO8601 formatting
+	 * Helper to do the ISO8601 formatting as found in object/bucket lists
 	 * @param d
 	 * @return
 	 */
-	public static String dateToHeaderFormattedString(Date d) {
+	public static String dateToListingFormattedString(Date d) {
 		if(d == null) { 
 			return null;
 		} else {
@@ -138,7 +138,12 @@ public class OSGUtil {
 		}
 	}
 	
-	public static Date dateFromHeaderFormattedString(String header) {
+	/**
+	 * Helper to parse the ISO8601 date, as found in listings
+	 * @param header
+	 * @return
+	 */
+	public static Date dateFromListingFormattedString(String header) {
 		if(header == null) { 
 			return null;
 		} else {		
@@ -150,7 +155,12 @@ public class OSGUtil {
 		}
 	}
 	
-	public static Date dateFromRFC822FormattedString(String dateStr) {
+	/**
+	 * Parses an RFC-822 formated date, as found in headers
+	 * @param dateStr
+	 * @return
+	 */
+	public static Date dateFromHeaderFormattedString(String dateStr) {
 		if(dateStr == null) { 
 			return null;
 		} else {
@@ -163,11 +173,11 @@ public class OSGUtil {
 	}
 	
 	/**
-	 * Helper to do the RFC822 formatting
+	 * Helper to do the RFC822 formatting for placement in HTTP headers
 	 * @param d
 	 * @return
 	 */
-	public static String dateToRFC822FormattedString(Date d) {
+	public static String dateToHeaderFormattedString(Date d) {
 		if(d == null) {
 			return null;
 		} else {

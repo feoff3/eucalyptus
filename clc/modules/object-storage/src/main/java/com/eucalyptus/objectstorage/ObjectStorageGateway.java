@@ -486,7 +486,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 			reply.setBucket(bucket.getBucketName());
 			reply.setStatus(HttpResponseStatus.OK);
 			reply.setStatusMessage("OK");
-			reply.setTimestamp(new Date());
+			reply.setTimestamp(new Date());		
 			return reply;
 		} else {
 			throw new AccessDeniedException(request.getBucket());			

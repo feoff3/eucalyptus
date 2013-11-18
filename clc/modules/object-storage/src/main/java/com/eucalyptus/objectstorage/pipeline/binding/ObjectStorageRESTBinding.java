@@ -76,8 +76,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
@@ -93,9 +91,7 @@ import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.DownstreamMessageEvent;
 import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.handler.codec.http.DefaultHttpMessage;
 import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
-import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -125,9 +121,7 @@ import com.eucalyptus.storage.msgs.s3.Group;
 import com.eucalyptus.storage.msgs.s3.LoggingEnabled;
 import com.eucalyptus.storage.msgs.s3.MetaDataEntry;
 import com.eucalyptus.storage.msgs.s3.TargetGrants;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDataMessage;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataMessenger;
-import com.eucalyptus.objectstorage.msgs.ObjectStorageDataQueue;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataGetRequestType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType;
 import com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType;
@@ -142,7 +136,6 @@ import com.eucalyptus.ws.InvalidOperationException;
 import com.eucalyptus.ws.handlers.RestfulMarshallingHandler;
 import com.google.common.collect.Lists;
 
-import edu.ucsb.eucalyptus.msgs.BaseDataChunk;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 import edu.ucsb.eucalyptus.msgs.EucalyptusErrorMessageType;
 import edu.ucsb.eucalyptus.msgs.ExceptionResponseType;
@@ -430,11 +423,11 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 	protected String getOperation(MappingHttpRequest httpRequest, Map operationParams) throws BindingException, NotImplementedException {
 		String[] target = null;
 		String path = getOperationPath(httpRequest);
-		boolean walrusInternalOperation = false;
+		boolean objectstorageInternalOperation = false;
 
 		String targetHost = httpRequest.getHeader(HttpHeaders.Names.HOST);
-		if(targetHost.contains(".walrus")) {
-			String bucket = targetHost.substring(0, targetHost.indexOf(".walrus"));
+		if(targetHost.contains(".objectstorage")) {
+			String bucket = targetHost.substring(0, targetHost.indexOf(".objectstorage"));
 			path = "/" + bucket + path;
 		}
 
@@ -456,16 +449,16 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			for(ObjectStorageProperties.WalrusInternalOperations operation: ObjectStorageProperties.WalrusInternalOperations.values()) {
 				if(value.toLowerCase().equals(operation.toString().toLowerCase())) {
 					operationName = operation.toString();
-					walrusInternalOperation = true;
+					objectstorageInternalOperation = true;
 					break;
 				}
 			}
 
-			if(!walrusInternalOperation) {
+			if(!objectstorageInternalOperation) {
 				for(ObjectStorageProperties.StorageOperations operation: ObjectStorageProperties.StorageOperations.values()) {
 					if(value.toLowerCase().equals(operation.toString().toLowerCase())) {
 						operationName = operation.toString();
-						walrusInternalOperation = true;
+						objectstorageInternalOperation = true;
 						if(httpRequest.containsHeader(StorageProperties.StorageParameters.EucaSnapSize.toString())) {
 							operationParams.put("SnapshotSize", httpRequest.getAndRemoveHeader(StorageProperties.StorageParameters.EucaSnapSize.toString()));
 						}
@@ -647,7 +640,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						}*/
 					}
 				} else if(verb.equals(ObjectStorageProperties.HTTPVerb.GET.toString())) {
-					if(!walrusInternalOperation) {
+					if(!objectstorageInternalOperation) {
 
 						if(params.containsKey("torrent")) {
 							operationParams.put("GetTorrent", Boolean.TRUE);
@@ -681,7 +674,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 					}
 
 				} else if(verb.equals(ObjectStorageProperties.HTTPVerb.HEAD.toString())) {
-					if(!walrusInternalOperation) {
+					if(!objectstorageInternalOperation) {
 						operationParams.put("GetData", Boolean.FALSE);
 						operationParams.put("InlineData", Boolean.FALSE);
 						operationParams.put("GetMetaData", Boolean.TRUE);
@@ -781,7 +774,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 			params.remove(key);
 		}
 
-		if(!walrusInternalOperation) {
+		if(!objectstorageInternalOperation) {
 			operationName = operationMap.get(operationKey);
 		}
 

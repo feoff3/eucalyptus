@@ -209,7 +209,7 @@ public class Bucket extends S3AccessControlledEntity {
 	}
 	
 	public BucketListEntry toBucketListEntry() {
-		return new BucketListEntry(this.getBucketName(), OSGUtil.dateToRFC822FormattedString(this.getCreationDate()));
+		return new BucketListEntry(this.getBucketName(), OSGUtil.dateToListingFormattedString(this.getCreationDate()));
 	}
 	
 }

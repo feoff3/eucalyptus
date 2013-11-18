@@ -421,7 +421,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		ListEntry e = new ListEntry();
 		e.setEtag(this.geteTag());
 		e.setKey(this.getObjectKey());
-		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
+		e.setLastModified(OSGUtil.dateToListingFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
 		e.setStorageClass(this.getStorageClass());
 		e.setOwner(new CanonicalUser(this.getOwnerCanonicalId(), this.getOwnerDisplayName()));		
@@ -437,7 +437,7 @@ public class ObjectEntity extends S3AccessControlledEntity implements Comparable
 		e.setEtag(this.geteTag());
 		e.setKey(this.getObjectKey());
 		e.setVersionId(this.getVersionId());
-		e.setLastModified(OSGUtil.dateToHeaderFormattedString(this.getObjectModifiedTimestamp()));
+		e.setLastModified(OSGUtil.dateToListingFormattedString(this.getObjectModifiedTimestamp()));
 		e.setSize(this.getSize());
 		
 		//TODO: FIXME!!!
