@@ -224,6 +224,8 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 				ChannelBuffer buffer = ChannelBuffers.wrappedBuffer( req );
 				httpResponse.addHeader( HttpHeaders.Names.CONTENT_LENGTH, String.valueOf(buffer.readableBytes() ) );
 				httpResponse.addHeader( HttpHeaders.Names.CONTENT_TYPE, "application/xml" );
+				httpResponse.addHeader( HttpHeaders.Names.DATE, OSGUtil.dateToHeaderFormattedString(new Date()));
+				httpResponse.addHeader( "x-amz-request-id", msg.getCorrelationId());
 				httpResponse.setContent( buffer );
 			}
 		}

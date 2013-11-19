@@ -519,7 +519,7 @@
 
 	<mapping name="VersioningConfiguration"
 		class="com.eucalyptus.objectstorage.msgs.GetBucketVersioningStatusResponseType">
-		<value name="Status" field="versioningStatus" usage="optional" />
+		<value name="Status" field="versioningStatus" usage="optional" test-method="isNotDisabled"/>
 	</mapping>
 
 	<mapping name="SetBucketVersioningStatus"

@@ -112,6 +112,7 @@
 		<structure field="canonicalUser" type="com.eucalyptus.storage.msgs.s3.CanonicalUser" usage="optional" />
 		<structure field="group" map-as="com.eucalyptus.storage.msgs.s3.Group" usage="optional" />
 		<value name="EmailAddress" field="emailAddress" usage="optional"/>
+		<value name="type" field="type" style="attribute"/>
 	</mapping>
 
 	<mapping class="com.eucalyptus.storage.msgs.s3.CanonicalUser" abstract="true">

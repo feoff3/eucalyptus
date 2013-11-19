@@ -553,7 +553,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				return BucketManagers.getInstance().create(request.getBucket(),
 						requestUser,
 						aclString,
-						request.getLocationConstraint(),
+						(request.getLocationConstraint() == null ? "" : request.getLocationConstraint()),
 						new CallableWithRollback<CreateBucketResponseType, Boolean>() {
 					public CreateBucketResponseType call() throws Exception {
 						return ospClient.createBucket(request);
@@ -1136,7 +1136,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 
 		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, null, 0)) {
 			GetBucketLocationResponseType reply = (GetBucketLocationResponseType) request.getReply();
-			reply.setLocationConstraint(bucket.getLocation());
+			reply.setLocationConstraint(bucket.getLocation() == null ? "" : bucket.getLocation());
 			reply.setBucket(request.getBucket());
 			return reply;
 		} else {		
