@@ -282,12 +282,19 @@ public class AclUtils {
 		@Override
 		public List<Grant> apply(OwnerIdPair ownerIds) {
 			List<Grant> logDeliveryWrite = PrivateOnlyGrantBuilder.INSTANCE.apply(ownerIds);
-			Grantee allUsers = new Grantee();
-			allUsers.setGroup(new Group(ObjectStorageProperties.S3_GROUP.LOGGING_GROUP.toString()));
-			Grant allUsersGrant = new Grant();
-			allUsersGrant.setPermission(ObjectStorageProperties.Permission.WRITE.toString());	
-			allUsersGrant.setGrantee(allUsers);
-			logDeliveryWrite.add(allUsersGrant);
+			Grantee logGroup = new Grantee();
+			logGroup.setGroup(new Group(ObjectStorageProperties.S3_GROUP.LOGGING_GROUP.toString()));
+			
+			Grant loggingWriteGrant = new Grant();
+			loggingWriteGrant.setPermission(ObjectStorageProperties.Permission.WRITE.toString());	
+			loggingWriteGrant.setGrantee(logGroup);
+			
+			Grant loggingReadAcpGrant = new Grant();
+			loggingReadAcpGrant.setPermission(ObjectStorageProperties.Permission.READ_ACP.toString());	
+			loggingReadAcpGrant.setGrantee(logGroup);
+			
+			logDeliveryWrite.add(loggingWriteGrant);
+			logDeliveryWrite.add(loggingReadAcpGrant);
 			return logDeliveryWrite;
 		}
 	};
