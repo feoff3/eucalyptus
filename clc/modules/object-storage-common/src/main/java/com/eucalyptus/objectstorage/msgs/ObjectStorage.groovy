@@ -600,8 +600,8 @@ public class GetBucketVersioningStatusType extends ObjectStorageRequestType {}
 public class GetBucketVersioningStatusResponseType extends ObjectStorageResponseType {
 	String versioningStatus;
 	
-	private boolean isVersioningDisabled() {
-		return versioningStatus == null || versioningStatus.toLowerCase() == "disabled";
+	private boolean isNotDisabled() {
+		return versioningStatus != null || "disabled" != versioningStatus.toLowerCase() ;
 	}
 }
 
