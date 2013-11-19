@@ -742,7 +742,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		httpResponse.addHeader( HttpHeaders.Names.CONTENT_TYPE, contentType != null ? contentType : "binary/octet-stream" );
 		if(etag != null)
 			httpResponse.addHeader(HttpHeaders.Names.ETAG, etag);
-		httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, lastModified);
+		httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, OSGUtil.dateToHeaderFormattedString(lastModified));
 		if(contentDisposition != null) {
 			httpResponse.addHeader("Content-Disposition", contentDisposition);
 		}
