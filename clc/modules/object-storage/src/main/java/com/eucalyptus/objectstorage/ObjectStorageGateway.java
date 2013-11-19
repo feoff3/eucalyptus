@@ -946,7 +946,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 				} else {
 					//Add in the owner entry if not present
 					if(request.getAccessControlPolicy().getOwner() == null ) {
-						request.getAccessControlPolicy().setOwner(new CanonicalUser(bucketOwnerCanonicalId,""));
+						request.getAccessControlPolicy().setOwner(new CanonicalUser(bucketOwnerCanonicalId, bucket.getOwnerDisplayName()));
 					}
 				}
 
@@ -1014,7 +1014,7 @@ public class ObjectStorageGateway implements ObjectStorageService {
 					} else {
 						//Add in the owner entry if not present
 						if(request.getAccessControlPolicy().getOwner() == null ) {
-							request.getAccessControlPolicy().setOwner(new CanonicalUser(objectOwnerId,""));
+							request.getAccessControlPolicy().setOwner(new CanonicalUser(objectOwnerId, objectEntity.getOwnerDisplayName()));
 						}
 					}
 
