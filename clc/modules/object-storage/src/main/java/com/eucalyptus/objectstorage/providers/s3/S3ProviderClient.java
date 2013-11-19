@@ -124,6 +124,7 @@ import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyRespons
 import com.eucalyptus.objectstorage.msgs.SetRESTObjectAccessControlPolicyType;
 import com.eucalyptus.objectstorage.util.AclUtils;
 import com.eucalyptus.objectstorage.util.OSGUtil;
+import com.eucalyptus.objectstorage.util.ObjectStorageProperties;
 import com.eucalyptus.storage.common.ChunkedDataStream;
 import com.eucalyptus.storage.msgs.s3.AccessControlList;
 import com.eucalyptus.storage.msgs.s3.AccessControlPolicy;
@@ -703,7 +704,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				response = s3Client.getObject(getRequest);
 				metadata = response.getObjectMetadata();
 			}
-			DefaultHttpResponse httpResponse = createHttpResponse(metadata);
+			DefaultHttpResponse httpResponse = createHttpResponse(metadata);			
+			if(!Strings.isNullOrEmpty(request.getCorrelationId())) {
+				httpResponse.setHeader(ObjectStorageProperties.AMZ_REQUEST_ID, request.getCorrelationId());
+			}
+			
 			Channel channel = request.getChannel();
 			channel.write(httpResponse);
 			if (request.getGetData()) {
@@ -741,7 +746,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		String contentDisposition = metadata.getContentDisposition();
 		httpResponse.addHeader( HttpHeaders.Names.CONTENT_TYPE, contentType != null ? contentType : "binary/octet-stream" );
 		if(etag != null)
-			httpResponse.addHeader(HttpHeaders.Names.ETAG, etag);
+			httpResponse.addHeader(HttpHeaders.Names.ETAG, "\"" + etag + "\""); //etag in quotes, per s3-spec.
 		httpResponse.addHeader(HttpHeaders.Names.LAST_MODIFIED, OSGUtil.dateToHeaderFormattedString(lastModified));
 		if(contentDisposition != null) {
 			httpResponse.addHeader("Content-Disposition", contentDisposition);
@@ -749,8 +754,9 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		httpResponse.addHeader( HttpHeaders.Names.CONTENT_LENGTH, String.valueOf(contentLength));
 		String versionId = metadata.getVersionId();
 		if(versionId != null) {
-			httpResponse.addHeader(WalrusProperties.X_AMZ_VERSION_ID, versionId);
+			httpResponse.addHeader(ObjectStorageProperties.X_AMZ_VERSION_ID, versionId);
 		}
+		httpResponse.setHeader(HttpHeaders.Names.DATE, OSGUtil.dateToHeaderFormattedString(new Date()));		
 		return httpResponse;
 	}
 

@@ -128,6 +128,7 @@ public class ObjectStorageProperties {
 	public static final String STREAMING_HTTP_GET = "STREAMING_HTTP_GET";
 	public static final String STREAMING_HTTP_PUT = "STREAMING_HTTP_PUT";
 	public static final String AMZ_ACL = "x-amz-acl";
+	public static final String AMZ_REQUEST_ID = "x-amz-request-id";
 
 	//TODO: zhill - these should be replaced by references to the actual Accounts lookup. May need to add these as valid groups/accounts
 	public static enum S3_GROUP {
