@@ -486,7 +486,7 @@ public class ListBucketType extends ObjectStorageRequestType {
 	def ListBucketType() {
 		prefix = "";
 		marker = "";
-		delimiter = "";
+		//delimiter = "";
 	}
 }
 

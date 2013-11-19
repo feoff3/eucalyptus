@@ -681,10 +681,7 @@ public class DbObjectManagerImpl implements ObjectManager {
 		EntityTransaction db = Entities.get(ObjectEntity.class);
 		try {
 			PaginatedResult<ObjectEntity> result = new PaginatedResult<ObjectEntity>();
-			HashSet<String> commonPrefixes = new HashSet<String>(); // set of
-			// common
-			// prefixes
-			// found
+			HashSet<String> commonPrefixes = new HashSet<String>(); 
 
 			// Include zero since 'istruncated' is still valid
 			if (maxEntries >= 0) {
