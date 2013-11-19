@@ -296,7 +296,8 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 					groupId = AclUtils.getGroupFromUri(entry.getKey());					
 				} catch(Exception e) {}				
 				if(groupId != null) {
-					grantee.setGroup(new Group(groupId.toString()));						
+					grantee.setGroup(new Group(groupId.toString()));
+					grantee.setType("Group");
 				} else {
 					try {
 						displayName = Accounts.lookupAccountByCanonicalId(entry.getKey()).getName();
@@ -305,6 +306,7 @@ public abstract class S3AccessControlledEntity extends AbstractPersistent {
 						displayName = "";
 					}
 					grantee.setCanonicalUser(new CanonicalUser(entry.getKey(),displayName));
+					grantee.setType("CanonicalUser");
 				}
 				
 				for(ObjectStorageProperties.Permission p : AccountGrantsFromBitmap.INSTANCE.apply(entry.getValue())) {

@@ -601,7 +601,7 @@ public class GetBucketVersioningStatusResponseType extends ObjectStorageResponse
 	String versioningStatus;
 	
 	private boolean isNotDisabled() {
-		return versioningStatus != null || "disabled" != versioningStatus.toLowerCase() ;
+		return versioningStatus != null && "disabled" != versioningStatus.toLowerCase() ;
 	}
 }
 
