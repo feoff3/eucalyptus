@@ -83,7 +83,7 @@
 
 	<mapping name="Error"
 		class="com.eucalyptus.objectstorage.msgs.ObjectStorageErrorMessageType">
-		<value name="Code" field="code" usage="optional"/>
+		<value name="Code" field="code" usage="optional" />
 		<value name="Message" field="message" usage="optional" />
 		<value name="Resource" field="resource" usage="optional" />
 		<value name="RequestId" field="requestId" usage="optional" />
@@ -119,22 +119,24 @@
 			usage="optional" />
 	</mapping>
 
-	<mapping name="ListBucketResult" class="com.eucalyptus.objectstorage.msgs.ListBucketResponseType">
-			<value name="Name" field="name" />
-			<value name="Prefix" field="prefix" />
-			<value name="Marker" field="marker"/>
-			<value name="NextMarker" field="nextMarker" usage="optional" />
-			<value name="MaxKeys" field="maxKeys" />
-			<value name="Delimiter" field="delimiter" usage="optional" />
-			<value name="IsTruncated" field="isTruncated" />
-			<collection field="contents"
-				factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
-				<structure name="Contents" map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
-			</collection>
-			<collection name="CommonPrefixes" field="commonPrefixes"
-				factory="org.jibx.runtime.Utility.arrayListFactory" test-method="isCommonPrefixesPresent" usage="optional">
-				<structure map-as="com.eucalyptus.storage.msgs.s3.PrefixEntry"/>
-			</collection>
+	<mapping name="ListBucketResult"
+		class="com.eucalyptus.objectstorage.msgs.ListBucketResponseType">
+		<value name="Name" field="name" />
+		<value name="Prefix" field="prefix" />
+		<value name="Marker" field="marker" />
+		<value name="NextMarker" field="nextMarker" usage="optional" />
+		<value name="MaxKeys" field="maxKeys" />
+		<value name="Delimiter" field="delimiter" usage="optional" />
+		<value name="IsTruncated" field="isTruncated" />
+		<collection field="contents"
+			factory="org.jibx.runtime.Utility.arrayListFactory" usage="optional">
+			<structure name="Contents" map-as="com.eucalyptus.storage.msgs.s3.ListEntry" />
+		</collection>
+		<collection name="CommonPrefixes" field="commonPrefixes"
+			factory="org.jibx.runtime.Utility.arrayListFactory" test-method="isCommonPrefixesPresent"
+			usage="optional">
+			<structure map-as="com.eucalyptus.storage.msgs.s3.PrefixEntry" />
+		</collection>
 	</mapping>
 
 	<mapping name="ListVersions"
@@ -263,7 +265,8 @@
 			usage="optional" />
 	</mapping>
 
-	<mapping name="DeleteBucketResponse" class="com.eucalyptus.objectstorage.msgs.DeleteBucketResponseType">
+	<mapping name="DeleteBucketResponse"
+		class="com.eucalyptus.objectstorage.msgs.DeleteBucketResponseType">
 	</mapping>
 
 	<mapping name="PutObjectResponse"
@@ -400,7 +403,6 @@
 		<structure
 			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType" />
 		<value name="GetMetadata" field="getMetaData" />
-		<value name="GetData" field="getData" />
 		<value name="InlineData" field="inlineData" />
 		<structure
 			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType"
@@ -424,7 +426,6 @@
 		<structure
 			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType" />
 		<value name="GetMetadata" field="getMetaData" />
-		<value name="GetData" field="getData" />
 		<value name="InlineData" field="inlineData" />
 		<value name="ByteRangeStart" field="byteRangeStart" />
 		<value name="ByteRangeEnd" field="byteRangeEnd" />
@@ -446,10 +447,27 @@
 		</structure>
 	</mapping>
 
+	<mapping name="HeadObject"
+		class="com.eucalyptus.objectstorage.msgs.HeadObjectType">
+		<structure
+			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataRequestType" />
+		<structure
+			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType"
+			usage="optional" />
+		<value name="VersionId" field="versionId" usage="optional" />
+	</mapping>
+
+	<mapping name="HeadObjectResponse"
+		class="com.eucalyptus.objectstorage.msgs.HeadObjectResponseType">
+		<structure
+			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageDataResponseType" />
+	</mapping>
+
 	<mapping name="DeleteObject"
 		class="com.eucalyptus.objectstorage.msgs.DeleteObjectType" extends="com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType">
 		<structure
-			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType" usage="optional" />
+			map-as="com.eucalyptus.objectstorage.msgs.ObjectStorageRequestType"
+			usage="optional" />
 	</mapping>
 
 	<mapping name="DeleteObjectResponse"
@@ -519,7 +537,8 @@
 
 	<mapping name="VersioningConfiguration"
 		class="com.eucalyptus.objectstorage.msgs.GetBucketVersioningStatusResponseType">
-		<value name="Status" field="versioningStatus" usage="optional" test-method="isNotDisabled"/>
+		<value name="Status" field="versioningStatus" usage="optional"
+			test-method="isNotDisabled" />
 	</mapping>
 
 	<mapping name="SetBucketVersioningStatus"

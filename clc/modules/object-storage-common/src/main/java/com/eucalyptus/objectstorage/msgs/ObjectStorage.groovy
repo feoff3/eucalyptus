@@ -365,7 +365,6 @@ public class PostObjectResponseType extends ObjectStorageDataResponseType {
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
 public class GetObjectType extends ObjectStorageDataGetRequestType {
 	Boolean getMetaData;
-	Boolean getData;
 	Boolean inlineData;
 	Boolean deleteAfterGet;
 	Boolean getTorrent;
@@ -374,9 +373,8 @@ public class GetObjectType extends ObjectStorageDataGetRequestType {
 	def GetObjectType() {
 	}
 
-	def GetObjectType(final String bucketName, final String key, final Boolean getData, final Boolean getMetaData, final Boolean inlineData) {
+	def GetObjectType(final String bucketName, final String key, final Boolean getMetaData, final Boolean inlineData) {
 		super( bucketName, key );
-		this.getData = getData;
 		this.getMetaData = getMetaData;
 		this.inlineData = inlineData;
 	}
@@ -394,7 +392,6 @@ public class GetObjectResponseType extends ObjectStorageDataGetResponseType {
 @ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
 @RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
 public class GetObjectExtendedType extends ObjectStorageDataGetRequestType {
-	Boolean getData;
 	Boolean getMetaData;
 	Boolean inlineData;
 	Long byteRangeStart;
@@ -426,6 +423,26 @@ public class CopyObjectType extends ObjectStorageRequestType {
 	String copySourceIfNoneMatch;
 	Date copySourceIfModifiedSince;
 	Date copySourceIfUnmodifiedSince;
+}
+
+
+/* HEAD /bucket/object */
+@AdminOverrideAllowed
+@RequiresPermission([PolicySpec.S3_HEADOBJECT])
+@ResourceType(PolicySpec.S3_RESOURCE_OBJECT)
+@RequiresACLPermission(object=[ObjectStorageProperties.Permission.READ], bucket=[])
+public class HeadObjectType extends ObjectStorageDataGetRequestType {
+	String versionId;
+
+	def HeadObjectType() {
+	}
+
+	def HeadObjectType(final String bucketName, final String key) {
+		super( bucketName, key );
+	}
+}
+
+public class HeadObjectResponseType extends ObjectStorageDataGetResponseType {
 }
 
 public class CopyObjectResponseType extends ObjectStorageResponseType {

@@ -96,6 +96,8 @@ import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectStorageConfigurationResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectStorageConfigurationType;
 import com.eucalyptus.objectstorage.msgs.GetObjectType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketType;
 import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsResponseType;
@@ -1076,21 +1078,6 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		}	
 	}
 
-	private class ObjectGetter implements Runnable {
-		GetObjectType request;
-		public ObjectGetter(GetObjectType request) {
-			this.request = request;
-		}
-		@Override
-		public void run() {
-			try {
-				ospClient.getObject(request);
-			} catch (Exception ex) {
-				LOG.error(ex, ex);
-			}
-		}
-
-	}
 	/* (non-Javadoc)
 	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObjectExtended(com.eucalyptus.objectstorage.msgs.GetObjectExtendedType)
 	 */
@@ -1117,6 +1104,40 @@ public class ObjectStorageGateway implements ObjectStorageService {
 		} else {
 			throw new AccessDeniedException(request.getBucket() + "/" + request.getKey());
 		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.eucalyptus.objectstorage.ObjectStorageService#GetObject(com.eucalyptus.objectstorage.msgs.GetObjectType)
+	 */
+	@Override
+	public HeadObjectResponseType headObject(HeadObjectType request) throws EucalyptusCloudException {
+		logRequest(request);
+		ObjectEntity objectEntity = null;
+		Bucket bucket = null;
+		try {
+			//Handle the pass-through
+			bucket = BucketManagers.getInstance().get(request.getBucket(), false, null);
+			objectEntity = ObjectManagers.getInstance().get(bucket, request.getKey(), request.getVersionId());
+		} catch(NoSuchElementException e) {
+			throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+		} catch (Exception e) {
+			if(e.getCause() instanceof NoSuchElementException) {
+				//Just in case
+				throw new NoSuchKeyException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+			}
+			LOG.error(e);
+			throw new InternalErrorException(request.getBucket() + "/" + request.getKey() + " , version= " +  request.getVersionId());
+		}
+
+		//TODO: make sure to handle getVersion case on auth. May need different operation to handle that case
+		// since it is a different IAM check
+		if(OSGAuthorizationHandler.getInstance().operationAllowed(request, bucket, objectEntity, 0)) {
+			request.setKey(objectEntity.getObjectUuid());
+			ospClient.headObject(request);
+			return null;
+		} else {
+			throw new AccessDeniedException(request.getBucket() + "/" + request.getKey() + "?versionId=" + request.getVersionId());
+		}	
 	}
 
 	/* (non-Javadoc)

@@ -275,7 +275,7 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.GET.toString() + ObjectStorageProperties.ObjectParameter.torrent.toString(), "GetObject");
 		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.DELETE.toString(), "DeleteObject");
 
-		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.HEAD.toString(), "GetObject");
+		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.HEAD.toString(), "HeadObject");
 		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.GET.toString() + "extended", "GetObjectExtended");
 
 		newMap.put(OBJECT + ObjectStorageProperties.HTTPVerb.DELETE.toString() + ObjectStorageProperties.ObjectParameter.versionId.toString().toLowerCase(), "DeleteVersion");
@@ -647,7 +647,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						if(params.containsKey("torrent")) {
 							operationParams.put("GetTorrent", Boolean.TRUE);
 						} else {
-							operationParams.put("GetData", Boolean.TRUE);
 							operationParams.put("InlineData", Boolean.FALSE);
 							operationParams.put("GetMetaData", Boolean.TRUE);
 						}
@@ -675,12 +674,6 @@ public class ObjectStorageRESTBinding extends RestfulMarshallingHandler {
 						operationParams.put("IsCompressed", isCompressed);
 					}
 
-				} else if(verb.equals(ObjectStorageProperties.HTTPVerb.HEAD.toString())) {
-					if(!objectstorageInternalOperation) {
-						operationParams.put("GetData", Boolean.FALSE);
-						operationParams.put("InlineData", Boolean.FALSE);
-						operationParams.put("GetMetaData", Boolean.TRUE);
-					}
 				}
 			}
 			if(params.containsKey(ObjectStorageProperties.ObjectParameter.versionId.toString())) {

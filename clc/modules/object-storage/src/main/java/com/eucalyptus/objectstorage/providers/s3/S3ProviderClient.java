@@ -56,6 +56,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.EmailAddressGrantee;
+import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GroupGrantee;
 import com.amazonaws.services.s3.model.ListBucketsRequest;
@@ -102,6 +103,8 @@ import com.eucalyptus.objectstorage.msgs.GetObjectExtendedResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectExtendedType;
 import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketType;
 import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsResponseType;
@@ -330,7 +333,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 	protected CanonicalUser getCanonicalUser(User usr) throws AuthException {
 		return new CanonicalUser(usr.getAccount().getCanonicalId(), usr.getAccount().getName());
 	}
-	
+
 	/*
 	 * TODO: add multi-account support on backend and then this can be a pass-thru to backend for bucket listing.
 	 * Multiplexing a single eucalyptus account on the backend means we have to track all of the user buckets ourselves
@@ -342,12 +345,12 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		ListAllMyBucketsResponseType reply = (ListAllMyBucketsResponseType) request.getReply();
 		try {			
 			User requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
-			
+
 			//The euca-types
 			ListAllMyBucketsList myBucketList = new ListAllMyBucketsList();
 			myBucketList.setBuckets(new ArrayList<BucketListEntry>());
-			
-			
+
+
 			//The s3 client types
 			AmazonS3Client s3Client = this.getS3Client(requestUser, request.getAccessKeyID());
 			ListBucketsRequest listRequest = new ListBucketsRequest();
@@ -476,7 +479,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -503,7 +506,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
-			
+
 			AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 			PutObjectResult result = null;
 			try {
@@ -549,11 +552,11 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 				LOG.error("Lookup of user and canonical id failed", e);
 				throw new EucalyptusCloudException("Cannot create bucket without user identity");
 			}
-			
+
 			DeleteObjectResponseType reply = (DeleteObjectResponseType) request.getReply();
 			reply.setStatus(HttpResponseStatus.NO_CONTENT);
 			reply.setStatusMessage("NO CONTENT");
-			
+
 			try {	
 				AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
 				s3Client.deleteObject(request.getBucket(), request.getKey());				
@@ -651,7 +654,7 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			LOG.error("Lookup of user and canonical id failed", e);
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}
-		
+
 		// call the storage manager to save the bucket to disk
 		try {
 			AmazonS3Client s3Client = getS3Client(requestUser, requestUser.getUserId());
@@ -696,30 +699,23 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		try {
 			ObjectMetadata metadata = null;
 			S3Object response = null;
-			if (!request.getGetData()) {
-				//TODO: This sucks. HEAD must be a separate operation.
-				metadata = s3Client.getObjectMetadata(request.getBucket(), request.getKey());
-			} else {
-				response = s3Client.getObject(getRequest);
-				metadata = response.getObjectMetadata();
-			}
+			response = s3Client.getObject(getRequest);
+			metadata = response.getObjectMetadata();
 			DefaultHttpResponse httpResponse = createHttpResponse(metadata);			
 			if(!Strings.isNullOrEmpty(request.getCorrelationId())) {
 				httpResponse.setHeader(ObjectStorageProperties.AMZ_REQUEST_ID, request.getCorrelationId());
 			}
-			
+
 			Channel channel = request.getChannel();
 			channel.write(httpResponse);
-			if (request.getGetData()) {
-				S3ObjectInputStream input = response.getObjectContent();
-				final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
-				channel.write(dataStream).addListener(new ChannelFutureListener( ) {
-					@Override public void operationComplete( ChannelFuture future ) throws Exception {			
-						Contexts.clear(request.getCorrelationId());
-						dataStream.close();
-					}
-				});
-			}
+			S3ObjectInputStream input = response.getObjectContent();
+			final ChunkedDataStream dataStream = new ChunkedDataStream(new PushbackInputStream(input));
+			channel.write(dataStream).addListener(new ChannelFutureListener( ) {
+				@Override public void operationComplete( ChannelFuture future ) throws Exception {			
+					Contexts.clear(request.getCorrelationId());
+					dataStream.close();
+				}
+			});
 			return null;
 		} catch(Exception ex) {
 			LOG.error(ex, ex);
@@ -770,7 +766,6 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 			throw new EucalyptusCloudException("Cannot create bucket without user identity");
 		}
 
-		Boolean isHead = request.getGetData() == null ? false : !(request.getGetData());
 		Boolean getMetaData = request.getGetMetaData();
 		Boolean inlineData = request.getInlineData();
 		Long byteRangeStart = request.getByteRangeStart();
@@ -1151,6 +1146,39 @@ public class S3ProviderClient extends ObjectStorageProviderClient {
 		} catch(Exception e) {
 			LOG.error("Unable to delete object version", e);
 			throw new EucalyptusCloudException(e);
+		}
+	}
+
+	@Override
+	public HeadObjectResponseType headObject(final HeadObjectType request)
+			throws EucalyptusCloudException {
+		User requestUser = null;
+		try {
+			requestUser = Accounts.lookupUserByAccessKeyId(request.getAccessKeyID());
+		} catch(Exception e) {
+			LOG.error("Lookup of user and canonical id failed", e);
+			throw new EucalyptusCloudException("Cannot get bucket without user identity");
+		}
+		AmazonS3Client s3Client = getS3Client(requestUser, request.getAccessKeyID());
+		GetObjectMetadataRequest getMetadataRequest = new GetObjectMetadataRequest(request.getBucket(), request.getKey());
+		getMetadataRequest.setVersionId(request.getVersionId());
+		try {
+			ObjectMetadata metadata = null;
+			metadata = s3Client.getObjectMetadata(getMetadataRequest);
+			DefaultHttpResponse httpResponse = createHttpResponse(metadata);			
+			if(!Strings.isNullOrEmpty(request.getCorrelationId())) {
+				httpResponse.setHeader(ObjectStorageProperties.AMZ_REQUEST_ID, request.getCorrelationId());
+			}
+			Channel channel = request.getChannel();
+			channel.write(httpResponse).addListener(new ChannelFutureListener( ) {
+				@Override public void operationComplete( ChannelFuture future ) throws Exception {			
+					Contexts.clear(request.getCorrelationId());
+				}
+			});
+			return null;
+		} catch(Exception ex) {
+			LOG.error(ex, ex);
+			return null;
 		}
 	}
 }

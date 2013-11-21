@@ -153,7 +153,7 @@ public class ImageManifests {
   static String requestManifestData( FullName userName, String bucketName, String objectName ) throws EucalyptusCloudException {
     GetObjectResponseType reply = null;
     try {
-      GetObjectType msg = new GetObjectType( bucketName, objectName, true, false, true );
+      GetObjectType msg = new GetObjectType( bucketName, objectName, false /*metadata*/, true /*inlinedata*/);
       // TODO:GRZE:WTF.
       // User user = Accounts.lookupUserById( userName.getNamespace( ) );
       // msg.setUserId( user.getName( ) );

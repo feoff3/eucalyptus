@@ -46,6 +46,8 @@ import com.eucalyptus.objectstorage.msgs.GetObjectExtendedResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectExtendedType;
 import com.eucalyptus.objectstorage.msgs.GetObjectResponseType;
 import com.eucalyptus.objectstorage.msgs.GetObjectType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectResponseType;
+import com.eucalyptus.objectstorage.msgs.HeadObjectType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketResponseType;
 import com.eucalyptus.objectstorage.msgs.HeadBucketType;
 import com.eucalyptus.objectstorage.msgs.ListAllMyBucketsResponseType;
@@ -184,6 +186,9 @@ public abstract class ObjectStorageProviderClient {
 	public abstract GetObjectExtendedResponseType getObjectExtended(
 			GetObjectExtendedType request) throws EucalyptusCloudException;
 	
+	public abstract HeadObjectResponseType headObject(HeadObjectType request)
+			throws EucalyptusCloudException;
+
 	public abstract CopyObjectResponseType copyObject(CopyObjectType request)
 			throws EucalyptusCloudException;
 	
