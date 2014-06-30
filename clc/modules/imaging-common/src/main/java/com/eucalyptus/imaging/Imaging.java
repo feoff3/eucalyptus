@@ -64,5 +64,14 @@ public class Imaging extends ComponentId {
     public ColocationBootstrapper( ) {
       super( Imaging.class );
     }    
+     @Override
+  public boolean check( ) throws Exception {
+    return true;
+  }
+
+  @Override
+  public boolean enable( ) throws Exception {
+    return true;
+  }
   }
 }

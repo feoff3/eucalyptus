@@ -126,6 +126,8 @@ public class ImagingServiceLaunchers {
     
     this.lockLauncher(launcherId);
     try{
+	// FEOFF-TODO: create imaging service, check service is running
+/*
       final String emi = ImagingServiceProperties.IMAGING_WORKER_EMI;
       final String instanceType = ImagingServiceProperties.IMAGING_WORKER_INSTANCE_TYPE;
       final String keyName = ImagingServiceProperties.IMAGING_WORKER_KEYNAME;
@@ -157,6 +159,7 @@ public class ImagingServiceLaunchers {
       }catch(final Exception ex){
         throw new EucalyptusCloudException("Failed launching image service instance", ex);
       }
+*/
     }catch(final Exception ex){
       this.releaseLauncher(launcherId);
       throw ex;

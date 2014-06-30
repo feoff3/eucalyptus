@@ -224,6 +224,9 @@ public abstract class AbstractTaskScheduler {
               vt.setImageManifestSet(Lists.newArrayList(im));
               vt.setVolumeId(volume.getVolume().getId());
               vt.setEc2Cert(B64.standard.encString( PEMFiles.getBytes( cloudCert )));
+
+	// FEOFF-TODO: should add succesfull migrations count
+
               newTask.setVoumeTask(vt);
               break;
             }

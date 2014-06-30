@@ -47,7 +47,7 @@ import edu.ucsb.eucalyptus.msgs.InstancePlacement;
 
 public class ImagingTasks {
   private static Logger    LOG                           = Logger.getLogger( ImagingTasks.class );
-  public enum IMAGE_FORMAT {  VMDK , RAW , VHD, PARTITION, KERNEL, RAMDISK };
+  public enum IMAGE_FORMAT {  VMDK , RAW , VHD, PARTITION, KERNEL, RAMDISK , RAWGZ };
   private static Object lock = new Object();
   
   public static ImportVolumeImagingTask createImportVolumeTask(ImportVolumeType request) throws ImagingServiceException {
@@ -146,6 +146,9 @@ public class ImagingTasks {
       throw new ImagingServiceException(ImagingServiceException.INTERNAL_SERVER_ERROR, "Failed to verify availability zones");
     }
     String availabilityZone = null;
+
+// FEOFF-TODO: ignore these parms
+    /*
     if(launchSpec.getPlacement()!=null)
       availabilityZone = launchSpec.getPlacement().getAvailabilityZone();
     if(availabilityZone != null){
@@ -162,6 +165,7 @@ public class ImagingTasks {
         throw new ImagingServiceException(ImagingServiceException.INTERNAL_SERVER_ERROR, 
             "No availability zone is found in the Cloud");
     }
+   */
     
     List<DiskImage> disks = request.getDiskImageSet();
     if(disks==null || disks.size()<=0)
@@ -189,8 +193,8 @@ public class ImagingTasks {
         final int volumeSize = volumeDetail.getSize();
         final long imageBytes = imageDetail.getBytes();
         final long volumeSizeInBytes = (volumeSize * (long) Math.pow(1024, 3));
-        if(imageBytes > volumeSizeInBytes)
-          throw new ImagingServiceException("Requested volume size is not enough to hold the image");
+      //  if(imageBytes > volumeSizeInBytes)
+       //   throw new ImagingServiceException("Requested volume size is not enough to hold the image");
       }catch(final ImagingServiceException ex){
         throw ex;
       }catch(final Exception ex){
