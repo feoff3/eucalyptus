@@ -195,8 +195,8 @@ public class ImagingTasks {
         final long volumeSizeInBytes = (volumeSize * (long) Math.pow(1024, 3));
       //  if(imageBytes > volumeSizeInBytes)
        //   throw new ImagingServiceException("Requested volume size is not enough to hold the image");
-      }catch(final ImagingServiceException ex){
-        throw ex;
+      //}catch(final ImagingServiceException ex){
+      //  throw ex;
       }catch(final Exception ex){
         throw new ImagingServiceException(ImagingServiceException.INTERNAL_SERVER_ERROR, 
             "Failed to verify the requested volume size");
