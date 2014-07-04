@@ -183,6 +183,8 @@ public class ImagingServiceProperties {
     private static boolean EmiCheckResult = true;
     @Override
     public boolean check() throws Exception {
+	return true;
+/*
       if ( CloudMetadatas.isMachineImageIdentifier( IMAGING_WORKER_EMI ) ) {
         if(CheckCounter == 3){
           try{
@@ -209,7 +211,7 @@ public class ImagingServiceProperties {
           LOG.debug( e );
         }
         return false;
-      }
+      }*/
     }
       
     @Override
