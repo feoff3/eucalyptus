@@ -38,4 +38,33 @@ public class ImagingQueryBinding extends BaseQueryBinding<OperationParameter> {
   public ImagingQueryBinding( ) {
     super( IMAGING_NAMESPACE_PATTERN, IMAGING_DEFAULT_VERSION, UnknownParameterStrategy.ERROR, OperationParameter.Action, OperationParameter.Operation );
   }
+
+@Override
+ public Object bind( final MappingHttpRequest httpRequest ) throws BindingException {
+    final String operationName = this.extractOperationName( httpRequest );
+    final String operationNameType = operationName + "Type";
+    final Map<String, String> params = httpRequest.getParameters( );
+   LOG.debug("IMAGING QUERY BINDING " + operationName + " Params:");
+
+
+     for (Map.Entry<String, String> entry : params.entrySet())
+     {
+           LOG.debug(entry.getKey() + "/" + entry.getValue());
+      }
+
+
+    Object ret;
+    try {
+	ret = super.bind(httpRequest);
+    }
+    catch ( final BindingException ex ) {
+         LOG.error("Got binding exception in Imaging binging");
+          LOG.error( ex, ex );
+          throw ex;
+        }
+   
+
+ }
+
+
 }
