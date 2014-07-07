@@ -164,7 +164,7 @@ public class BaseQueryBinding<T extends Enum<T>> extends RestfulMarshallingHandl
     this.possibleParams = Arrays.asList( operationParam.getDeclaringClass( ).getEnumConstants( ) );
   }
   
-  private String extractOperationName( final MappingHttpRequest httpRequest ) {
+  protected String extractOperationName( final MappingHttpRequest httpRequest ) {
     if ( httpRequest.getParameters( ).containsKey( this.operationParam.toString( ) ) ) {
       return httpRequest.getParameters( ).get( this.operationParam.toString( ) );
     } else {
