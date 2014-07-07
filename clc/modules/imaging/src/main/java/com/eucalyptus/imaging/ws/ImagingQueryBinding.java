@@ -68,7 +68,7 @@ public class ImagingQueryBinding extends BaseQueryBinding<OperationParameter> {
           LOG.error( ex, ex );
           throw ex;
         }
-   
+    return ret;   
 
  }
 
