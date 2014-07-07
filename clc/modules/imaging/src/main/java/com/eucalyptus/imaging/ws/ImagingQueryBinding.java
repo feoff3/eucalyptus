@@ -23,6 +23,7 @@ import com.eucalyptus.component.annotation.ComponentPart;
 import com.eucalyptus.imaging.Imaging;
 import com.eucalyptus.ws.protocol.BaseQueryBinding;
 import com.eucalyptus.ws.protocol.OperationParameter;
+import org.apache.log4j.Logger;
 
 /**
  * @author Sang-Min Park
@@ -33,6 +34,8 @@ public class ImagingQueryBinding extends BaseQueryBinding<OperationParameter> {
   static final String IMAGING_NAMESPACE_PATTERN = "http://www.eucalyptus.com/ns/imaging/%s/";
   static final String IMAGING_DEFAULT_VERSION = "2014-02-14";
   static final String IMAGING_DEFAULT_NAMESPACE = String.format( IMAGING_NAMESPACE_PATTERN, IMAGING_DEFAULT_VERSION );
+
+   private static Logger LOG = Logger.getLogger( ImagingQueryBinding.class );
 
   
   public ImagingQueryBinding( ) {
