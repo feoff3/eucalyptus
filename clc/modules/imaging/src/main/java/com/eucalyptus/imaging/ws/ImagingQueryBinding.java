@@ -23,7 +23,10 @@ import com.eucalyptus.component.annotation.ComponentPart;
 import com.eucalyptus.imaging.Imaging;
 import com.eucalyptus.ws.protocol.BaseQueryBinding;
 import com.eucalyptus.ws.protocol.OperationParameter;
+import com.eucalyptus.binding.BindingException;
 import org.apache.log4j.Logger;
+import java.util.Map;
+import com.eucalyptus.http.MappingHttpRequest;
 
 /**
  * @author Sang-Min Park
