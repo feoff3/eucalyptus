@@ -47,7 +47,7 @@ public class ImagingQueryBinding extends BaseQueryBinding<OperationParameter> {
 
 @Override
  public Object bind( final MappingHttpRequest httpRequest ) throws BindingException {
-    final String operationName = this.extractOperationName( httpRequest );
+    final String operationName = super.extractOperationName( httpRequest );
     final String operationNameType = operationName + "Type";
     final Map<String, String> params = httpRequest.getParameters( );
    LOG.debug("IMAGING QUERY BINDING " + operationName + " Params:");
