@@ -83,7 +83,7 @@ public class ComputeService {
       return AsyncRequests.sendSyncWithCurrentIdentity( Topology.lookup( Eucalyptus.class ), request );
     } catch ( final NoSuchElementException e ) {
      LOG.error("Cannot send a request in cuurent topology" , e);
-      throw new ComputeServiceUnavailableException( "Service Unavailable" );
+      throw new ComputeServiceUnavailableException( "Service Unavailable - ComputeService:;Send" );
     } catch ( final ServiceDispatchException e ) {
       final ComponentException componentException = Exceptions.findCause( e, ComponentException.class );
       if ( componentException != null && componentException.getCause( ) instanceof Exception ) {
@@ -113,7 +113,7 @@ public class ComputeService {
         case 403:
           throw new ComputeServiceAuthorizationException( code, message );
         case 503:
-          throw new ComputeServiceUnavailableException( message );
+          throw new ComputeServiceUnavailableException( message + " - remote exception" );
         default:
           throw new ComputeServiceException( code, message );
       }
