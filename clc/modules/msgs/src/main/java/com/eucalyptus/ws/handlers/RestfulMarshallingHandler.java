@@ -133,6 +133,7 @@ public abstract class RestfulMarshallingHandler extends MessageStackHandler {
   @Override
   public void incomingMessage( MessageEvent event ) throws Exception {
     if ( event.getMessage( ) instanceof MappingHttpRequest ) {
+  try {
       MappingHttpRequest httpRequest = ( MappingHttpRequest ) event.getMessage( );
       String bindingVersion = httpRequest.getParameters( ).remove( RequiredQueryParams.Version.toString( ) );
       if ( bindingVersion.matches( "\\d\\d\\d\\d-\\d\\d-\\d\\d" ) ) {
@@ -140,7 +141,7 @@ public abstract class RestfulMarshallingHandler extends MessageStackHandler {
       } else {
         this.setNamespace( BindingManager.defaultBindingName() );
       }
-      try {
+    
         BaseMessage msg = ( BaseMessage ) this.bind( httpRequest );
         httpRequest.setMessage( msg );
       } catch ( Exception e ) {
