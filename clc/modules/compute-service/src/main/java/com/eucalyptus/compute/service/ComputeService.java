@@ -43,12 +43,15 @@ import com.eucalyptus.ws.EucalyptusWebServiceException;
 import com.google.common.base.Objects;
 import edu.ucsb.eucalyptus.msgs.BaseMessage;
 import edu.ucsb.eucalyptus.msgs.BaseMessages;
-
+import org.apache.log4j.Logger;
 
 /**
  *
  */
 public class ComputeService {
+
+ private static Logger    LOG                           = Logger.getLogger( ComputeService.class );  
+
 
   public ComputeMessage dispatchAction( final ComputeMessage request ) throws EucalyptusCloudException {
     final AuthContextSupplier user = Contexts.lookup( ).getAuthContext( );
@@ -79,6 +82,7 @@ public class ComputeService {
     try {
       return AsyncRequests.sendSyncWithCurrentIdentity( Topology.lookup( Eucalyptus.class ), request );
     } catch ( final NoSuchElementException e ) {
+     LOG.error("Cannot send a request in cuurent topology" , e);
       throw new ComputeServiceUnavailableException( "Service Unavailable" );
     } catch ( final ServiceDispatchException e ) {
       final ComponentException componentException = Exceptions.findCause( e, ComponentException.class );
