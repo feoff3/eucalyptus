@@ -107,6 +107,7 @@ public class ComputeService {
       final HttpResponseStatus status = Objects.firstNonNull( remoteFault.getStatus(), HttpResponseStatus.INTERNAL_SERVER_ERROR );
       final String code = remoteFault.getFaultCode( );
       final String message = remoteFault.getFaultDetail( );
+      LOG.error("Compute: Remote service fault: " + message , e);
       switch( status.getCode( ) ) {
         case 400:
           throw new ComputeServiceClientException( code, message );
