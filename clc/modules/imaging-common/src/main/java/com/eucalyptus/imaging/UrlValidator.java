@@ -46,7 +46,12 @@ public class UrlValidator {
    * @return
    */
   public boolean isEucalyptusUrl(String url) {
-    URI in = null;
+ 
+//TODO-FEOFF: it checks for scalable Walrus (OSG). Should use it too
+    return true;
+  
+
+  /*   URI in = null;
     if (url == null)
       return false;
 
@@ -55,10 +60,7 @@ public class UrlValidator {
     } catch (URISyntaxException e) {
       return false;
     }
-    //TODO-FEOFF: it checks for scalable Walrus (OSG). Should use it too
-    return true;
-    /*
-    if ( DomainNames.isSystemSubdomain( Name.fromConstantString(in.getHost()+".") ) )
+        if ( DomainNames.isSystemSubdomain( Name.fromConstantString(in.getHost()+".") ) )
       return true;
     
     for(URI u:osgUrls){
