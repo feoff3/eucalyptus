@@ -83,6 +83,8 @@ public class ImagingServiceLaunchers {
   
   public boolean isWorkedEnabled() {
     try{
+// TODO-FEOFF: make smarter handling
+	return true;
       if(isLauncherLocked(launcherId))
         return false;
       if( tagExists() )
