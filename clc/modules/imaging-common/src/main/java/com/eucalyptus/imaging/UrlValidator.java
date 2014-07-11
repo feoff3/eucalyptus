@@ -55,7 +55,9 @@ public class UrlValidator {
     } catch (URISyntaxException e) {
       return false;
     }
-    
+    //TODO-FEOFF: it checks for scalable Walrus (OSG). Should use it too
+    return true;
+    /*
     if ( DomainNames.isSystemSubdomain( Name.fromConstantString(in.getHost()+".") ) )
       return true;
     
@@ -63,6 +65,6 @@ public class UrlValidator {
       if (u.getHost().equalsIgnoreCase(in.getHost()))
         return true;
     }
-    return false;
+    return false;*/
   }
 }

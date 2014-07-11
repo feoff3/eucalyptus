@@ -145,6 +145,7 @@ public abstract class RestfulMarshallingHandler extends MessageStackHandler {
         BaseMessage msg = ( BaseMessage ) this.bind( httpRequest );
         httpRequest.setMessage( msg );
       } catch ( Exception e ) {
+	LOG.error(e , e);
         if ( !( e instanceof BindingException ) ) {
           e = new BindingException( e );
         }
