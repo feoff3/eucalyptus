@@ -114,6 +114,7 @@ public class ImportManager {
    * </ol>
    */
   public ImportInstanceResponseType ImportInstance( final ImportInstanceType request ) throws Exception {
+    LOG.debug("New import instance task obtained");
     final ImportInstanceResponseType reply = request.getReply( );
     final Context context = Contexts.lookup( );
     try{
@@ -124,7 +125,8 @@ public class ImportManager {
     }catch(final Exception ex){
       throw new ImagingServiceException(ImagingServiceException.INTERNAL_SERVER_ERROR, "For import, Imaging service should be enabled");
     }
-    
+
+    LOG.debug("Checking auhtorization");
     try{
       if (! Permissions.isAuthorized(
           VENDOR_EC2,
@@ -141,6 +143,8 @@ public class ImportManager {
       throw new ImagingServiceException( ImagingServiceException.DEFAULT_CODE, "Not authorized to import instance." );
     }
     
+    LOG.debug("Checking imaging service launchers");
+
     try{
       if(ImagingServiceLaunchers.getInstance().shouldEnable())
         ImagingServiceLaunchers.getInstance().enable();
@@ -148,6 +152,7 @@ public class ImportManager {
       LOG.error("Failed to enable imaging service workers");
       throw new ImagingServiceException(ImagingServiceException.INTERNAL_SERVER_ERROR, "Could not launch imaging service workers");
     }
+    LOG.debug("Create imaging service task");
         
     ImportInstanceImagingTask task = null;
     try{
