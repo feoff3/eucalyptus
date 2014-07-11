@@ -85,12 +85,12 @@ public class ImagingServiceLaunchers {
     try{
 // TODO-FEOFF: make smarter handling
 	return true;
-      if(isLauncherLocked(launcherId))
+      /*if(isLauncherLocked(launcherId))
         return false;
       if( tagExists() )
         return true;
       else
-        return false;
+        return false;*/
     }catch(final Exception ex){
       return false;
     }
