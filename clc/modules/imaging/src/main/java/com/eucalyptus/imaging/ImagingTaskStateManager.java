@@ -478,15 +478,18 @@ public class ImagingTaskStateManager implements EventListener<ClockTick> {
             throw new Exception("Availability zone is missing from the volume detail");
           if(size==null || size <=0 )
             throw new Exception("Volume size is missing from the volume detail");
-          try{
+	// TODO-FEOFF: No volumes created here - this functionality is passed to imaging worker          
+        /*try{
             final String volumeId = 
                 EucalyptusActivityTasks.getInstance().createVolumeAsUser(instanceTask.getOwnerUserId(), zone, size);
             volume.getVolume().setId(volumeId);
           }catch(final Exception ex){
             throw new Exception("Failed to create the volume", ex);
-          }
+          }*/
+
         }else{
-          String volumeStatus= null;
+       // TODO-FEOFF: No volumes actually created here
+         /* String volumeStatus= null;
           try{
             final List<Volume> eucaVolumes = 
                 EucalyptusActivityTasks.getInstance().describeVolumesAsUser(instanceTask.getOwnerUserId(), Lists.newArrayList(volume.getVolume().getId()));
@@ -498,15 +501,16 @@ public class ImagingTaskStateManager implements EventListener<ClockTick> {
           if("available".equals(volumeStatus)){
             volume.setStatus("active");
             numVolumeCreated++;
-          }else if ("creating".equals(volumeStatus)){
+          }else if ("creating".equals(volumeStatus)){ */
             volume.setStatus("active");
-          }else{
+         /* }else{
             volume.setStatus("cancelled");
             volume.setStatusMessage("Failed to create the volume");
             throw new Exception("Volume "+volume.getVolume().getId()+" is in "+volumeStatus);
-          }
+          }*/
         } 
       }
+      numVolumeCreated = volumes.size();
       if(numVolumeCreated == volumes.size()){
         try{
           ImagingTasks.transitState(instanceTask, ImportTaskState.NEW, ImportTaskState.PENDING, "");
@@ -548,13 +552,16 @@ public class ImagingTaskStateManager implements EventListener<ClockTick> {
       final String zone = volumeTask.getAvailabilityZone();
       final int size = volumeTask.getVolumeSize();
       //create volume (already sanitized)
-      try{
+      // TODO-FEOFF: no volumes are actually created
+      /*try{
         final String volumeId = EucalyptusActivityTasks.getInstance().createVolumeAsUser(volumeTask.getOwnerUserId(), zone, size);
         ImagingTasks.setVolumeId(volumeTask, volumeId);
       }catch(final Exception ex){
         throw new Exception("Failed to create the volume", ex);
-      }
-    } else { /// check status
+      }*/
+    } 
+// TODO-FEOFF: commented out
+/*else { /// check status
       final List<Volume> volumes = 
           EucalyptusActivityTasks.getInstance().describeVolumesAsUser(volumeTask.getOwnerUserId(), Lists.newArrayList(volumeTask.getVolumeId()));
       final Volume volume = volumes.get(0);
@@ -575,7 +582,7 @@ public class ImagingTaskStateManager implements EventListener<ClockTick> {
       }else{
         throw new Exception("The volume "+volume.getVolumeId()+"'s state is "+volumeStatus);
       }
-    }  
+    }*/  
   }
   
   private boolean doesManifestExist(final String manifestUrl) throws Exception {
