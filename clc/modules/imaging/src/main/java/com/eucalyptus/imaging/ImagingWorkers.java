@@ -169,7 +169,6 @@ public class ImagingWorkers {
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
     // TODO-FEOFF: turned of the verification of the worker
-	return true;
 /*    if(!verifiedWorkers.contains(instanceId)){
       try{
         final List<RunningInstancesItemType> instances=
