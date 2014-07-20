@@ -171,7 +171,8 @@ public class ImagingWorkers {
   }
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
-  // FEOFF-TODO: added pad worker
+  // FEOFF-TODO: turned off verify 
+/*
   if (instanceId == PAD_WORKER)
         return;
     if(!verifiedWorkers.contains(instanceId)){
@@ -194,7 +195,7 @@ public class ImagingWorkers {
       }catch(final Exception ex){
         throw new Exception("Failed to verify imaging worker", ex);
       }
-    }
+    }*/
   }
   
   public static ImagingWorker createWorker(final String workerId){
