@@ -168,7 +168,9 @@ public class ImagingWorkers {
   }
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
-    if(!verifiedWorkers.contains(instanceId)){
+    // TODO-FEOFF: turned of the verification of the worker
+	return true;
+/*    if(!verifiedWorkers.contains(instanceId)){
       try{
         final List<RunningInstancesItemType> instances=
             EucalyptusActivityTasks.getInstance().describeSystemInstances(Lists.newArrayList(instanceId));
@@ -188,7 +190,7 @@ public class ImagingWorkers {
       }catch(final Exception ex){
         throw new Exception("Failed to verify imaging worker", ex);
       }
-    }
+    }*/
   }
   
   public static ImagingWorker createWorker(final String workerId){
