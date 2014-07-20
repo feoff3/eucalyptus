@@ -178,7 +178,7 @@ return false;
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
   // FEOFF-TODO: turned off verify for pad worker
-
+  LOG.info("Checking instanceId = " + instanceId + "for PAD_WORKER");
   if (instanceId.startsWith(PAD_WORKER))
         return;
     if(!verifiedWorkers.contains(instanceId)){
