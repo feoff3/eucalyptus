@@ -118,13 +118,15 @@ public class ImagingWorkers {
   }
   
   private static boolean isTimedOut(final ImagingWorker worker){
-    final Date lastUpdated = worker.getWorkerUpdateTime();
+// FEOFF-TODO: switched off timeout
+return false;
+    /*final Date lastUpdated = worker.getWorkerUpdateTime();
     Calendar cal = Calendar.getInstance(); // creates calendar
     cal.setTime(lastUpdated); // sets calendar time/date
     cal.add(Calendar.MINUTE, WORKER_TIMEOUT_MIN); // adds 5 minutes
     final Date expirationTime = cal.getTime(); //
 
-    return expirationTime.before(new Date());
+    return expirationTime.before(new Date());*/
   }
 
   public static boolean hasWorker(final String workerId){
