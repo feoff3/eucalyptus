@@ -51,6 +51,9 @@ import edu.ucsb.eucalyptus.msgs.RunningInstancesItemType;
 public class ImagingWorkers {
   private static Logger LOG = Logger.getLogger( ImagingWorkers.class );
   public static final int WORKER_TIMEOUT_MIN = 10;
+  // FEOFF-TODO: the pad worker should not be checked
+  public static final String PAD_WORKER = "PadWorker";
+
   private static Set<String> verifiedWorkers = new HashSet<String>();
   public static class ImagingWorkerStateManager implements EventListener<ClockTick> {
     public static void register( ) {
@@ -168,8 +171,10 @@ public class ImagingWorkers {
   }
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
-    // TODO-FEOFF: turned of the verification of the worker
-/*    if(!verifiedWorkers.contains(instanceId)){
+  // FEOFF-TODO: added pad worker
+  if (instanceId == PAD_WORKER)
+        return;
+    if(!verifiedWorkers.contains(instanceId)){
       try{
         final List<RunningInstancesItemType> instances=
             EucalyptusActivityTasks.getInstance().describeSystemInstances(Lists.newArrayList(instanceId));
@@ -189,10 +194,19 @@ public class ImagingWorkers {
       }catch(final Exception ex){
         throw new Exception("Failed to verify imaging worker", ex);
       }
-    }*/
+    }
   }
   
   public static ImagingWorker createWorker(final String workerId){
+  // FEOFF-TODO: added pad worker
+ if (instanceId == PAD_WORKER) {
+         final ImagingWorker worker = new ImagingWorker(ImagingWorker.STATE.RUNNING, workerId);
+        worker.setWorkerUpdateTime();
+        worker.setAvailabilityZone(availabilityZone);
+        Entities.persist(worker);
+        db.commit();
+        return worker;
+}
     String availabilityZone = null;
     try{
       final List<RunningInstancesItemType> instances =
