@@ -143,8 +143,11 @@ return false;
   
   public static boolean canAllocate(final String workerId) {
     final ImagingWorker worker = getWorker(workerId);
-    if(worker==null)
+    if(worker==null)    {
+      LOG.warn("Cannot find worker " + workerId);
       return false;
+    }
+    LOG.warn("State of  " + workerId  +  " worker :" + worker.getState().toString() );
     return ImagingWorker.STATE.RUNNING.equals(worker.getState());
   }
   
