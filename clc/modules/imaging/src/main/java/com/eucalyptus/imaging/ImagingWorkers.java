@@ -92,13 +92,14 @@ public class ImagingWorkers {
           final ImagingTask task = ImagingTasks.getConvertingTaskByWorkerId(worker.getDisplayName());
           if(task!=null && ImportTaskState.CONVERTING.equals(task.getState())) {
             ImagingTasks.killAndRerunTask(task.getDisplayName());
-            LOG.debug(String.format("Imaging worker task %s is moved back into queue", task.getDisplayName()));
+            LOG.warn(String.format("Imaging worker task %s is moved back into queue", task.getDisplayName()));
           }
+          LOG.warn("Decomissioning " +worker.getDisplayName() );
           decommisionWorker(worker.getDisplayName());
         }
         
         for(final ImagingWorker worker : toRemove){
-          LOG.debug("Forgetting about imaging worker "+worker.getDisplayName());
+          LOG.warn("Forgetting about imaging worker "+worker.getDisplayName());
           removeWorker(worker.getDisplayName());
         }
       }catch(final Exception ex){
