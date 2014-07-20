@@ -198,20 +198,14 @@ public class ImagingWorkers {
   }
   
   public static ImagingWorker createWorker(final String workerId){
-  // FEOFF-TODO: added pad worker
- if (instanceId == PAD_WORKER) {
-         final ImagingWorker worker = new ImagingWorker(ImagingWorker.STATE.RUNNING, workerId);
-        worker.setWorkerUpdateTime();
-        worker.setAvailabilityZone(availabilityZone);
-        Entities.persist(worker);
-        db.commit();
-        return worker;
-}
     String availabilityZone = null;
     try{
+  // FEOFF-TODO: skip pad worker
+     if (workerId != PAD_WORKER) {
       final List<RunningInstancesItemType> instances =
           EucalyptusActivityTasks.getInstance().describeSystemInstances(Lists.newArrayList(workerId));
-      availabilityZone = instances.get(0).getPlacement();
+      availabilityZone = instances.get(0).getPlacement(); 
+    }
     }catch(final Exception ex){
       throw Exceptions.toUndeclared("Unable to find the instance named: "+workerId);
     }
