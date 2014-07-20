@@ -179,7 +179,7 @@ return false;
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
   // FEOFF-TODO: turned off verify for pad worker
 
-  if (instanceId.equals(PAD_WORKER))
+  if (instanceId.startsWith(PAD_WORKER))
         return;
     if(!verifiedWorkers.contains(instanceId)){
       try{
@@ -206,7 +206,7 @@ return false;
   
   public static ImagingWorker createWorker(final String workerId){
     String availabilityZone = null;
-   if (workerId.equals(PAD_WORKER) == false) {
+   if (workerId.startsWith(PAD_WORKER) == false) {
 
     try{
   // FEOFF-TODO: skip pad worker
