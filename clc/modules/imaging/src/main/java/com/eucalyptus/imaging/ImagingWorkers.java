@@ -200,15 +200,16 @@ public class ImagingWorkers {
   
   public static ImagingWorker createWorker(final String workerId){
     String availabilityZone = null;
+   if (workerId.equals(PAD_WORKER) == false) {
+
     try{
   // FEOFF-TODO: skip pad worker
-     if (workerId.equals(PAD_WORKER) == false) {
-      final List<RunningInstancesItemType> instances =
+           final List<RunningInstancesItemType> instances =
           EucalyptusActivityTasks.getInstance().describeSystemInstances(Lists.newArrayList(workerId));
       availabilityZone = instances.get(0).getPlacement(); 
-    }
     }catch(final Exception ex){
       throw Exceptions.toUndeclared("Unable to find the instance named: "+workerId);
+    }
     }
     
     try ( final TransactionResource db =
