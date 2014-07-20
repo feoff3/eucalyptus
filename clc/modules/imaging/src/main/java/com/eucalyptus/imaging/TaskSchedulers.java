@@ -76,8 +76,9 @@ public class TaskSchedulers {
             for(final ImportInstanceVolumeDetail volume : ((ImportInstanceImagingTask)task).getVolumes()){
               final String importManifestUrl = volume.getImage().getImportManifestUrl();
               /// this volume is not yet converted and the zone matches
-              if(! ((ImportInstanceImagingTask)task).hasDownloadManifestUrl(importManifestUrl) &&
-                  availabilityZone.equals(volume.getAvailabilityZone())){
+	// TODO-FEOFF: ignore volume , it's not created
+              if(! ((ImportInstanceImagingTask)task).hasDownloadManifestUrl(importManifestUrl) /*&&
+                  availabilityZone.equals(volume.getAvailabilityZone()) */){
                 clusterFound = true;
                 break;
               }
