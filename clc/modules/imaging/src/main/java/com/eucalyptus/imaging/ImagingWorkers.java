@@ -171,9 +171,9 @@ public class ImagingWorkers {
   }
   
   public static void verifyWorker(final String instanceId, final String remoteHost) throws Exception{
-  // FEOFF-TODO: turned off verify 
-/*
-  if (instanceId == PAD_WORKER)
+  // FEOFF-TODO: turned off verify for pad worker
+
+  if (instanceId.equals(PAD_WORKER))
         return;
     if(!verifiedWorkers.contains(instanceId)){
       try{
@@ -195,14 +195,14 @@ public class ImagingWorkers {
       }catch(final Exception ex){
         throw new Exception("Failed to verify imaging worker", ex);
       }
-    }*/
+    }
   }
   
   public static ImagingWorker createWorker(final String workerId){
     String availabilityZone = null;
     try{
   // FEOFF-TODO: skip pad worker
-     if (workerId != PAD_WORKER) {
+     if (workerId.equals(PAD_WORKER) == false) {
       final List<RunningInstancesItemType> instances =
           EucalyptusActivityTasks.getInstance().describeSystemInstances(Lists.newArrayList(workerId));
       availabilityZone = instances.get(0).getPlacement(); 
